@@ -1,0 +1,13 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "caterm",
+  "outputfilename": "caterm_new",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Cecep Saeful Azhar Hidayat, ST",
+    "email": "122300501+cecep-azhar@users.noreply.github.com"
+  }
+}
