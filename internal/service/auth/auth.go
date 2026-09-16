@@ -32,6 +32,15 @@ func New(v *vault.Vault, db vault.DB) *Service {
 	}
 }
 
+func (s *Service) IsInitialized(ctx context.Context) (bool, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM vault_meta").Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func (s *Service) Init(ctx context.Context, password string) error {
 	if len(password) < 12 {
 		return errors.New("password must be at least 12 characters")

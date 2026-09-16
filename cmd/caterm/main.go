@@ -2,19 +2,39 @@ package main
 
 import (
 	"embed"
+	"log"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+
+	"caterm/internal/config"
+	"caterm/internal/service/auth"
+	"caterm/internal/store"
+	"caterm/internal/vault"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	app := NewApp()
+	dbPath, err := config.GetDBPath()
+	if err != nil {
+		log.Fatalf("failed to get db path: %v", err)
+	}
 
-	err := wails.Run(&options.App{
+	db, err := store.Open(dbPath)
+	if err != nil {
+		log.Fatalf("failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	v := vault.NewVault()
+	authService := auth.New(v, db)
+
+	app := NewApp(authService)
+
+	err = wails.Run(&options.App{
 		Title:  "caterm",
 		Width:  1024,
 		Height: 768,
