@@ -76,3 +76,10 @@ func (s *Service) Unlock(ctx context.Context, password string) error {
 	s.fails = 0
 	return nil
 }
+
+func (s *Service) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
+	if len(newPassword) < 12 {
+		return errors.New("new password must be at least 12 characters")
+	}
+	return s.v.ChangePassword(ctx, s.db, oldPassword, newPassword)
+}

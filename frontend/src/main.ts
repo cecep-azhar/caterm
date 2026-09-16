@@ -1,163 +1,153 @@
-import './style.css';
-import '@xterm/xterm/css/xterm.css';
+import { IsInitialized, Setup, Unlock } from "../wailsjs/go/main/App";
 
-import { Terminal } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import { IsInitialized, Setup, Unlock } from '../wailsjs/go/main/App';
+document.addEventListener("DOMContentLoaded", async () => {
+    const app = document.getElementById("app");
+    if (!app) return;
 
-const appDiv = document.querySelector('#app')!;
-
-function renderSetup() {
-  appDiv.innerHTML = `
-    <div class="flex items-center justify-center h-screen w-screen bg-gray-100 dark:bg-gray-900">
-      <div class="p-8 bg-white dark:bg-gray-800 rounded shadow-md w-96">
-        <h2 class="text-2xl font-bold mb-4">Setup Master Password</h2>
-        <input type="password" id="password" class="w-full p-2 border rounded mb-4 text-black" placeholder="Password (min 12 chars)" />
-        <div class="mb-4">
-          <label class="flex items-center space-x-2">
-            <input type="checkbox" id="acknowledge" />
-            <span class="text-sm">I acknowledge that if I lose this password, there is NO recovery.</span>
-          </label>
-        </div>
-        <button id="setupBtn" class="w-full bg-blue-500 text-white p-2 rounded disabled:opacity-50" disabled>Setup Vault</button>
-        <div id="errorMsg" class="text-red-500 mt-2 text-sm hidden"></div>
-      </div>
-    </div>
-  `;
-
-  const pwInput = document.getElementById('password') as HTMLInputElement;
-  const ackCheck = document.getElementById('acknowledge') as HTMLInputElement;
-  const setupBtn = document.getElementById('setupBtn') as HTMLButtonElement;
-  const errorMsg = document.getElementById('errorMsg') as HTMLDivElement;
-
-  ackCheck.addEventListener('change', () => {
-    setupBtn.disabled = !ackCheck.checked;
-  });
-
-  setupBtn.addEventListener('click', async () => {
-    const pwd = pwInput.value;
-    if (pwd.length < 12) {
-      errorMsg.textContent = "Password must be at least 12 characters";
-      errorMsg.classList.remove('hidden');
-      return;
-    }
-    
     try {
-      await Setup(pwd);
-      renderDashboard();
-    } catch (e: any) {
-      errorMsg.textContent = e;
-      errorMsg.classList.remove('hidden');
+        const isInit = await IsInitialized();
+        if (isInit) {
+            renderUnlock(app);
+        } else {
+            renderSetup(app);
+        }
+    } catch (e) {
+        console.error("Failed to check initialization status:", e);
+        app.innerHTML = `<div class="text-red-500">Error: ${e}</div>`;
     }
-  });
-}
+});
 
-function renderUnlock() {
-  appDiv.innerHTML = `
-    <div class="flex items-center justify-center h-screen w-screen bg-gray-100 dark:bg-gray-900">
-      <div id="lockContainer" class="p-8 bg-white dark:bg-gray-800 rounded shadow-md w-96 transition-transform">
-        <h2 class="text-2xl font-bold mb-4">Unlock Vault</h2>
-        <input type="password" id="password" class="w-full p-2 border rounded mb-4 text-black" placeholder="Master Password" />
-        <button id="unlockBtn" class="w-full bg-blue-500 text-white p-2 rounded">Unlock</button>
-        <div id="errorMsg" class="text-red-500 mt-2 text-sm hidden"></div>
-      </div>
-    </div>
-  `;
-
-  const pwInput = document.getElementById('password') as HTMLInputElement;
-  const unlockBtn = document.getElementById('unlockBtn') as HTMLButtonElement;
-  const errorMsg = document.getElementById('errorMsg') as HTMLDivElement;
-  const lockContainer = document.getElementById('lockContainer') as HTMLDivElement;
-
-  const shake = () => {
-    lockContainer.animate([
-      { transform: 'translateX(0)' },
-      { transform: 'translateX(-10px)' },
-      { transform: 'translateX(10px)' },
-      { transform: 'translateX(-10px)' },
-      { transform: 'translateX(10px)' },
-      { transform: 'translateX(0)' }
-    ], { duration: 400 });
-  };
-
-  unlockBtn.addEventListener('click', async () => {
-    try {
-      await Unlock(pwInput.value);
-      renderDashboard();
-    } catch (e: any) {
-      errorMsg.textContent = e;
-      errorMsg.classList.remove('hidden');
-      shake();
-    }
-  });
-
-  pwInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') unlockBtn.click();
-  });
-}
-
-function renderDashboard() {
-  appDiv.innerHTML = `
-    <div class="flex h-screen w-screen overflow-hidden">
-      <!-- Sidebar -->
-      <div class="w-64 flex-shrink-0 border-r border-gray-200 dark:border-gray-700" style="background-color: var(--sidebar-bg)">
-        <div class="p-4">
-          <h2 class="text-lg font-semibold">CATERM</h2>
-          <ul class="mt-4 space-y-2">
-            <li class="p-2 bg-gray-200 dark:bg-gray-800 rounded">Groups</li>
-            <li class="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded cursor-pointer">Hosts</li>
-            <li class="p-2 hover:bg-gray-200 dark:hover:bg-gray-800 rounded cursor-pointer">Snippets</li>
-          </ul>
+function renderSetup(container: HTMLElement) {
+    container.innerHTML = `
+        <div class="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+            <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-96">
+                <h1 class="text-2xl font-bold mb-4">Welcome to CATERM</h1>
+                <p class="mb-4 text-gray-300">Let's set up your master password.</p>
+                <form id="setup-form" class="space-y-4">
+                    <div>
+                        <input type="password" id="password" placeholder="Master Password (min 12 chars)" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500" required>
+                        <div id="password-strength" class="h-2 mt-1 rounded bg-gray-600 transition-all duration-300"></div>
+                        <p id="password-error" class="text-red-400 text-sm hidden"></p>
+                    </div>
+                    <div>
+                        <input type="password" id="confirm-password" placeholder="Confirm Password" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500" required>
+                    </div>
+                    <div class="flex items-start">
+                        <input type="checkbox" id="acknowledge" class="mt-1 mr-2" required>
+                        <label for="acknowledge" class="text-sm text-gray-400">I understand there is no recovery option if I lose this password.</label>
+                    </div>
+                    <button type="submit" id="submit-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50 disabled:cursor-not-allowed" disabled>Initialize Vault</button>
+                </form>
+            </div>
         </div>
-      </div>
+    `;
 
-      <!-- Main Content -->
-      <div class="flex-1 flex flex-col min-w-0">
-        <!-- Topbar -->
-        <div class="h-12 border-b border-gray-200 dark:border-gray-700 flex items-center px-4 space-x-2" style="background-color: var(--topbar-bg)">
-          <div class="px-3 py-1 bg-white dark:bg-gray-900 rounded shadow-sm text-sm border border-gray-200 dark:border-gray-600">
-            Terminal 1
-          </div>
-        </div>
+    const form = document.getElementById("setup-form") as HTMLFormElement;
+    const pwdInput = document.getElementById("password") as HTMLInputElement;
+    const confirmInput = document.getElementById("confirm-password") as HTMLInputElement;
+    const ackInput = document.getElementById("acknowledge") as HTMLInputElement;
+    const submitBtn = document.getElementById("submit-btn") as HTMLButtonElement;
+    const strengthIndicator = document.getElementById("password-strength") as HTMLDivElement;
+    const errorText = document.getElementById("password-error") as HTMLParagraphElement;
 
-        <!-- Terminal Area -->
-        <div class="flex-1 relative bg-black p-2">
-          <div id="terminal-container" class="absolute inset-0 p-2"></div>
-        </div>
-      </div>
-    </div>
-  `;
+    const validateForm = () => {
+        const pwd = pwdInput.value;
+        let valid = true;
+        let strength = 0;
+        
+        if (pwd.length >= 12) {
+             strength = 33;
+             if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) strength += 33;
+             if (/[0-9]/.test(pwd) || /[^A-Za-z0-9]/.test(pwd)) strength += 34;
+        }
 
-  const termContainer = document.getElementById('terminal-container')!;
-  const term = new Terminal({
-    scrollback: 10000,
-    theme: { background: '#000000', foreground: '#ffffff' }
-  });
+        strengthIndicator.style.width = `${strength}%`;
+        if (strength < 33) {
+            strengthIndicator.className = "h-2 mt-1 rounded transition-all duration-300 bg-red-500";
+            errorText.textContent = "Password must be at least 12 characters.";
+            errorText.classList.remove("hidden");
+            valid = false;
+        } else if (strength < 66) {
+             strengthIndicator.className = "h-2 mt-1 rounded transition-all duration-300 bg-yellow-500";
+             errorText.classList.add("hidden");
+        } else {
+             strengthIndicator.className = "h-2 mt-1 rounded transition-all duration-300 bg-green-500";
+             errorText.classList.add("hidden");
+        }
 
-  const fitAddon = new FitAddon();
-  term.loadAddon(fitAddon);
-  term.open(termContainer);
-  fitAddon.fit();
+        if (pwd !== confirmInput.value && confirmInput.value !== "") {
+            valid = false;
+        }
 
-  term.writeln('Welcome to CATERM Shell UI Demo!');
-  term.write('$ ');
+        if (!ackInput.checked) valid = false;
 
-  window.addEventListener('resize', () => {
-    fitAddon.fit();
-  });
+        submitBtn.disabled = !valid;
+    };
+
+    pwdInput.addEventListener("input", validateForm);
+    confirmInput.addEventListener("input", validateForm);
+    ackInput.addEventListener("change", validateForm);
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+            await Setup(pwdInput.value);
+            renderUnlock(container);
+        } catch (err: any) {
+             errorText.textContent = err.toString();
+             errorText.classList.remove("hidden");
+        }
+    });
 }
 
-async function init() {
-  try {
-    const initialized = await IsInitialized();
-    if (initialized) {
-      renderUnlock();
-    } else {
-      renderSetup();
-    }
-  } catch (e) {
-    console.error("Initialization error:", e);
-  }
+function renderUnlock(container: HTMLElement) {
+    container.innerHTML = `
+        <div id="unlock-container" class="min-h-screen flex items-center justify-center bg-gray-900 text-white transition-transform duration-100">
+            <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-96">
+                <h1 class="text-2xl font-bold mb-4">Unlock Vault</h1>
+                <form id="unlock-form" class="space-y-4">
+                    <div>
+                        <input type="password" id="unlock-password" placeholder="Master Password" class="w-full p-2 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:border-blue-500" required>
+                        <p id="unlock-error" class="text-red-400 text-sm hidden mt-1"></p>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Unlock</button>
+                </form>
+            </div>
+        </div>
+    `;
+
+    const form = document.getElementById("unlock-form") as HTMLFormElement;
+    const pwdInput = document.getElementById("unlock-password") as HTMLInputElement;
+    const errorText = document.getElementById("unlock-error") as HTMLParagraphElement;
+    const unlockContainer = document.getElementById("unlock-container") as HTMLDivElement;
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        try {
+            await Unlock(pwdInput.value);
+            renderDashboard(container);
+        } catch (err: any) {
+             errorText.textContent = err.toString();
+             errorText.classList.remove("hidden");
+             
+             // Shake effect
+             unlockContainer.classList.add("translate-x-2");
+             setTimeout(() => unlockContainer.classList.replace("translate-x-2", "-translate-x-2"), 50);
+             setTimeout(() => unlockContainer.classList.replace("-translate-x-2", "translate-x-2"), 100);
+             setTimeout(() => unlockContainer.classList.replace("translate-x-2", "-translate-x-2"), 150);
+             setTimeout(() => unlockContainer.classList.remove("-translate-x-2"), 200);
+             
+             pwdInput.value = "";
+             pwdInput.focus();
+        }
+    });
 }
 
-init();
+function renderDashboard(container: HTMLElement) {
+    container.innerHTML = `
+        <div class="min-h-screen bg-gray-900 text-white p-4">
+            <h1 class="text-2xl font-bold">Dashboard</h1>
+            <p>Vault unlocked successfully.</p>
+        </div>
+    `;
+}

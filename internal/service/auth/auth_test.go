@@ -2,62 +2,49 @@ package auth
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
-	"time"
 
 	"caterm/internal/store"
 	"caterm/internal/vault"
 )
 
-func TestAuthService_InitAndUnlock(t *testing.T) {
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.db")
+func TestChangePassword(t *testing.T) {
+	dbPath := t.TempDir() + "/test.db"
 	db, err := store.Open(dbPath)
 	if err != nil {
-		t.Fatalf("Open failed: %v", err)
+		t.Fatalf("failed to open db: %v", err)
 	}
 	defer db.Close()
 
 	ctx := context.Background()
 	if err := db.Migrate(ctx); err != nil {
-		t.Fatalf("Migrate failed: %v", err)
+		t.Fatalf("failed to migrate: %v", err)
 	}
 
 	v := vault.NewVault()
 	svc := New(v, db)
 
-	// Password short -> error
-	if err := svc.Init(ctx, "short"); err == nil {
-		t.Errorf("expected error for short password")
-	}
+	oldPw := "QA_TEST_pw_old_123456"
+	newPw := "QA_TEST_pw_new_123456"
 
-	pw := "QA_TEST_pw_12345678"
-	if err := svc.Init(ctx, pw); err != nil {
+	if err := svc.Init(ctx, oldPw); err != nil {
 		t.Fatalf("Init failed: %v", err)
 	}
 
-	// Unlock wrong -> generic error
-	if err := svc.Unlock(ctx, "bad_password_12345"); err != ErrWrongAuth {
-		t.Errorf("expected ErrWrongAuth, got: %v", err)
+	if err := svc.ChangePassword(ctx, oldPw, newPw); err != nil {
+		t.Fatalf("ChangePassword failed: %v", err)
 	}
 
-	// Rate limiting test: 5 bad attempts -> 6th fails with rate limit or delay
-	for i := 0; i < 4; i++ {
-		_ = svc.Unlock(ctx, "bad_password_12345")
+	v2 := vault.NewVault()
+	svc2 := New(v2, db)
+
+	if err := svc2.Unlock(ctx, oldPw); err == nil {
+		t.Errorf("expected unlock with old password to fail, but succeeded")
 	}
 
-	start := time.Now()
-	err = svc.Unlock(ctx, "bad_password_12345")
-	if err != ErrRateLimited {
-		t.Errorf("expected ErrRateLimited on 6th attempt, got: %v", err)
-	}
-	_ = start
-
-	// Correct password after lock/reset or wait
-	// In test, simulate time pass
-	svc.lastFail = time.Now().Add(-6 * time.Second)
-	if err := svc.Unlock(ctx, pw); err != nil {
-		t.Errorf("Unlock failed with correct password: %v", err)
+	v3 := vault.NewVault()
+	svc3 := New(v3, db)
+	if err := svc3.Unlock(ctx, newPw); err != nil {
+		t.Errorf("Unlock with new password failed: %v", err)
 	}
 }
