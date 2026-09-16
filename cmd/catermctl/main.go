@@ -20,6 +20,8 @@ func main() {
 		cmdDb(os.Args[2:], config.DataPath())
 	case "vault":
 		cmdVault(os.Args[2:])
+	case "group":
+		cmdGroup(os.Args[2:])
 	case "util":
 		cmdUtil(os.Args[2:])
 	default:
