@@ -1,15 +1,19 @@
 package main
 
 import (
+	"caterm/internal/service/auth"
 	"context"
 )
 
 type App struct {
-	ctx context.Context
+	ctx         context.Context
+	authService *auth.Service
 }
 
-func NewApp() *App {
-	return &App{}
+func NewApp(authService *auth.Service) *App {
+	return &App{
+		authService: authService,
+	}
 }
 
 func (a *App) startup(ctx context.Context) {

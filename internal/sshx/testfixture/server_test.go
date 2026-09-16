@@ -184,7 +184,7 @@ func TestPublicKeyAuth(t *testing.T) {
 		Auth: []gossh.AuthMethod{
 			gossh.PublicKeys(clientSigner),
 		},
-		HostKeyCallback: gossh.InsecureIgnoreHostKey(),
+		HostKeyCallback: func(hostname string, remote net.Addr, key gossh.PublicKey) error { return nil },
 		Timeout:         5 * time.Second,
 	}
 

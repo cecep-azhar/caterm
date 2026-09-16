@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"log"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -18,14 +17,12 @@ import (
 var assets embed.FS
 
 func main() {
-	dbPath, err := config.GetDBPath()
-	if err != nil {
-		log.Fatalf("failed to get db path: %v", err)
-	}
+	dbPath := config.DataPath()
 
 	db, err := store.Open(dbPath)
 	if err != nil {
-		log.Fatalf("failed to open database: %v", err)
+		println("failed to open database:", err.Error())
+		return
 	}
 	defer db.Close()
 
