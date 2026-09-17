@@ -6,6 +6,10 @@ export function AckTerminal(arg1, arg2) {
   return window['go']['main']['App']['AckTerminal'](arg1, arg2);
 }
 
+export function Activity() {
+  return window['go']['main']['App']['Activity']();
+}
+
 export function AddSSHKey(arg1, arg2) {
   return window['go']['main']['App']['AddSSHKey'](arg1, arg2);
 }
@@ -90,10 +94,6 @@ export function GetSyncPath() {
   return window['go']['main']['App']['GetSyncPath']();
 }
 
-export function Greet(arg1) {
-  return window['go']['main']['App']['Greet'](arg1);
-}
-
 export function HardDeleteRecord(arg1, arg2) {
   return window['go']['main']['App']['HardDeleteRecord'](arg1, arg2);
 }
@@ -126,6 +126,10 @@ export function ListTeams() {
   return window['go']['main']['App']['ListTeams']();
 }
 
+export function Lock() {
+  return window['go']['main']['App']['Lock']();
+}
+
 export function LogCommand(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['LogCommand'](arg1, arg2, arg3, arg4);
 }
@@ -134,8 +138,8 @@ export function OpenDonationLink() {
   return window['go']['main']['App']['OpenDonationLink']();
 }
 
-export function ResetVault() {
-  return window['go']['main']['App']['ResetVault']();
+export function ResetVault(arg1) {
+  return window['go']['main']['App']['ResetVault'](arg1);
 }
 
 export function ResizeTerminal(arg1, arg2, arg3) {

@@ -30,6 +30,11 @@ func (s *Service) LogCommand(ctx context.Context, hostID, command, output string
 	now := time.Now().UTC()
 	id := uuid.NewString()
 
+	// Truncate output to 5KB max to prevent bloat/leakage
+	if len(output) > 5000 {
+		output = output[:5000] + "...[TRUNCATED]"
+	}
+
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO audit_logs (id, host_id, command, output, exit_code, created_at)
 		VALUES (?, ?, ?, ?, ?, ?)
