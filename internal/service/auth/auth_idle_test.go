@@ -24,7 +24,7 @@ func TestIdleAutoLock(t *testing.T) {
 
 	v := vault.NewVault()
 	s := New(v, db)
-	s.SetIdleTimeout(10 * time.Millisecond) // Short timeout for testing
+	s.SetIdleTimeout(100 * time.Millisecond) // Short timeout for testing
 
 	// Init and unlock
 	err = s.Init(ctx, "QA_TEST_pw_12345678")
@@ -40,7 +40,7 @@ func TestIdleAutoLock(t *testing.T) {
 	}
 
 	// Wait longer than idle timeout
-	time.Sleep(50 * time.Millisecond)
+	time.Sleep(150 * time.Millisecond)
 
 	if v.IsUnlocked() {
 		t.Errorf("Vault should be locked after idle timeout")
@@ -52,15 +52,15 @@ func TestIdleAutoLock(t *testing.T) {
 		t.Fatalf("Unlock failed: %v", err)
 	}
 
-	time.Sleep(5 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 	s.Activity()                     // Reset timer
-	time.Sleep(8 * time.Millisecond) // Total 13ms, but timer was reset at 5ms
+	time.Sleep(80 * time.Millisecond) // Total 130ms, but timer was reset at 50ms
 
 	if !v.IsUnlocked() {
 		t.Errorf("Vault should still be unlocked because of activity")
 	}
 
-	time.Sleep(10 * time.Millisecond) // Now let it expire
+	time.Sleep(150 * time.Millisecond) // Now let it expire
 	if v.IsUnlocked() {
 		t.Errorf("Vault should be locked after second idle period")
 	}
