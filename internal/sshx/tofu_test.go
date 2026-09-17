@@ -88,9 +88,18 @@ func TestHostKeyChanged(t *testing.T) {
 	client.Close()
 
 	newHostKey, _ := testfixture.GenerateHostKey()
-	server.ChangeHostKey(newHostKey)
+	server.Close()
 
-	client, err = ssh.Dial("tcp", server.Addr(), clientConfig)
+	server2, err := testfixture.NewServer(testfixture.Config{
+		Password: "testpass",
+		HostKey:  newHostKey,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server2: %v", err)
+	}
+	defer server2.Close()
+
+	client, err = ssh.Dial("tcp", server2.Addr(), clientConfig)
 	if err == nil {
 		client.Close()
 		t.Fatalf("expected dial error on host key mismatch, got success")

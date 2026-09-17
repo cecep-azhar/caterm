@@ -33,6 +33,12 @@ func main() {
 		cmdUtil(os.Args[2:])
 	case "ssh":
 		handleSSH(os.Args[2:])
+	case "bench":
+		if len(os.Args) < 3 || os.Args[2] != "pty" {
+			fmt.Println("Usage: catermctl bench pty [--panes N] [--duration Ns] [--json]")
+			os.Exit(1)
+		}
+		runBenchPty(os.Args[3:])
 	default:
 		fmt.Printf("Unknown command: %s\n", os.Args[1])
 		os.Exit(1)

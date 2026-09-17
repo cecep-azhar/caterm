@@ -141,7 +141,19 @@ func TestHostKeyChange(t *testing.T) {
 	}
 
 	// 2. Server changes host key
-	server.ChangeHostKey(key2)
+	// Due to data races in glider-ssh when modifying keys on the fly,
+	// we shut down the first server and start a new one on the same (or new) port
+	// to simulate the host key changing.
+	server.Close()
+
+	server2, err := testfixture.NewServer(testfixture.Config{
+		Password: "QA_TEST_pass",
+		HostKey:  key2,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server2: %v", err)
+	}
+	defer server2.Close()
 
 	// 3. Second connection should receive key2
 	var receivedKey2 gossh.PublicKey
@@ -150,7 +162,7 @@ func TestHostKeyChange(t *testing.T) {
 		return nil
 	}
 
-	c2, err := gossh.Dial("tcp", server.Addr(), clientConfig)
+	c2, err := gossh.Dial("tcp", server2.Addr(), clientConfig)
 	if err != nil {
 		t.Fatalf("failed second dial: %v", err)
 	}
