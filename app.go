@@ -66,9 +66,7 @@ func (a *App) startup(ctx context.Context) {
 	a.terminalService.SetEventEmitter(runtime.EventsEmit)
 }
 
-func (a *App) Greet(name string) string {
-	return "Hello " + name
-}
+
 
 func (a *App) IsInitialized() (bool, error) {
 	if a.ctx == nil {
