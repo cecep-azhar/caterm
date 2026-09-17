@@ -81,7 +81,7 @@ func (s *Service) StartSession(paneID string, sess *sshx.Session, client *ssh.Cl
 
 			// Wails events are used to send output to frontend, skip in tests
 			if s.ctx != nil && !s.isTest {
-				s.emitEvent(ctx, fmt.Sprintf("terminal:output:%s", paneID), data)
+				s.emitEvent(ctx, fmt.Sprintf("terminal:output:%s", paneID), string(data))
 			}
 		})
 	}()

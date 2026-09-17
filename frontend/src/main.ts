@@ -3,7 +3,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
 import { EventsOn, EventsOff } from "../wailsjs/runtime/runtime";
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal, GetAIConfig, SaveAIConfig, AskAI } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal, GetAIConfig, SaveAIConfig, AskAI, ListSSHKeys, GenerateSSHKey, DeleteSSHKey, ListAuditLogs, ClearAuditLogs, ListSnippets, CreateSnippet, DeleteSnippet, ListTeams, CreateTeam, DeleteTeam } from "../wailsjs/go/main/App";
 
 let activeTab = "hosts";
 let editingHostId: string | null = null;
@@ -294,7 +294,8 @@ async function renderDashboard(container: HTMLElement) {
         { id: "port_forwarding", label: "Port forwarding", icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>' },
         { id: "monitoring", label: "Monitoring", icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>' },
         { id: "command_logs", label: "Command logs", icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>' },
-        { id: "ssh_keys", label: "SSH keys", icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>' }
+        { id: "ssh_keys", label: "SSH keys", icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>' },
+        { id: "settings", label: "Settings", icon: '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>' }
     ];
 
     container.innerHTML = `
@@ -351,6 +352,16 @@ async function renderDashboard(container: HTMLElement) {
         renderHostsView(mainView, container, hosts, groups);
     } else if (activeTab === "groups") {
         renderGroupsView(mainView, container, groups);
+    } else if (activeTab === "snippets") {
+        renderSnippetsView(mainView, container);
+    } else if (activeTab === "teams") {
+        renderTeamsView(mainView, container);
+    } else if (activeTab === "ssh_keys") {
+        renderSSHKeysView(mainView, container);
+    } else if (activeTab === "command_logs") {
+        renderAuditLogsView(mainView, container);
+    } else if (activeTab === "settings") {
+        renderSettingsView(mainView, container);
     } else {
         renderGenericView(mainView, activeTab);
     }
@@ -1032,4 +1043,375 @@ function renderGenericView(mainView: HTMLElement, tabId: string) {
             </span>
         </div>
     `;
+}
+// Module Renderers for Snippets, Teams, SSH Keys, and Audit Logs
+
+async function renderSnippetsView(mainView: HTMLElement, container: HTMLElement) {
+    let snippets: any[] = [];
+    try {
+        snippets = await ListSnippets() || [];
+    } catch (e) {
+        console.error("Failed to load snippets", e);
+    }
+
+    mainView.innerHTML = `
+        <div class="px-8 py-6 border-b border-[#30363d] flex justify-between items-center bg-[#0d1117]">
+            <div>
+                <h2 class="text-xl font-bold text-white">Command Snippets</h2>
+                <p class="text-sm text-[#8b949e]">Save and quickly execute reusable shell scripts across hosts</p>
+            </div>
+            <button id="btn-add-snippet" class="bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2 px-4 rounded-md text-sm flex items-center shadow-md transition-colors">
+                + Add Snippet
+            </button>
+        </div>
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${snippets.map(s => `
+                    <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-5 flex flex-col justify-between hover:border-[#58a6ff] transition-all shadow-md">
+                        <div>
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="font-semibold text-white text-base">${s.name}</h3>
+                                ${s.auto_execute ? '<span class="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded">Auto-Execute</span>' : ''}
+                            </div>
+                            <pre class="bg-[#0d1117] p-3 rounded border border-[#30363d] text-xs font-mono text-[#38bdf8] overflow-x-auto mb-4">${s.content}</pre>
+                        </div>
+                        <div class="flex justify-end gap-2 border-t border-[#30363d] pt-3">
+                            <button data-del-snippet="${s.id}" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded transition-colors">Delete</button>
+                        </div>
+                    </div>
+                `).join('')}
+                ${snippets.length === 0 ? '<div class="col-span-2 text-center py-12 text-[#8b949e]">No snippets created yet. Click "+ Add Snippet" to get started.</div>' : ''}
+            </div>
+        </div>
+    `;
+
+    document.getElementById("btn-add-snippet")?.addEventListener("click", async () => {
+        const name = prompt("Snippet Name (e.g. Docker Clean):");
+        if (!name) return;
+        const content = prompt("Command Content (e.g. docker system prune -f):");
+        if (!content) return;
+        try {
+            await CreateSnippet({ name, content, description: "", auto_execute: false } as any);
+            renderDashboard(container);
+        } catch (e: any) {
+            alert("Error creating snippet: " + e.toString());
+        }
+    });
+
+    mainView.querySelectorAll("[data-del-snippet]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = (btn as HTMLElement).getAttribute("data-del-snippet")!;
+            if (confirm("Delete this snippet?")) {
+                try {
+                    await DeleteSnippet(id);
+                    renderDashboard(container);
+                } catch (e: any) {
+                    alert("Error: " + e.toString());
+                }
+            }
+        });
+    });
+}
+
+async function renderTeamsView(mainView: HTMLElement, container: HTMLElement) {
+    let teams: any[] = [];
+    try {
+        teams = await ListTeams() || [];
+    } catch (e) {
+        console.error("Failed to load teams", e);
+    }
+
+    mainView.innerHTML = `
+        <div class="px-8 py-6 border-b border-[#30363d] flex justify-between items-center bg-[#0d1117]">
+            <div>
+                <h2 class="text-xl font-bold text-white">Team Workspaces</h2>
+                <p class="text-sm text-[#8b949e]">Collaborate and share server host access with team members</p>
+            </div>
+            <button id="btn-add-team" class="bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2 px-4 rounded-md text-sm flex items-center shadow-md transition-colors">
+                + Create Team
+            </button>
+        </div>
+        <div class="p-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${teams.map(t => `
+                    <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-5 flex flex-col justify-between hover:border-[#58a6ff] transition-all shadow-md">
+                        <div>
+                            <h3 class="font-semibold text-white text-base mb-1">${t.name}</h3>
+                            <p class="text-xs text-[#8b949e] mb-4">${t.description || 'No description'}</p>
+                        </div>
+                        <div class="flex justify-end gap-2 border-t border-[#30363d] pt-3">
+                            <button data-del-team="${t.id}" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded transition-colors">Delete</button>
+                        </div>
+                    </div>
+                `).join('')}
+                ${teams.length === 0 ? '<div class="col-span-2 text-center py-12 text-[#8b949e]">No teams created yet. Click "+ Create Team" to get started.</div>' : ''}
+            </div>
+        </div>
+    `;
+
+    document.getElementById("btn-add-team")?.addEventListener("click", async () => {
+        const name = prompt("Team Name:");
+        if (!name) return;
+        const description = prompt("Description:") || "";
+        try {
+            await CreateTeam({ name, description } as any);
+            renderDashboard(container);
+        } catch (e: any) {
+            alert("Error creating team: " + e.toString());
+        }
+    });
+
+    mainView.querySelectorAll("[data-del-team]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = (btn as HTMLElement).getAttribute("data-del-team")!;
+            if (confirm("Delete this team?")) {
+                try {
+                    await DeleteTeam(id);
+                    renderDashboard(container);
+                } catch (e: any) {
+                    alert("Error: " + e.toString());
+                }
+            }
+        });
+    });
+}
+
+async function renderSSHKeysView(mainView: HTMLElement, container: HTMLElement) {
+    let keys: any[] = [];
+    try {
+        keys = await ListSSHKeys() || [];
+    } catch (e) {
+        console.error("Failed to load SSH keys", e);
+    }
+
+    mainView.innerHTML = `
+        <div class="px-8 py-6 border-b border-[#30363d] flex justify-between items-center bg-[#0d1117]">
+            <div>
+                <h2 class="text-xl font-bold text-white">SSH Key Manager</h2>
+                <p class="text-sm text-[#8b949e]">Zero-knowledge local SSH private keys</p>
+            </div>
+            <button id="btn-gen-key" class="bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2 px-4 rounded-md text-sm flex items-center shadow-md transition-colors">
+                + Generate RSA Key
+            </button>
+        </div>
+        <div class="p-8">
+            <div class="space-y-4">
+                ${keys.map(k => `
+                    <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-5 flex items-center justify-between hover:border-[#58a6ff] transition-all shadow-md">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="font-semibold text-white text-base">${k.name}</span>
+                                <span class="text-xs bg-sky-500/10 text-[#38bdf8] border border-sky-500/20 px-2 py-0.5 rounded font-mono">${k.type || 'RSA'}</span>
+                            </div>
+                            <p class="text-xs font-mono text-[#8b949e]">${k.fingerprint || 'No fingerprint'}</p>
+                        </div>
+                        <button data-del-key="${k.id}" class="text-xs bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-1.5 rounded transition-colors">Delete</button>
+                    </div>
+                `).join('')}
+                ${keys.length === 0 ? '<div class="text-center py-12 text-[#8b949e]">No SSH keys saved yet. Click "+ Generate RSA Key" to create your first zero-knowledge keypair.</div>' : ''}
+            </div>
+        </div>
+    `;
+
+    document.getElementById("btn-gen-key")?.addEventListener("click", async () => {
+        const name = prompt("Key Label / Name (e.g. Id_rsa_dev):");
+        if (!name) return;
+        try {
+            await GenerateSSHKey(name, 4096);
+            renderDashboard(container);
+        } catch (e: any) {
+            alert("Error generating key: " + e.toString());
+        }
+    });
+
+    mainView.querySelectorAll("[data-del-key]").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const id = (btn as HTMLElement).getAttribute("data-del-key")!;
+            if (confirm("Delete this SSH key?")) {
+                try {
+                    await DeleteSSHKey(id);
+                    renderDashboard(container);
+                } catch (e: any) {
+                    alert("Error: " + e.toString());
+                }
+            }
+        });
+    });
+}
+
+async function renderAuditLogsView(mainView: HTMLElement, container: HTMLElement) {
+    let logs: any[] = [];
+    try {
+        logs = await ListAuditLogs("", 100, 0) || [];
+    } catch (e) {
+        console.error("Failed to load audit logs", e);
+    }
+
+    mainView.innerHTML = `
+        <div class="px-8 py-6 border-b border-[#30363d] flex justify-between items-center bg-[#0d1117]">
+            <div>
+                <h2 class="text-xl font-bold text-white">Command Audit Trail</h2>
+                <p class="text-sm text-[#8b949e]">Zero-trust local audit history of executed SSH terminal commands</p>
+            </div>
+            <button id="btn-clear-logs" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 font-medium py-2 px-4 rounded-md text-sm flex items-center shadow-md transition-colors">
+                Clear Trail
+            </button>
+        </div>
+        <div class="p-8">
+            <div class="bg-[#161b22] border border-[#30363d] rounded-lg overflow-hidden shadow-md">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-[#0d1117] text-[#8b949e] border-b border-[#30363d] text-xs font-mono">
+                        <tr>
+                            <th class="p-3">TIMESTAMP</th>
+                            <th class="p-3">HOST</th>
+                            <th class="p-3">COMMAND EXECUTED</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-[#30363d] text-[#e6edf3]">
+                        ${logs.map(l => `
+                            <tr class="hover:bg-[#1f242d] transition-colors">
+                                <td class="p-3 text-xs text-[#8b949e] font-mono">${new Date(l.timestamp * 1000).toLocaleString()}</td>
+                                <td class="p-3 text-xs font-semibold text-[#38bdf8]">${l.host_id}</td>
+                                <td class="p-3 text-xs font-mono text-emerald-400">${l.command}</td>
+                            </tr>
+                        `).join('')}
+                        ${logs.length === 0 ? '<tr><td colspan="3" class="p-8 text-center text-[#8b949e]">No audit logs recorded yet. Commands executed in terminal sessions will be recorded here automatically.</td></tr>' : ''}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("btn-clear-logs")?.addEventListener("click", async () => {
+        if (confirm("Clear all command audit logs?")) {
+            try {
+                await ClearAuditLogs("");
+                renderDashboard(container);
+            } catch (e: any) {
+                alert("Error clearing logs: " + e.toString());
+            }
+        }
+    });
+}
+async function renderSettingsView(mainView: HTMLElement, _container: HTMLElement) {
+    let cfg: any = { provider: "9router", model: "ZA126_PRO", base_url: "http://100.76.150.46:3007/v1", api_key: "" };
+    try {
+        cfg = await GetAIConfig() || cfg;
+    } catch (e) {
+        console.error("Failed to fetch AI config", e);
+    }
+
+    mainView.innerHTML = `
+        <div class="px-8 py-6 border-b border-[#30363d] bg-[#0d1117] flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-bold text-white">Settings</h2>
+                <p class="text-sm text-[#8b949e]">Account profile, AI Provider integration, and Vault security settings</p>
+            </div>
+        </div>
+        <div class="p-8 max-w-4xl overflow-y-auto">
+            <!-- Account Section (Matching Image 2) -->
+            <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-6 mb-8 shadow-md">
+                <h3 class="text-base font-semibold text-white mb-4 pb-2 border-b border-[#30363d] flex items-center gap-2">
+                    <svg class="w-5 h-5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                    Account Profile
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-xs font-mono text-[#8b949e] mb-1">EMAIL ADDRESS</label>
+                        <input type="text" readonly value="cecep.azhtech@gmail.com" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e6edf3] font-mono focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-mono text-[#8b949e] mb-1">FULL NAME</label>
+                        <input type="text" readonly value="Cecep Saeful Azhar Hidayat, ST" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-[#e6edf3] focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Referrals Block (Matching Image 2) -->
+                <div class="mt-6 pt-4 border-t border-[#30363d]/50 flex items-center justify-between">
+                    <div>
+                        <h4 class="text-sm font-medium text-white">Referrals & Workspace Code</h4>
+                        <p class="text-xs text-[#8b949e]">Share code to invite team members: <span class="font-mono text-[#38bdf8] font-bold">3PVVHR</span></p>
+                    </div>
+                    <div class="flex gap-4 text-xs font-mono text-[#8b949e]">
+                        <span>Invited: <strong class="text-white">0</strong></span>
+                        <span>Activated: <strong class="text-white">0</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Assistant Settings Section -->
+            <div class="bg-[#161b22] border border-[#30363d] rounded-lg p-6 mb-8 shadow-md">
+                <h3 class="text-base font-semibold text-white mb-4 pb-2 border-b border-[#30363d] flex items-center gap-2">
+                    <svg class="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    AI Copilot & Assistant Provider Settings
+                </h3>
+                <form id="form-save-ai-settings" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-mono text-[#8b949e] mb-1">AI PROVIDER</label>
+                            <select id="settings-ai-provider" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
+                                <option value="9router" ${cfg.provider === '9router' ? 'selected' : ''}>9Router / Custom OpenAI (Local Fleet)</option>
+                                <option value="openai" ${cfg.provider === 'openai' ? 'selected' : ''}>OpenAI Official</option>
+                                <option value="anthropic" ${cfg.provider === 'anthropic' ? 'selected' : ''}>Anthropic Claude API</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-mono text-[#8b949e] mb-1">MODEL NAME</label>
+                            <input type="text" id="settings-ai-model" value="${cfg.model || 'ZA126_PRO'}" placeholder="ZA126_PRO or gpt-4o" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-mono text-[#8b949e] mb-1">BASE API URL</label>
+                        <input type="text" id="settings-ai-base-url" value="${cfg.base_url || 'http://100.76.150.46:3007/v1'}" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-mono text-[#8b949e] mb-1">API KEY (OPTIONAL FOR LOCAL PROXY)</label>
+                        <input type="password" id="settings-ai-api-key" value="${cfg.api_key || ''}" placeholder="sk-..." class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
+                    </div>
+                    <div class="pt-2 flex justify-end">
+                        <button type="submit" class="bg-[#238636] hover:bg-[#2ea043] text-white px-5 py-2 rounded-md text-sm font-medium transition-colors shadow">Save AI Settings</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Danger Zone (Matching Image 2) -->
+            <div class="bg-[#161b22] border border-red-500/30 rounded-lg p-6 shadow-md">
+                <h3 class="text-base font-semibold text-red-400 mb-2 flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    Danger Zone
+                </h3>
+                <p class="text-xs text-[#8b949e] mb-4">Permanently clear local SQLite tables or reset master vault security key.</p>
+                <button id="btn-settings-reset-vault" class="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-medium px-4 py-2 rounded text-sm transition-colors">
+                    Reset Vault & Clear Local Database
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("form-save-ai-settings")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const provider = (document.getElementById("settings-ai-provider") as HTMLSelectElement).value;
+        const model = (document.getElementById("settings-ai-model") as HTMLInputElement).value;
+        const base_url = (document.getElementById("settings-ai-base-url") as HTMLInputElement).value;
+        const api_key = (document.getElementById("settings-ai-api-key") as HTMLInputElement).value;
+
+        try {
+            await SaveAIConfig({ provider, model, base_url, api_key } as any);
+            alert("AI Settings saved successfully!");
+        } catch (err: any) {
+            alert("Error saving AI settings: " + err.toString());
+        }
+    });
+
+    document.getElementById("btn-settings-reset-vault")?.addEventListener("click", async () => {
+        if (confirm("DANGER: Are you sure you want to reset your vault? This will erase all saved hosts, groups, and snippets!")) {
+            try {
+                await ResetVault();
+                alert("Vault reset successful.");
+                location.reload();
+            } catch (err: any) {
+                alert("Reset error: " + err.toString());
+            }
+        }
+    });
 }
