@@ -1,0 +1,10 @@
+[Unit]
+Description=CATERM Terminal Emulator & Vault Manager
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/caterm
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
