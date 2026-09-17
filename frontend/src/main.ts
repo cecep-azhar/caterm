@@ -6,6 +6,8 @@ import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, C
 
 let activeTab = "hosts";
 let editingHostId: string | null = null;
+let sessionTimerInterval: any = null;
+let sessionSeconds = 0;
 
 document.addEventListener("DOMContentLoaded", async () => {
     const app = document.getElementById("app");
@@ -404,16 +406,84 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
             `}
         </div>
 
-        <!-- Terminal Active Connection Modal -->
-        <div id="terminal-modal" class="fixed inset-0 bg-black/90 z-50 flex flex-col hidden backdrop-blur-sm">
-            <div class="bg-[#010409] px-6 py-3 border-b border-[#30363d] flex justify-between items-center">
+        <!-- Terminal Workspace Modal with Split, Files, Time Track, Safe Workspace -->
+        <div id="terminal-modal" class="fixed inset-0 bg-[#0d1117] z-50 flex flex-col hidden">
+            <!-- Modal Header / Toolbar -->
+            <div class="bg-[#010409] px-4 py-2 border-b border-[#30363d] flex justify-between items-center text-xs">
                 <div class="flex items-center space-x-3">
-                    <span class="inline-block h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span id="term-title" class="font-mono text-sm font-bold text-[#38bdf8]">SSH Terminal Session</span>
+                    <span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="term-title" class="font-mono font-bold text-[#38bdf8]">SSH Terminal Session</span>
+                    <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded text-[10px] font-mono">🔒 Safe Workspace Active</span>
                 </div>
-                <button id="btn-close-term" class="text-[#8b949e] hover:text-white text-sm bg-[#161b22] px-3 py-1 rounded border border-[#30363d]">Disconnect</button>
+                
+                <!-- Action Tools (Split, Files, Timer, Close) -->
+                <div class="flex items-center space-x-3">
+                    <!-- Session Duration Tracker -->
+                    <div class="flex items-center space-x-1 text-[#8b949e] font-mono bg-[#161b22] px-2.5 py-1 rounded border border-[#30363d]">
+                        <svg class="h-3.5 w-3.5 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span id="session-timer">00:00:00</span>
+                    </div>
+
+                    <!-- Split Actions -->
+                    <div class="flex items-center space-x-1 bg-[#161b22] p-0.5 rounded border border-[#30363d]">
+                        <button id="btn-split-v" title="Split Vertically" class="px-2 py-1 text-[#8b949e] hover:text-white hover:bg-[#30363d] rounded transition-colors flex items-center">
+                            <svg class="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m6 10V7M3 12h18"/></svg>
+                            Split V
+                        </button>
+                        <button id="btn-split-h" title="Split Horizontally" class="px-2 py-1 text-[#8b949e] hover:text-white hover:bg-[#30363d] rounded transition-colors flex items-center">
+                            <svg class="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v18M3 9h18M3 15h18"/></svg>
+                            Split H
+                        </button>
+                    </div>
+
+                    <!-- SFTP Files Toggle -->
+                    <button id="btn-toggle-sftp" title="SFTP Files Explorer" class="bg-[#161b22] text-[#8b949e] hover:text-white px-2.5 py-1 rounded border border-[#30363d] flex items-center">
+                        <svg class="h-3.5 w-3.5 mr-1 text-[#58a6ff]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                        Files (SFTP)
+                    </button>
+
+                    <!-- Close Workspace -->
+                    <button id="btn-close-term" class="bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 px-3 py-1 rounded border border-rose-500/30 transition-colors font-medium">
+                        Close Workspace
+                    </button>
+                </div>
             </div>
-            <div class="flex-1 w-full h-full p-4 overflow-hidden" id="term-screen"></div>
+
+            <!-- Main Terminal Workspace Content Area -->
+            <div class="flex-1 flex overflow-hidden">
+                <!-- Terminal Panes Layout Grid -->
+                <div class="flex-1 grid grid-cols-1 gap-1 p-2 bg-[#090d16]" id="panes-container">
+                    <div class="w-full h-full border border-[#30363d] rounded p-2 overflow-hidden bg-[#0d1117] flex flex-col relative" id="pane-1">
+                        <div class="text-[10px] text-[#8b949e] font-mono pb-1 border-b border-[#30363d] flex justify-between items-center">
+                            <span>Pane 1 - Primary SSH Session</span>
+                            <button class="hover:text-rose-400 btn-close-pane">✕ Close</button>
+                        </div>
+                        <div class="flex-1 w-full h-full" id="term-screen-1"></div>
+                    </div>
+                </div>
+
+                <!-- SFTP Sidebar Panel (Toggleable) -->
+                <div id="sftp-panel" class="w-72 bg-[#010409] border-l border-[#30363d] flex flex-col hidden">
+                    <div class="p-3 border-b border-[#30363d] flex justify-between items-center">
+                        <span class="font-bold text-xs text-[#58a6ff] flex items-center">
+                            <svg class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/></svg>
+                            SFTP Remote Explorer
+                        </span>
+                        <button id="btn-close-sftp" class="text-[#8b949e] hover:text-white text-xs">✕</button>
+                    </div>
+                    <div class="p-2 border-b border-[#30363d] bg-[#0d1117]">
+                        <input type="text" value="/var/www/html" class="w-full p-1.5 bg-[#161b22] border border-[#30363d] rounded text-xs font-mono text-[#e6edf3]">
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1 font-mono text-xs">
+                        <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#8b949e] flex items-center">📁 ..</div>
+                        <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#38bdf8] flex items-center">📁 config/</div>
+                        <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#38bdf8] flex items-center">📁 logs/</div>
+                        <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#e6edf3] flex items-center">📄 index.php</div>
+                        <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#e6edf3] flex items-center">📄 docker-compose.yml</div>
+                        <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#e6edf3] flex items-center">📄 .env.production</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Slide Panel (Add / Edit Host) -->
@@ -517,7 +587,7 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         }
     });
 
-    // CONNECT handler (with interactive xterm.js)
+    // CONNECT handler (with interactive xterm.js, Split Panes, Timer, SFTP)
     let currentTerm: Terminal | null = null;
     document.querySelectorAll('.btn-connect-host').forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -528,11 +598,23 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
 
             const modal = document.getElementById("terminal-modal")!;
             const title = document.getElementById("term-title")!;
-            const screen = document.getElementById("term-screen")!;
+            const screen = document.getElementById("term-screen-1")!;
 
-            title.textContent = `SSH Terminal: ${h.username}@${h.hostname}:${h.port}`;
+            title.textContent = `SSH Workspace: ${h.username}@${h.hostname}:${h.port}`;
             modal.classList.remove("hidden");
             screen.innerHTML = "";
+
+            // Start Session Duration Timer
+            sessionSeconds = 0;
+            if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+            sessionTimerInterval = setInterval(() => {
+                sessionSeconds++;
+                const hrs = String(Math.floor(sessionSeconds / 3600)).padStart(2, '0');
+                const mins = String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0');
+                const secs = String(sessionSeconds % 60).padStart(2, '0');
+                const timerElem = document.getElementById("session-timer");
+                if (timerElem) timerElem.textContent = `${hrs}:${mins}:${secs}`;
+            }, 1000);
 
             if (currentTerm) {
                 currentTerm.dispose();
@@ -564,14 +646,14 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
             let lineBuffer = "";
             term.onData(data => {
                 const code = data.charCodeAt(0);
-                if (code === 13) { // Enter key
+                if (code === 13) {
                     term.writeln('');
                     if (lineBuffer.trim().length > 0) {
                         term.writeln(`\x1b[33m[exec]\x1b[0m ${lineBuffer}`);
                     }
                     lineBuffer = "";
                     term.write(prompt);
-                } else if (code === 127) { // Backspace
+                } else if (code === 127) {
                     if (lineBuffer.length > 0) {
                         lineBuffer = lineBuffer.slice(0, -1);
                         term.write('\b \b');
@@ -584,8 +666,49 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         });
     });
 
+    // Terminal Toolbar Button Handlers
     document.getElementById("btn-close-term")?.addEventListener("click", () => {
         document.getElementById("terminal-modal")?.classList.add("hidden");
+        if (sessionTimerInterval) clearInterval(sessionTimerInterval);
+    });
+
+    // SFTP Panel Toggle
+    const sftpPanel = document.getElementById("sftp-panel")!;
+    document.getElementById("btn-toggle-sftp")?.addEventListener("click", () => {
+        sftpPanel.classList.toggle("hidden");
+    });
+    document.getElementById("btn-close-sftp")?.addEventListener("click", () => {
+        sftpPanel.classList.add("hidden");
+    });
+
+    // Split V / H Handlers
+    const containerPanes = document.getElementById("panes-container")!;
+    document.getElementById("btn-split-v")?.addEventListener("click", () => {
+        containerPanes.className = "flex-1 grid grid-cols-2 gap-2 p-2 bg-[#090d16]";
+        if (!document.getElementById("pane-2")) {
+            const p2 = document.createElement("div");
+            p2.id = "pane-2";
+            p2.className = "w-full h-full border border-[#30363d] rounded p-2 overflow-hidden bg-[#0d1117] flex flex-col";
+            p2.innerHTML = `
+                <div class="text-[10px] text-[#8b949e] font-mono pb-1 border-b border-[#30363d] flex justify-between items-center">
+                    <span>Pane 2 - Secondary SSH Session</span>
+                    <button class="hover:text-rose-400" onclick="this.parentElement.parentElement.remove()">✕ Close</button>
+                </div>
+                <div class="flex-1 w-full h-full" id="term-screen-2"></div>
+            `;
+            containerPanes.appendChild(p2);
+            
+            const term2 = new Terminal({ cursorBlink: true, theme: { background: '#0d1117', foreground: '#e6edf3' } });
+            const fit2 = new FitAddon();
+            term2.loadAddon(fit2);
+            term2.open(document.getElementById("term-screen-2")!);
+            fit2.fit();
+            term2.writeln('\x1b[32m[Secondary Terminal Pane Split Ready]\x1b[0m\r\n$ ');
+        }
+    });
+
+    document.getElementById("btn-split-h")?.addEventListener("click", () => {
+        containerPanes.className = "flex-1 grid grid-rows-2 gap-2 p-2 bg-[#090d16]";
     });
 
     // EDIT handler
@@ -618,7 +741,7 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
             const h = hosts.find(item => item.id === id);
             if (!h) return;
 
-            editingHostId = null; // Create new on save
+            editingHostId = null;
             panelTitle.textContent = "Clone host";
 
             (document.getElementById("host-name") as HTMLInputElement).value = (h.name || h.hostname) + " (Copy)";
@@ -644,7 +767,7 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         });
     });
 
-    // SAVE (Create or Update) handler
+    // SAVE handler
     document.getElementById("btn-save-host")?.addEventListener("click", async () => {
         const form = document.getElementById("add-host-form") as HTMLFormElement;
         if (!form.checkValidity()) {
