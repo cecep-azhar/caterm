@@ -112,8 +112,8 @@ func (s *Service) IsInitialized(ctx context.Context) (bool, error) {
 }
 
 func (s *Service) Init(ctx context.Context, password string) error {
-	if len(password) < 12 {
-		return errors.New("password must be at least 12 characters")
+	if len(password) < 8 {
+		return errors.New("password must be at least 8 characters")
 	}
 	err := s.v.Init(ctx, s.db, password)
 	if err == nil {
@@ -153,8 +153,8 @@ func (s *Service) Unlock(ctx context.Context, password string) error {
 }
 
 func (s *Service) ChangePassword(ctx context.Context, oldPassword, newPassword string) error {
-	if len(newPassword) < 12 {
-		return errors.New("new password must be at least 12 characters")
+	if len(newPassword) < 8 {
+		return errors.New("new password must be at least 8 characters")
 	}
 	return s.v.ChangePassword(ctx, s.db, oldPassword, newPassword)
 }
