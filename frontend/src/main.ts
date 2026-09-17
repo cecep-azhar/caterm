@@ -24,8 +24,77 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function renderSetup(container: HTMLElement) {
-    // skipped: full setup logic matching Termique design, add when setup UI is requested.
-    container.innerHTML = `<div class="p-8">Setup (Placeholder)</div>`;
+    container.innerHTML = `
+        <div class="min-h-screen flex bg-[#0d1117] text-[#e6edf3] font-sans">
+            <!-- Left Column -->
+            <div class="flex-1 flex flex-col justify-between p-12 bg-[#010409] border-r border-[#30363d]">
+                <div>
+                    <div class="flex items-center space-x-3 mb-2">
+                        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center font-bold text-white shadow-lg text-lg tracking-wider border border-emerald-400/30">
+                            CA
+                        </div>
+                        <h1 class="text-2xl font-bold tracking-tight text-white">CATerm</h1>
+                    </div>
+                </div>
+                <div>
+                    <h2 class="text-4xl font-bold mb-4 text-[#e6edf3]">// KEEP CALM - When stuck, tail -f the logs</h2>
+                </div>
+                <div class="text-[#8b949e] text-sm flex items-center space-x-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+                    <span>Zero-knowledge · keys never leave this device</span>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="w-[480px] flex flex-col justify-center p-12 bg-[#0d1117]">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold mb-2">Setup Vault</h2>
+                    <p class="text-[#8b949e]">cecep.azhtech@gmail.com</p>
+                </div>
+                
+                <form id="setup-form" class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-[#e6edf3]">Master Password (min 12 chars)</label>
+                        <input type="password" id="setup-password" class="w-full p-3 rounded-md custom-input" placeholder="Enter master password" required>
+                        <p id="setup-error" class="text-[#f85149] text-sm hidden mt-2"></p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2 text-[#e6edf3]">Confirm Password</label>
+                        <input type="password" id="setup-confirm" class="w-full p-3 rounded-md custom-input" placeholder="Confirm master password" required>
+                    </div>
+                    <button type="submit" class="w-full bg-[#238636] hover:bg-[#2ea043] text-white font-semibold py-3 px-4 rounded-md transition-colors shadow-lg">Initialize Vault</button>
+                </form>
+            </div>
+        </div>
+    `;
+
+    const form = document.getElementById("setup-form") as HTMLFormElement;
+    const pwdInput = document.getElementById("setup-password") as HTMLInputElement;
+    const confirmInput = document.getElementById("setup-confirm") as HTMLInputElement;
+    const errorText = document.getElementById("setup-error") as HTMLParagraphElement;
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const pwd = pwdInput.value;
+        if (!pwd || pwd.length < 12) {
+            errorText.textContent = "Master Password must be at least 12 characters.";
+            errorText.classList.remove("hidden");
+            return;
+        }
+        if (pwd !== confirmInput.value) {
+            errorText.textContent = "Passwords do not match.";
+            errorText.classList.remove("hidden");
+            return;
+        }
+
+        try {
+            await Setup(pwd);
+            renderUnlock(container);
+        } catch (err: any) {
+            errorText.textContent = err.toString();
+            errorText.classList.remove("hidden");
+        }
+    });
 }
 
 function renderUnlock(container: HTMLElement) {
@@ -34,13 +103,19 @@ function renderUnlock(container: HTMLElement) {
             <!-- Left Column -->
             <div class="flex-1 flex flex-col justify-between p-12 bg-[#010409] border-r border-[#30363d]">
                 <div>
-                    <h1 class="text-2xl font-bold tracking-tight mb-2">Termique</h1>
+                    <div class="flex items-center space-x-3 mb-2">
+                        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center font-bold text-white shadow-lg text-lg tracking-wider border border-emerald-400/30">
+                            CA
+                        </div>
+                        <h1 class="text-2xl font-bold tracking-tight text-white">CATerm</h1>
+                    </div>
                 </div>
                 <div>
-                    <h2 class="text-4xl font-bold mb-4">// KEEP CALM - When stuck, tail -f the logs</h2>
+                    <h2 class="text-4xl font-bold mb-4 text-[#e6edf3]">// KEEP CALM - When stuck, tail -f the logs</h2>
                 </div>
-                <div class="text-[#8b949e] text-sm">
-                    Zero-knowledge · keys never leave this device
+                <div class="text-[#8b949e] text-sm flex items-center space-x-2">
+                    <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
+                    <span>Zero-knowledge · keys never leave this device</span>
                 </div>
             </div>
 
@@ -51,13 +126,13 @@ function renderUnlock(container: HTMLElement) {
                     <p class="text-[#8b949e]">cecep.azhtech@gmail.com</p>
                 </div>
                 
-                <form id="unlock-form" class="space-y-6">
+                <form id="unlock-form" class="space-y-6" autocomplete="off">
                     <div>
                         <label class="block text-sm font-medium mb-2 text-[#e6edf3]">Master Password</label>
-                        <input type="password" id="unlock-password" class="w-full p-3 rounded-md custom-input" required autofocus>
+                        <input type="password" id="unlock-password" class="w-full p-3 rounded-md custom-input" placeholder="Enter master password" required autofocus autocomplete="current-password">
                         <p id="unlock-error" class="text-[#f85149] text-sm hidden mt-2"></p>
                     </div>
-                    <button type="submit" class="w-full glow-btn text-white font-semibold py-3 px-4 rounded-md">Unlock</button>
+                    <button type="submit" class="w-full bg-[#238636] hover:bg-[#2ea043] text-white font-semibold py-3 px-4 rounded-md transition-colors shadow-lg">Unlock</button>
                 </form>
             </div>
         </div>
@@ -67,10 +142,20 @@ function renderUnlock(container: HTMLElement) {
     const pwdInput = document.getElementById("unlock-password") as HTMLInputElement;
     const errorText = document.getElementById("unlock-error") as HTMLParagraphElement;
 
+    // Ensure error message is explicitly hidden on initial render
+    errorText.classList.add("hidden");
+    errorText.textContent = "";
+
     setTimeout(() => pwdInput.focus(), 100);
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
+        
+        const pwd = pwdInput.value;
+        if (!pwd || pwd.trim() === "") {
+            // Do not submit empty string or show incorrect password
+            return;
+        }
         
         const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
         const originalText = submitBtn.textContent;
@@ -78,34 +163,70 @@ function renderUnlock(container: HTMLElement) {
         submitBtn.disabled = true;
 
         try {
-            await Unlock(pwdInput.value);
+            await Unlock(pwd);
             renderDashboard(container);
         } catch (err: any) {
-             errorText.textContent = "Incorrect password.";
-             errorText.classList.remove("hidden");
-             pwdInput.classList.add("border-[#f85149]", "focus:border-[#f85149]", "focus:ring-[#f85149]/20");
-             
-             submitBtn.textContent = originalText || "Unlock";
-             submitBtn.disabled = false;
-             
-             pwdInput.value = "";
-             pwdInput.focus();
+            errorText.textContent = "Incorrect password.";
+            errorText.classList.remove("hidden");
+            pwdInput.classList.add("border-[#f85149]", "focus:border-[#f85149]", "focus:ring-[#f85149]/20");
+            
+            submitBtn.textContent = originalText || "Unlock";
+            submitBtn.disabled = false;
+            
+            pwdInput.value = "";
+            pwdInput.focus();
         }
     });
     
     pwdInput.addEventListener('input', () => {
         pwdInput.classList.remove("border-[#f85149]", "focus:border-[#f85149]", "focus:ring-[#f85149]/20");
         errorText.classList.add("hidden");
+        errorText.textContent = "";
     });
 }
 
 function renderSyncReview(container: HTMLElement, syncResult: any) {
-    // skipped: full sync review UI, add when requested
-    container.innerHTML = `<div class="p-8">Sync Pending (Placeholder)</div>`;
+    container.innerHTML = `
+        <div class="min-h-screen flex items-center justify-center bg-[#0d1117] text-[#e6edf3]">
+            <div class="bg-[#161b22] p-8 rounded-xl border border-[#30363d] w-[450px]">
+                <h2 class="text-2xl font-bold mb-6 text-[#58a6ff]">Sync Pending</h2>
+                <div class="space-y-4 mb-8 bg-[#0d1117] p-4 rounded-lg border border-[#30363d]">
+                    <div class="flex justify-between items-center pb-2 border-b border-[#30363d]">
+                        <span class="text-[#8b949e]">Applied changes:</span>
+                        <span class="font-bold text-[#3fb950]">${syncResult.applied || 0}</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-2 border-b border-[#30363d]">
+                        <span class="text-[#8b949e]">Deleted records:</span>
+                        <span class="font-bold text-[#f85149]">${syncResult.deleted || 0}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-[#8b949e]">Conflicts:</span>
+                        <span class="font-bold text-[#d29922]">${syncResult.conflicts || 0}</span>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <button id="sync-cancel" class="flex-1 bg-[#21262d] hover:bg-[#30363d] text-[#e6edf3] font-semibold py-2.5 px-4 rounded-md border border-[#30363d]">Skip</button>
+                    <button id="sync-apply" class="flex-1 bg-[#238636] hover:bg-[#2ea043] text-white font-semibold py-2.5 px-4 rounded-md">Apply Sync</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("sync-cancel")?.addEventListener("click", () => {
+        renderUnlock(container);
+    });
+
+    document.getElementById("sync-apply")?.addEventListener("click", async () => {
+        try {
+            await ApplySync();
+            renderUnlock(container);
+        } catch (e: any) {
+            alert("Failed to apply sync: " + e.toString());
+        }
+    });
 }
 
 async function renderDashboard(container: HTMLElement) {
-    // Fetch data early
     let hosts: any[] = [];
     let groups: any[] = [];
     try {
@@ -119,13 +240,16 @@ async function renderDashboard(container: HTMLElement) {
         <div class="h-screen flex bg-[#0d1117] text-[#e6edf3] font-sans overflow-hidden">
             <!-- Sidebar -->
             <div class="w-64 flex flex-col bg-[#010409] border-r border-[#30363d]">
-                <div class="p-4 border-b border-[#30363d]">
-                    <h1 class="text-xl font-bold tracking-tight">Termique</h1>
+                <div class="p-4 border-b border-[#30363d] flex items-center space-x-3">
+                    <div class="h-8 w-8 rounded-lg bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center font-bold text-white text-xs shadow-md border border-emerald-400/30">
+                        CA
+                    </div>
+                    <h1 class="text-xl font-bold tracking-tight text-white">CATerm</h1>
                 </div>
                 
                 <div class="flex-1 overflow-y-auto py-4">
                     <nav class="space-y-1 px-2">
-                        <a href="#" class="flex items-center px-3 py-2 bg-[#161b22] text-[#e6edf3] rounded-md font-medium text-sm group">
+                        <a href="#" class="flex items-center px-3 py-2 bg-[#161b22] text-[#e6edf3] rounded-md font-medium text-sm group border border-[#30363d]">
                             <span class="mr-3 text-[#e6edf3]">
                                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"/></svg>
                             </span>
@@ -177,8 +301,8 @@ async function renderDashboard(container: HTMLElement) {
                 </div>
                 
                 <div class="p-4 border-t border-[#30363d] flex items-center group cursor-pointer hover:bg-[#161b22] transition-colors">
-                    <div class="h-8 w-8 rounded-full bg-[#238636] flex items-center justify-center text-white font-bold mr-3">
-                        C
+                    <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center text-white font-bold mr-3 text-xs shadow-md border border-emerald-400/30">
+                        CA
                     </div>
                     <div class="flex-1 overflow-hidden">
                         <p class="text-sm font-medium text-[#e6edf3] truncate">Cecep Saeful Azhar</p>
@@ -202,7 +326,7 @@ async function renderDashboard(container: HTMLElement) {
                     </div>
                     <div class="ml-4 flex items-center">
                         <span class="text-[#8b949e] text-sm mr-4">${hosts.length} saved hosts</span>
-                        <button id="btn-add-host" class="glow-btn text-white font-medium py-2 px-4 rounded-md text-sm flex items-center">
+                        <button id="btn-add-host" class="bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2 px-4 rounded-md text-sm flex items-center shadow-md transition-colors">
                             <svg class="h-4 w-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                             Add host
                         </button>
@@ -245,28 +369,28 @@ async function renderDashboard(container: HTMLElement) {
                         <form id="add-host-form" class="space-y-5">
                             <div>
                                 <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Label</label>
-                                <input type="text" id="host-label" placeholder="e.g. Production Web" class="w-full p-2 rounded-md custom-input text-sm">
+                                <input type="text" id="host-label" placeholder="e.g. Production Web" class="w-full p-2.5 rounded-md custom-input text-sm">
                             </div>
                             
                             <div class="flex space-x-4">
                                 <div class="flex-1">
                                     <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Host / IP *</label>
-                                    <input type="text" id="host-ip" required placeholder="192.168.1.1" class="w-full p-2 rounded-md custom-input text-sm">
+                                    <input type="text" id="host-ip" required placeholder="192.168.1.1" class="w-full p-2.5 rounded-md custom-input text-sm">
                                 </div>
                                 <div class="w-24">
                                     <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Port *</label>
-                                    <input type="number" id="host-port" required value="22" class="w-full p-2 rounded-md custom-input text-sm">
+                                    <input type="number" id="host-port" required value="22" class="w-full p-2.5 rounded-md custom-input text-sm">
                                 </div>
                             </div>
                             
                             <div>
                                 <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Username *</label>
-                                <input type="text" id="host-user" required value="root" class="w-full p-2 rounded-md custom-input text-sm">
+                                <input type="text" id="host-user" required value="root" class="w-full p-2.5 rounded-md custom-input text-sm">
                             </div>
                             
                             <div>
                                 <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Authentication Method</label>
-                                <select id="host-auth" class="w-full p-2 rounded-md custom-input text-sm">
+                                <select id="host-auth" class="w-full p-2.5 rounded-md custom-input text-sm">
                                     <option value="password">Password</option>
                                     <option value="private_key">Private Key</option>
                                 </select>
@@ -274,17 +398,17 @@ async function renderDashboard(container: HTMLElement) {
 
                             <div id="auth-password-group">
                                 <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Password</label>
-                                <input type="password" id="host-pass" class="w-full p-2 rounded-md custom-input text-sm">
+                                <input type="password" id="host-pass" class="w-full p-2.5 rounded-md custom-input text-sm">
                             </div>
 
                             <div id="auth-key-group" class="hidden">
                                 <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Private Key</label>
-                                <textarea id="host-key" rows="4" class="w-full p-2 rounded-md custom-input text-sm font-mono text-xs"></textarea>
+                                <textarea id="host-key" rows="4" class="w-full p-2.5 rounded-md custom-input text-sm font-mono text-xs"></textarea>
                             </div>
                             
                             <div>
                                 <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Group / Organization</label>
-                                <select id="host-group" class="w-full p-2 rounded-md custom-input text-sm">
+                                <select id="host-group" class="w-full p-2.5 rounded-md custom-input text-sm">
                                     <option value="">-- None --</option>
                                     ${groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('')}
                                 </select>
@@ -293,7 +417,7 @@ async function renderDashboard(container: HTMLElement) {
                     </div>
                     
                     <div class="p-6 border-t border-[#30363d] bg-[#010409]">
-                        <button type="button" id="btn-save-host" class="w-full glow-btn text-white font-medium py-2 px-4 rounded-md text-sm">Save Host</button>
+                        <button type="button" id="btn-save-host" class="w-full bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2.5 px-4 rounded-md text-sm transition-colors shadow-md">Save Host</button>
                     </div>
                 </div>
             </div>
@@ -355,9 +479,5 @@ async function renderDashboard(container: HTMLElement) {
         } catch (e: any) {
             alert("Failed to save host: " + e.toString());
         }
-    });
-
-    document.getElementById("btn-settings")?.addEventListener("click", () => {
-        // skipped: settings UI, add when requested
     });
 }
