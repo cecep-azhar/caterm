@@ -11,6 +11,7 @@ import (
 
 type DB struct {
 	*sql.DB
+	path string
 }
 
 func Open(path string) (*DB, error) {
@@ -36,5 +37,9 @@ func Open(path string) (*DB, error) {
 		}
 	}
 
-	return &DB{db}, nil
+	return &DB{DB: db, path: path}, nil
+}
+
+func (db *DB) Path() string {
+	return db.path
 }

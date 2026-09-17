@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,8 +39,32 @@ func cmdSync(args []string) {
 		fmt.Printf("Exported successfully to %s\n", syncPath)
 
 	case "import":
-		fmt.Println("Not implemented yet")
-		os.Exit(1)
+		importCmd := flag.NewFlagSet("import", flag.ExitOnError)
+		dryRun := importCmd.Bool("dry-run", false, "Perform dry-run without modifying database")
+		jsonOutput := importCmd.Bool("json", false, "Output in JSON format")
+		_ = importCmd.Parse(args[1:])
+
+		db, err := store.Open(dbPath)
+		if err != nil {
+			fmt.Printf("failed to open db: %v\n", err)
+			os.Exit(1)
+		}
+		defer db.Close()
+
+		importer := sync.NewImporter(db, syncPath)
+		res, err := importer.Import(context.Background(), *dryRun)
+		if err != nil {
+			fmt.Printf("Import failed: %v\n", err)
+			os.Exit(1)
+		}
+
+		if *jsonOutput {
+			b, _ := json.Marshal(res)
+			fmt.Println(string(b))
+		} else {
+			fmt.Printf("Import completed: Added=%d, Updated=%d, Deleted=%d, Skipped=%d\n",
+				res.Added, res.Updated, res.Deleted, len(res.Skipped))
+		}
 
 	default:
 		fmt.Printf("Unknown sync command: %s\n", args[0])
