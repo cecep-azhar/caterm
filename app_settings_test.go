@@ -42,7 +42,7 @@ func TestSettingsHardDelete(t *testing.T) {
 	auditService := audit.NewService(db)
 
 	terminalService := terminal.New()
-	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, terminalService, db)
+	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, terminalService, nil, db)
 	app.startup(ctx)
 
 	// Insert a test group
