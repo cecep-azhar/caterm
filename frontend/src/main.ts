@@ -30,8 +30,8 @@ function renderSetup(container: HTMLElement) {
             <div class="flex-1 flex flex-col justify-between p-12 bg-[#010409] border-r border-[#30363d]">
                 <div>
                     <div class="flex items-center space-x-3 mb-2">
-                        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center font-bold text-white shadow-lg text-lg tracking-wider border border-emerald-400/30">
-                            CA
+                        <div class="h-10 w-10 rounded-xl bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] shadow-lg text-lg tracking-wider border border-[#38bdf8]/30">
+                            &gt;_
                         </div>
                         <h1 class="text-2xl font-bold tracking-tight text-white">CATerm</h1>
                     </div>
@@ -104,8 +104,8 @@ function renderUnlock(container: HTMLElement) {
             <div class="flex-1 flex flex-col justify-between p-12 bg-[#010409] border-r border-[#30363d]">
                 <div>
                     <div class="flex items-center space-x-3 mb-2">
-                        <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center font-bold text-white shadow-lg text-lg tracking-wider border border-emerald-400/30">
-                            CA
+                        <div class="h-10 w-10 rounded-xl bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] shadow-lg text-lg tracking-wider border border-[#38bdf8]/30">
+                            &gt;_
                         </div>
                         <h1 class="text-2xl font-bold tracking-tight text-white">CATerm</h1>
                     </div>
@@ -241,8 +241,8 @@ async function renderDashboard(container: HTMLElement) {
             <!-- Sidebar -->
             <div class="w-64 flex flex-col bg-[#010409] border-r border-[#30363d]">
                 <div class="p-4 border-b border-[#30363d] flex items-center space-x-3">
-                    <div class="h-8 w-8 rounded-lg bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center font-bold text-white text-xs shadow-md border border-emerald-400/30">
-                        CA
+                    <div class="h-8 w-8 rounded-lg bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] text-xs shadow-md border border-[#38bdf8]/30">
+                        &gt;_
                     </div>
                     <h1 class="text-xl font-bold tracking-tight text-white">CATerm</h1>
                 </div>
@@ -301,8 +301,10 @@ async function renderDashboard(container: HTMLElement) {
                 </div>
                 
                 <div class="p-4 border-t border-[#30363d] flex items-center group cursor-pointer hover:bg-[#161b22] transition-colors">
-                    <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-emerald-500 to-sky-600 flex items-center justify-center text-white font-bold mr-3 text-xs shadow-md border border-emerald-400/30">
-                        CA
+                    <div class="h-8 w-8 rounded-full bg-[#1e293b] border border-[#334155] flex items-center justify-center text-white font-bold mr-3 text-xs shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
                     </div>
                     <div class="flex-1 overflow-hidden">
                         <p class="text-sm font-medium text-[#e6edf3] truncate">Cecep Saeful Azhar</p>
