@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"os"
 	"path/filepath"
 
 	"caterm/internal/config"
@@ -83,15 +82,7 @@ func (a *App) ResetVault() error {
 		return errors.New("context not initialized")
 	}
 	
-	// Close database connection
-	a.db.Close()
-	
-	// Remove database file
-	dbPath := config.DataPath()
-	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	
-	// Restart is usually required, but Wails runtime.WindowReload(a.ctx) can refresh the frontend
-	return nil
+	// Delete all data to reset vault state without closing the DB connection
+	_, err := a.db.ExecContext(a.ctx, "DELETE FROM vault_meta; DELETE FROM groups; DELETE FROM hosts;")
+	return err
 }
