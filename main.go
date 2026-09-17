@@ -1,20 +1,46 @@
 package main
 
 import (
+	"context"
 	"embed"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+
+	"caterm/internal/config"
+	"caterm/internal/service/auth"
+	"caterm/internal/service/host"
+	"caterm/internal/store"
+	"caterm/internal/vault"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	app := NewApp()
+	dbPath := config.DataPath()
 
-	err := wails.Run(&options.App{
+	db, err := store.Open(dbPath)
+	if err != nil {
+		println("failed to open database:", err.Error())
+		return
+	}
+	defer db.Close()
+
+	if err := db.Migrate(context.Background()); err != nil {
+		println("failed to migrate database:", err.Error())
+		return
+	}
+
+	v := vault.NewVault()
+	authService := auth.New(v, db)
+	groupService := host.NewGroupService(db)
+	hostService := host.NewHostService(db, v)
+
+	app := NewApp(authService, groupService, hostService, db)
+
+	err = wails.Run(&options.App{
 		Title:  "caterm",
 		Width:  1024,
 		Height: 768,
