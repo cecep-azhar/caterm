@@ -1,4 +1,4 @@
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, OpenDonationLink, HardDeleteRecord } from "../wailsjs/go/main/App";
 
 document.addEventListener("DOMContentLoaded", async () => {
     const app = document.getElementById("app");
@@ -150,11 +150,97 @@ function renderUnlock(container: HTMLElement) {
 
 function renderDashboard(container: HTMLElement) {
     container.innerHTML = `
-        <div class="min-h-screen bg-gray-900 text-white p-4">
-            <h1 class="text-2xl font-bold">Dashboard</h1>
-            <p>Vault unlocked successfully.</p>
+        <div class="min-h-screen bg-gray-900 text-white flex flex-col">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+                <h1 class="text-2xl font-bold">Dashboard</h1>
+                <button id="btn-settings" class="text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 flex-1">
+                <p>Vault unlocked successfully.</p>
+            </div>
         </div>
     `;
+
+    document.getElementById("btn-settings")?.addEventListener("click", () => {
+        renderSettings(container);
+    });
+}
+
+function renderSettings(container: HTMLElement) {
+    container.innerHTML = `
+        <div class="min-h-screen bg-gray-900 text-white p-4">
+            <div class="flex items-center mb-6">
+                <button id="btn-back" class="mr-4 text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </button>
+                <h1 class="text-2xl font-bold">Settings</h1>
+            </div>
+            
+            <div class="max-w-2xl bg-gray-800 rounded-lg p-6 space-y-8">
+                <!-- Delete Data Section -->
+                <section>
+                    <h2 class="text-xl font-semibold mb-4 text-red-400 border-b border-gray-700 pb-2">Danger Zone</h2>
+                    <div class="space-y-4">
+                        <p class="text-sm text-gray-400">Hard delete a record permanently from the database (bypasses soft delete).</p>
+                        <div class="flex space-x-2">
+                            <select id="del-table" class="bg-gray-700 border border-gray-600 rounded p-2 focus:outline-none">
+                                <option value="groups">Group</option>
+                                <option value="hosts">Host</option>
+                            </select>
+                            <input type="text" id="del-id" placeholder="Record ID (UUIDv7)" class="flex-1 bg-gray-700 border border-gray-600 rounded p-2 focus:outline-none">
+                            <button id="btn-hard-delete" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium">Delete</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Support Section -->
+                <section>
+                    <h2 class="text-xl font-semibold mb-4 border-b border-gray-700 pb-2">Support</h2>
+                    <button id="btn-donate" class="flex items-center bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded font-medium">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
+                        </svg>
+                        Support the Developer (Open in Browser)
+                    </button>
+                </section>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("btn-back")?.addEventListener("click", () => {
+        renderDashboard(container);
+    });
+
+    document.getElementById("btn-hard-delete")?.addEventListener("click", async () => {
+        const table = (document.getElementById("del-table") as HTMLSelectElement).value;
+        const id = (document.getElementById("del-id") as HTMLInputElement).value;
+        
+        if (!id) {
+            alert("Please enter a valid record ID");
+            return;
+        }
+
+        if (confirm(`WARNING: This will permanently delete the record with ID ${id} from the ${table} table. This action cannot be undone and will not sync as a deletion to other devices. Continue?`)) {
+            try {
+                await HardDeleteRecord(table, id);
+                alert("Record deleted successfully.");
+                (document.getElementById("del-id") as HTMLInputElement).value = "";
+            } catch (e: any) {
+                alert(`Error deleting record: ${e}`);
+            }
+        }
+    });
+
+    document.getElementById("btn-donate")?.addEventListener("click", () => {
+        OpenDonationLink();
+    });
 }
 
 function renderSyncReview(container: HTMLElement, syncResult: any) {
