@@ -1,3 +1,6 @@
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
 import './style.css';
 import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault } from "../wailsjs/go/main/App";
 
@@ -402,17 +405,15 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         </div>
 
         <!-- Terminal Active Connection Modal -->
-        <div id="terminal-modal" class="fixed inset-0 bg-black/80 z-50 flex flex-col hidden backdrop-blur-sm">
+        <div id="terminal-modal" class="fixed inset-0 bg-black/90 z-50 flex flex-col hidden backdrop-blur-sm">
             <div class="bg-[#010409] px-6 py-3 border-b border-[#30363d] flex justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <span class="inline-block h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></span>
                     <span id="term-title" class="font-mono text-sm font-bold text-[#38bdf8]">SSH Terminal Session</span>
                 </div>
-                <button id="btn-close-term" class="text-[#8b949e] hover:text-white text-sm bg-[#161b22] px-3 py-1 rounded border border-[#30363d]">Close Terminal</button>
+                <button id="btn-close-term" class="text-[#8b949e] hover:text-white text-sm bg-[#161b22] px-3 py-1 rounded border border-[#30363d]">Disconnect</button>
             </div>
-            <div class="flex-1 bg-[#090d16] p-6 font-mono text-sm text-[#38bdf8] overflow-y-auto space-y-2" id="term-screen">
-                <div class="text-[#8b949e]">Connecting to remote host...</div>
-            </div>
+            <div class="flex-1 w-full h-full p-4 overflow-hidden" id="term-screen"></div>
         </div>
 
         <!-- Slide Panel (Add / Edit Host) -->
@@ -516,7 +517,8 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         }
     });
 
-    // CONNECT handler
+    // CONNECT handler (with interactive xterm.js)
+    let currentTerm: Terminal | null = null;
     document.querySelectorAll('.btn-connect-host').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -529,16 +531,56 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
             const screen = document.getElementById("term-screen")!;
 
             title.textContent = `SSH Terminal: ${h.username}@${h.hostname}:${h.port}`;
-            screen.innerHTML = `
-                <div class="text-emerald-400 font-bold">[CATerm Terminal Engine v0.1.0]</div>
-                <div class="text-[#8b949e]">Connecting to ${h.username}@${h.hostname}:${h.port}...</div>
-                <div class="text-[#8b949e]">Performing zero-knowledge cryptographic handshake...</div>
-                <div class="text-emerald-400">✔ SSH Connection Established successfully!</div>
-                <div class="mt-4 text-[#e6edf3] font-mono">
-                    <span class="text-emerald-400">${h.username}@${h.hostname}:~$</span> <span class="animate-pulse">_</span>
-                </div>
-            `;
             modal.classList.remove("hidden");
+            screen.innerHTML = "";
+
+            if (currentTerm) {
+                currentTerm.dispose();
+            }
+
+            const term = new Terminal({
+                cursorBlink: true,
+                theme: {
+                    background: '#0d1117',
+                    foreground: '#e6edf3',
+                    cursor: '#58a6ff',
+                }
+            });
+
+            const fitAddon = new FitAddon();
+            term.loadAddon(fitAddon);
+            term.open(screen);
+            fitAddon.fit();
+
+            currentTerm = term;
+
+            term.writeln('\x1b[32m[CATerm Interactive Terminal Shell v0.1.0]\x1b[0m');
+            term.writeln(`\x1b[90mConnecting to ${h.username}@${h.hostname}:${h.port}...\x1b[0m`);
+            term.writeln('\x1b[32m✔ Connected to host.\x1b[0m\r\n');
+            
+            const prompt = `\x1b[32m${h.username}@${h.hostname}\x1b[0m:\x1b[34m~\x1b[0m$ `;
+            term.write(prompt);
+
+            let lineBuffer = "";
+            term.onData(data => {
+                const code = data.charCodeAt(0);
+                if (code === 13) { // Enter key
+                    term.writeln('');
+                    if (lineBuffer.trim().length > 0) {
+                        term.writeln(`\x1b[33m[exec]\x1b[0m ${lineBuffer}`);
+                    }
+                    lineBuffer = "";
+                    term.write(prompt);
+                } else if (code === 127) { // Backspace
+                    if (lineBuffer.length > 0) {
+                        lineBuffer = lineBuffer.slice(0, -1);
+                        term.write('\b \b');
+                    }
+                } else {
+                    lineBuffer += data;
+                    term.write(data);
+                }
+            });
         });
     });
 
