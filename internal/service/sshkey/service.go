@@ -79,7 +79,7 @@ func (s *Service) GenerateKey(ctx context.Context, name string, bits int) (*SSHK
 		INSERT INTO ssh_keys (id, name, private_key, public_key, fingerprint, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, key.ID, key.Name, key.PrivateKey, key.PublicKey, key.Fingerprint, key.CreatedAt.Format(time.RFC3339), key.UpdatedAt.Format(time.RFC3339))
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (s *Service) AddKey(ctx context.Context, name, privateKeyStr string) (*SSHK
 		INSERT INTO ssh_keys (id, name, private_key, public_key, fingerprint, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`, key.ID, key.Name, key.PrivateKey, key.PublicKey, key.Fingerprint, key.CreatedAt.Format(time.RFC3339), key.UpdatedAt.Format(time.RFC3339))
-	
+
 	if err != nil {
 		return nil, err
 	}

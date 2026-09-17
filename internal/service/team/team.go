@@ -63,7 +63,7 @@ func (s *TeamService) Create(ctx context.Context, input TeamInput) (*Team, error
 	_, err := s.db.ExecContext(ctx,
 		"INSERT INTO teams (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)",
 		t.ID, t.Name, t.CreatedAt.Format(time.RFC3339Nano), t.UpdatedAt.Format(time.RFC3339Nano))
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (s *TeamService) Update(ctx context.Context, id string, input TeamInput) (*
 	res, err := s.db.ExecContext(ctx,
 		"UPDATE teams SET name = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
 		input.Name, now.Format(time.RFC3339Nano), id)
-	
+
 	if err != nil {
 		return nil, err
 	}

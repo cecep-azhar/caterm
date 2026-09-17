@@ -43,7 +43,7 @@ func (s *Service) ListLogs(ctx context.Context, hostID string, limit, offset int
 		FROM audit_logs
 	`
 	args := []any{}
-	
+
 	if hostID != "" {
 		q += ` WHERE host_id = ?`
 		args = append(args, hostID)

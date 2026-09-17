@@ -3,10 +3,10 @@ package portforward
 import (
 	"context"
 	"fmt"
+	"golang.org/x/crypto/ssh"
 	"io"
 	"net"
 	"sync"
-	"golang.org/x/crypto/ssh"
 )
 
 type PortForward struct {

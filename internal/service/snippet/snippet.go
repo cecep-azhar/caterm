@@ -87,7 +87,7 @@ func (s *SnippetService) Create(ctx context.Context, input SnippetInput) (*Snipp
 	_, err := s.db.ExecContext(ctx,
 		"INSERT INTO snippets (id, name, body, auto_enter, scope_type, scope_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 		snip.ID, snip.Name, snip.Body, snip.AutoEnter, snip.ScopeType, scopeID, snip.CreatedAt.Format(time.RFC3339Nano), snip.UpdatedAt.Format(time.RFC3339Nano))
-	
+
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +101,7 @@ func (s *SnippetService) Update(ctx context.Context, id string, input SnippetInp
 	if input.ScopeID != "" {
 		scopeID = input.ScopeID
 	}
-	
+
 	if input.ScopeType == "" {
 		input.ScopeType = "global"
 	}
@@ -109,7 +109,7 @@ func (s *SnippetService) Update(ctx context.Context, id string, input SnippetInp
 	res, err := s.db.ExecContext(ctx,
 		"UPDATE snippets SET name = ?, body = ?, auto_enter = ?, scope_type = ?, scope_id = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL",
 		input.Name, input.Body, input.AutoEnter, input.ScopeType, scopeID, now.Format(time.RFC3339Nano), id)
-	
+
 	if err != nil {
 		return nil, err
 	}

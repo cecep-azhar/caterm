@@ -21,17 +21,17 @@ import (
 )
 
 type App struct {
-	ctx            context.Context
-	authService    *auth.Service
-	groupService   *host.GroupService
-	hostService    *host.HostService
-	snippetService *snippet.SnippetService
-	teamService    *team.TeamService
-	sshKeyService  *sshkey.Service
-	auditService   *audit.Service
+	ctx             context.Context
+	authService     *auth.Service
+	groupService    *host.GroupService
+	hostService     *host.HostService
+	snippetService  *snippet.SnippetService
+	teamService     *team.TeamService
+	sshKeyService   *sshkey.Service
+	auditService    *audit.Service
 	terminalService *terminal.Service
-	aiService      *ai.Service
-	db             *store.DB
+	aiService       *ai.Service
+	db              *store.DB
 }
 
 func NewApp(
@@ -114,7 +114,7 @@ func (a *App) ResetVault() error {
 	if a.ctx == nil {
 		return errors.New("context not initialized")
 	}
-	
+
 	_, err := a.db.ExecContext(a.ctx, "DELETE FROM vault_meta; DELETE FROM groups; DELETE FROM hosts;")
 	return err
 }

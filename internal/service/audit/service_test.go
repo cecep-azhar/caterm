@@ -33,12 +33,12 @@ func TestAuditService(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LogCommand failed: %v", err)
 	}
-	
+
 	err = svc.LogCommand(ctx, "host-1", "cat missing.txt", "cat: missing.txt: No such file", 1)
 	if err != nil {
 		t.Fatalf("LogCommand failed: %v", err)
 	}
-	
+
 	err = svc.LogCommand(ctx, "host-2", "uname -a", "Linux", 0)
 	if err != nil {
 		t.Fatalf("LogCommand failed: %v", err)
@@ -69,7 +69,7 @@ func TestAuditService(t *testing.T) {
 	if err := svc.ClearLogs(ctx, "host-1"); err != nil {
 		t.Fatalf("ClearLogs failed: %v", err)
 	}
-	
+
 	logs, _ = svc.ListLogs(ctx, "", 0, 0)
 	if len(logs) != 1 {
 		t.Fatalf("expected 1 log remaining, got %d", len(logs))
@@ -79,7 +79,7 @@ func TestAuditService(t *testing.T) {
 	if err := svc.ClearLogs(ctx, ""); err != nil {
 		t.Fatalf("ClearLogs all failed: %v", err)
 	}
-	
+
 	logs, _ = svc.ListLogs(ctx, "", 0, 0)
 	if len(logs) != 0 {
 		t.Fatalf("expected 0 logs remaining, got %d", len(logs))

@@ -53,7 +53,7 @@ df -B1 / | tail -n 1 | awk '{print $2" "$3}'
 `
 	var stdout bytes.Buffer
 	session.Stdout = &stdout
-	
+
 	if err := session.Run(cmd); err != nil {
 		return stats, fmt.Errorf("failed to run monitor command: %w", err)
 	}
