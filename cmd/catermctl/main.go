@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"caterm/internal/config"
 )
@@ -17,12 +18,15 @@ func main() {
 	switch os.Args[1] {
 	case "env":
 		fmt.Printf("DATA_PATH=%s\n", config.DataPath())
+		fmt.Printf("SYNC_PATH=%s\n", filepath.Join(filepath.Dir(config.DataPath()), "sync"))
 	case "db":
 		cmdDb(os.Args[2:], config.DataPath())
 	case "vault":
 		cmdVault(os.Args[2:])
 	case "group":
 		cmdGroup(os.Args[2:])
+	case "sync":
+		cmdSync(os.Args[2:])
 	case "util":
 		cmdUtil(os.Args[2:])
 	case "ssh":

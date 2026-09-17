@@ -93,6 +93,10 @@ func cmdVault(args []string) {
 		}
 
 		v := vault.NewVault()
+		if err := db.Migrate(ctx); err != nil {
+			fmt.Printf("Migration error: %v\n", err)
+			os.Exit(1)
+		}
 		if err := v.Init(ctx, db, pw); err != nil {
 			fmt.Printf("Init error: %v\n", err)
 			os.Exit(1)
