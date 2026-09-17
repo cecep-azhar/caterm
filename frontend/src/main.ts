@@ -796,14 +796,15 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
     document.getElementById("btn-settings")?.addEventListener("click", async () => {
         try {
             const cfg = await GetAIConfig();
-            if (cfg) {
-                (document.getElementById("ai-provider") as HTMLSelectElement).value = cfg.provider || "9router";
-                (document.getElementById("ai-model") as HTMLInputElement).value = cfg.model || "ZA126_PRO";
-                (document.getElementById("ai-base-url") as HTMLInputElement).value = cfg.base_url || "http://100.76.150.46:3007/v1";
-                (document.getElementById("ai-api-key") as HTMLInputElement).value = cfg.api_key || "";
-            }
+            (document.getElementById("ai-provider") as HTMLSelectElement).value = (cfg && cfg.provider) ? cfg.provider : "9router";
+            (document.getElementById("ai-model") as HTMLInputElement).value = (cfg && cfg.model) ? cfg.model : "ZA126_PRO";
+            (document.getElementById("ai-base-url") as HTMLInputElement).value = (cfg && cfg.base_url) ? cfg.base_url : "http://100.76.150.46:3007/v1";
+            (document.getElementById("ai-api-key") as HTMLInputElement).value = (cfg && cfg.api_key) ? cfg.api_key : "";
         } catch (e) {
             console.error("Failed to load AI config", e);
+            (document.getElementById("ai-provider") as HTMLSelectElement).value = "9router";
+            (document.getElementById("ai-model") as HTMLInputElement).value = "ZA126_PRO";
+            (document.getElementById("ai-base-url") as HTMLInputElement).value = "http://100.76.150.46:3007/v1";
         }
         settingsModal.classList.remove("hidden");
     });

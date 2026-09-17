@@ -43,7 +43,7 @@ func (s *Service) GetConfig(ctx context.Context) (*Config, error) {
 
 	for rows.Next() {
 		var k, v string
-		if err := rows.Scan(&k, &v); err == nil {
+		if err := rows.Scan(&k, &v); err == nil && v != "" {
 			switch k {
 			case "ai_provider":
 				cfg.Provider = v
@@ -61,6 +61,16 @@ func (s *Service) GetConfig(ctx context.Context) (*Config, error) {
 }
 
 func (s *Service) SaveConfig(ctx context.Context, cfg *Config) error {
+	if cfg.Provider == "" {
+		cfg.Provider = "9router"
+	}
+	if cfg.Model == "" {
+		cfg.Model = "ZA126_PRO"
+	}
+	if cfg.BaseURL == "" {
+		cfg.BaseURL = "http://100.76.150.46:3007/v1"
+	}
+
 	queries := []struct {
 		k, v string
 	}{
