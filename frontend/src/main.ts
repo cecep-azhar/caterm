@@ -3,7 +3,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
 import { EventsOn, EventsOff } from "../wailsjs/runtime/runtime";
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal, GetAIConfig, SaveAIConfig, AskAI } from "../wailsjs/go/main/App";
 
 let activeTab = "hosts";
 let editingHostId: string | null = null;
@@ -447,6 +447,12 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
                         Files (SFTP)
                     </button>
 
+                    <!-- Ask AI Assistant Button -->
+                    <button id="btn-ask-ai" title="AI Terminal Assistant" class="bg-gradient-to-r from-sky-500/20 to-purple-500/20 text-[#38bdf8] hover:text-white px-2.5 py-1 rounded border border-[#38bdf8]/30 flex items-center">
+                        <svg class="h-3.5 w-3.5 mr-1 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        Ask AI (Copilot)
+                    </button>
+
                     <!-- Close Workspace -->
                     <button id="btn-close-term" class="bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 px-3 py-1 rounded border border-rose-500/30 transition-colors font-medium">
                         Close Workspace
@@ -487,6 +493,69 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
                         <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#e6edf3] flex items-center">📄 docker-compose.yml</div>
                         <div class="p-1.5 rounded hover:bg-[#161b22] cursor-pointer text-[#e6edf3] flex items-center">📄 .env.production</div>
                     </div>
+                </div>
+
+                <!-- AI Copilot Assistant Drawer -->
+                <div id="ai-panel" class="w-80 bg-[#010409] border-l border-[#30363d] flex flex-col hidden">
+                    <div class="p-3 border-b border-[#30363d] flex justify-between items-center bg-[#0d1117]">
+                        <span class="font-bold text-xs text-[#38bdf8] flex items-center">
+                            <svg class="h-4 w-4 mr-1 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            AI Terminal Copilot
+                        </span>
+                        <button id="btn-close-ai" class="text-[#8b949e] hover:text-white text-xs">✕</button>
+                    </div>
+                    <div class="flex-1 overflow-y-auto p-3 space-y-3 font-sans text-xs" id="ai-chat-history">
+                        <div class="p-2.5 bg-[#161b22] border border-[#30363d] rounded-md text-[#e6edf3]">
+                            🤖 <strong>CATerm Copilot:</strong> Ask me any terminal command or sysadmin question!
+                        </div>
+                    </div>
+                    <div class="p-3 border-t border-[#30363d] bg-[#0d1117] flex space-x-2">
+                        <input type="text" id="ai-input-prompt" placeholder="e.g. How to check free disk space?" class="flex-1 p-2 bg-[#161b22] border border-[#30363d] rounded text-xs text-[#e6edf3]">
+                        <button id="btn-send-ai" class="bg-[#238636] hover:bg-[#2ea043] text-white px-3 py-1.5 rounded text-xs font-semibold">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Settings Modal -->
+        <div id="ai-settings-modal" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center hidden backdrop-blur-sm">
+            <div class="bg-[#161b22] border border-[#30363d] rounded-lg shadow-2xl w-[450px] flex flex-col">
+                <div class="px-6 py-4 border-b border-[#30363d] flex justify-between items-center bg-[#010409] rounded-t-lg">
+                    <h2 class="text-lg font-medium text-white flex items-center">
+                        <svg class="h-5 w-5 mr-2 text-[#38bdf8]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Profile & AI Settings
+                    </h2>
+                    <button id="btn-close-ai-settings" class="text-[#8b949e] hover:text-[#e6edf3] transition-colors">✕</button>
+                </div>
+                <div class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-[#e6edf3]">AI Provider</label>
+                        <select id="ai-provider" class="w-full p-2.5 rounded-md custom-input text-sm">
+                            <option value="9router">9Router / Custom OpenAI</option>
+                            <option value="openai">OpenAI</option>
+                            <option value="anthropic">Anthropic</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Model Name</label>
+                        <input type="text" id="ai-model" value="ZA126_PRO" class="w-full p-2.5 rounded-md custom-input text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-[#e6edf3]">Base URL</label>
+                        <input type="text" id="ai-base-url" value="http://100.76.150.46:3007/v1" class="w-full p-2.5 rounded-md custom-input text-sm font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-[#e6edf3]">API Key</label>
+                        <div class="relative">
+                            <input type="password" id="ai-api-key" placeholder="sk-..." class="w-full p-2.5 pr-10 rounded-md custom-input text-sm">
+                            <button type="button" class="toggle-pwd absolute inset-y-0 right-0 pr-3 flex items-center text-[#8b949e] hover:text-white" data-target="ai-api-key">
+                                <svg class="h-4 w-4 eye-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="p-4 border-t border-[#30363d] bg-[#010409] rounded-b-lg">
+                    <button id="btn-save-ai-settings" class="w-full bg-[#238636] hover:bg-[#2ea043] text-white font-medium py-2 rounded-md transition-colors">Save Settings</button>
                 </div>
             </div>
         </div>
@@ -681,6 +750,83 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
     });
     document.getElementById("btn-close-sftp")?.addEventListener("click", () => {
         sftpPanel.classList.add("hidden");
+    });
+
+    // AI Copilot Panel Toggle & Query Handler
+    const aiPanel = document.getElementById("ai-panel")!;
+    document.getElementById("btn-ask-ai")?.addEventListener("click", () => {
+        aiPanel.classList.toggle("hidden");
+    });
+    document.getElementById("btn-close-ai")?.addEventListener("click", () => {
+        aiPanel.classList.add("hidden");
+    });
+
+    const aiInput = document.getElementById("ai-input-prompt") as HTMLInputElement;
+    const aiHistory = document.getElementById("ai-chat-history")!;
+    document.getElementById("btn-send-ai")?.addEventListener("click", async () => {
+        const query = aiInput.value.trim();
+        if (!query) return;
+
+        const userMsg = document.createElement("div");
+        userMsg.className = "p-2 bg-[#1f2328] border border-[#30363d] rounded-md text-[#58a6ff]";
+        userMsg.textContent = `👤 ${query}`;
+        aiHistory.appendChild(userMsg);
+
+        const aiMsg = document.createElement("div");
+        aiMsg.className = "p-2 bg-[#161b22] border border-[#30363d] rounded-md text-[#8b949e]";
+        aiMsg.textContent = "🤖 Thinking...";
+        aiHistory.appendChild(aiMsg);
+        aiHistory.scrollTop = aiHistory.scrollHeight;
+
+        aiInput.value = "";
+
+        try {
+            const resp = await AskAI(query);
+            aiMsg.className = "p-2.5 bg-[#161b22] border border-[#38bdf8]/30 rounded-md text-[#e6edf3]";
+            aiMsg.innerHTML = `🤖 <strong>CATerm Copilot:</strong><br><pre class="mt-1 bg-[#0d1117] p-2 rounded text-[#38bdf8] font-mono whitespace-pre-wrap">${resp}</pre>`;
+            aiHistory.scrollTop = aiHistory.scrollHeight;
+        } catch (err: any) {
+            aiMsg.className = "p-2 bg-rose-500/10 border border-rose-500/30 rounded-md text-rose-400";
+            aiMsg.textContent = `❌ AI Error: ${err.toString()}`;
+        }
+    });
+
+    // Profile Settings & AI Config Modal Handlers
+    const settingsModal = document.getElementById("ai-settings-modal")!;
+    document.getElementById("btn-settings")?.addEventListener("click", async () => {
+        try {
+            const cfg = await GetAIConfig();
+            if (cfg) {
+                (document.getElementById("ai-provider") as HTMLSelectElement).value = cfg.provider || "9router";
+                (document.getElementById("ai-model") as HTMLInputElement).value = cfg.model || "ZA126_PRO";
+                (document.getElementById("ai-base-url") as HTMLInputElement).value = cfg.base_url || "http://100.76.150.46:3007/v1";
+                (document.getElementById("ai-api-key") as HTMLInputElement).value = cfg.api_key || "";
+            }
+        } catch (e) {
+            console.error("Failed to load AI config", e);
+        }
+        settingsModal.classList.remove("hidden");
+    });
+
+    document.getElementById("btn-close-ai-settings")?.addEventListener("click", () => {
+        settingsModal.classList.add("hidden");
+    });
+
+    document.getElementById("btn-save-ai-settings")?.addEventListener("click", async () => {
+        const cfg = {
+            provider: (document.getElementById("ai-provider") as HTMLSelectElement).value,
+            model: (document.getElementById("ai-model") as HTMLInputElement).value,
+            base_url: (document.getElementById("ai-base-url") as HTMLInputElement).value,
+            api_key: (document.getElementById("ai-api-key") as HTMLInputElement).value,
+        };
+
+        try {
+            await SaveAIConfig(cfg as any);
+            alert("AI Profile settings saved successfully!");
+            settingsModal.classList.add("hidden");
+        } catch (e: any) {
+            alert("Failed to save settings: " + e.toString());
+        }
     });
 
     // Split V / H Handlers

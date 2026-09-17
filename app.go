@@ -8,6 +8,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"caterm/internal/config"
+	"caterm/internal/service/ai"
 	"caterm/internal/service/audit"
 	"caterm/internal/service/auth"
 	"caterm/internal/service/host"
@@ -29,6 +30,7 @@ type App struct {
 	sshKeyService  *sshkey.Service
 	auditService   *audit.Service
 	terminalService *terminal.Service
+	aiService      *ai.Service
 	db             *store.DB
 }
 
@@ -41,18 +43,20 @@ func NewApp(
 	sshKeyService *sshkey.Service,
 	auditService *audit.Service,
 	terminalService *terminal.Service,
+	aiService *ai.Service,
 	db *store.DB,
 ) *App {
 	return &App{
-		authService:    authService,
-		groupService:   groupService,
-		hostService:    hostService,
-		snippetService: snippetService,
-		teamService:    teamService,
-		sshKeyService:  sshKeyService,
-		auditService:   auditService,
+		authService:     authService,
+		groupService:    groupService,
+		hostService:     hostService,
+		snippetService:  snippetService,
+		teamService:     teamService,
+		sshKeyService:   sshKeyService,
+		auditService:    auditService,
 		terminalService: terminalService,
-		db:             db,
+		aiService:       aiService,
+		db:              db,
 	}
 }
 

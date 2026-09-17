@@ -14,6 +14,10 @@ export function ApplySync() {
   return window['go']['main']['App']['ApplySync']();
 }
 
+export function AskAI(arg1) {
+  return window['go']['main']['App']['AskAI'](arg1);
+}
+
 export function ChangePassword(arg1, arg2) {
   return window['go']['main']['App']['ChangePassword'](arg1, arg2);
 }
@@ -74,6 +78,10 @@ export function GenerateSSHKey(arg1, arg2) {
   return window['go']['main']['App']['GenerateSSHKey'](arg1, arg2);
 }
 
+export function GetAIConfig() {
+  return window['go']['main']['App']['GetAIConfig']();
+}
+
 export function GetSSHKey(arg1) {
   return window['go']['main']['App']['GetSSHKey'](arg1);
 }
@@ -132,6 +140,10 @@ export function ResetVault() {
 
 export function ResizeTerminal(arg1, arg2, arg3) {
   return window['go']['main']['App']['ResizeTerminal'](arg1, arg2, arg3);
+}
+
+export function SaveAIConfig(arg1) {
+  return window['go']['main']['App']['SaveAIConfig'](arg1);
 }
 
 export function Setup(arg1) {

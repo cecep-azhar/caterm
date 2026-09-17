@@ -9,6 +9,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 
 	"caterm/internal/config"
+	"caterm/internal/service/ai"
 	"caterm/internal/service/audit"
 	"caterm/internal/service/auth"
 	"caterm/internal/service/host"
@@ -47,8 +48,9 @@ func main() {
 	sshKeyService := sshkey.NewService(db)
 	auditService := audit.NewService(db)
 	terminalService := terminal.New()
+	aiService := ai.NewService(db)
 
-	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, terminalService, db)
+	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, terminalService, aiService, db)
 
 	err = wails.Run(&options.App{
 		Title:  "caterm",

@@ -5,6 +5,7 @@ import {sync} from '../models';
 import {host} from '../models';
 import {snippet} from '../models';
 import {team} from '../models';
+import {ai} from '../models';
 import {audit} from '../models';
 
 export function AckTerminal(arg1:string,arg2:number):Promise<void>;
@@ -12,6 +13,8 @@ export function AckTerminal(arg1:string,arg2:number):Promise<void>;
 export function AddSSHKey(arg1:string,arg2:string):Promise<sshkey.SSHKey>;
 
 export function ApplySync():Promise<sync.MergeResult>;
+
+export function AskAI(arg1:string):Promise<string>;
 
 export function ChangePassword(arg1:string,arg2:string):Promise<void>;
 
@@ -43,6 +46,8 @@ export function DeleteTeam(arg1:string):Promise<void>;
 
 export function GenerateSSHKey(arg1:string,arg2:number):Promise<sshkey.SSHKey>;
 
+export function GetAIConfig():Promise<ai.Config>;
+
 export function GetSSHKey(arg1:string):Promise<sshkey.SSHKey>;
 
 export function GetSyncPath():Promise<string>;
@@ -72,6 +77,8 @@ export function OpenDonationLink():Promise<void>;
 export function ResetVault():Promise<void>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
+
+export function SaveAIConfig(arg1:ai.Config):Promise<void>;
 
 export function Setup(arg1:string):Promise<void>;
 

@@ -1,3 +1,26 @@
+export namespace ai {
+	
+	export class Config {
+	    provider: string;
+	    model: string;
+	    base_url: string;
+	    api_key: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Config(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.provider = source["provider"];
+	        this.model = source["model"];
+	        this.base_url = source["base_url"];
+	        this.api_key = source["api_key"];
+	    }
+	}
+
+}
+
 export namespace audit {
 	
 	export class AuditLog {
