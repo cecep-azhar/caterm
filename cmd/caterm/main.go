@@ -9,6 +9,7 @@ import (
 
 	"caterm/internal/config"
 	"caterm/internal/service/auth"
+	"caterm/internal/service/host"
 	"caterm/internal/store"
 	"caterm/internal/vault"
 )
@@ -28,8 +29,10 @@ func main() {
 
 	v := vault.NewVault()
 	authService := auth.New(v, db)
+	groupService := host.NewGroupService(db)
+	hostService := host.NewHostService(db, v)
 
-	app := NewApp(authService)
+	app := NewApp(authService, groupService, hostService)
 
 	err = wails.Run(&options.App{
 		Title:  "caterm",
