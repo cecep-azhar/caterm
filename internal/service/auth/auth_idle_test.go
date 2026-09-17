@@ -53,7 +53,7 @@ func TestIdleAutoLock(t *testing.T) {
 	}
 
 	time.Sleep(50 * time.Millisecond)
-	s.Activity()                     // Reset timer
+	s.Activity()                      // Reset timer
 	time.Sleep(80 * time.Millisecond) // Total 130ms, but timer was reset at 50ms
 
 	if !v.IsUnlocked() {
