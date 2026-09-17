@@ -1,4 +1,4 @@
-import { IsInitialized, Setup, Unlock } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync } from "../wailsjs/go/main/App";
 
 document.addEventListener("DOMContentLoaded", async () => {
     const app = document.getElementById("app");
@@ -7,7 +7,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
         const isInit = await IsInitialized();
         if (isInit) {
-            renderUnlock(app);
+            const syncResult = await CheckSyncPending();
+            if (syncResult && (syncResult.applied > 0 || syncResult.deleted > 0 || syncResult.conflicts > 0)) {
+                renderSyncReview(app, syncResult);
+            } else {
+                renderUnlock(app);
+            }
         } else {
             renderSetup(app);
         }
@@ -150,4 +155,46 @@ function renderDashboard(container: HTMLElement) {
             <p>Vault unlocked successfully.</p>
         </div>
     `;
+}
+
+function renderSyncReview(container: HTMLElement, syncResult: any) {
+    container.innerHTML = `
+        <div class="min-h-screen flex items-center justify-center bg-gray-900 text-white">
+            <div class="bg-gray-800 p-8 rounded-lg shadow-lg w-96">
+                <h1 class="text-2xl font-bold mb-4">Pending Sync Changes</h1>
+                <p class="mb-4 text-gray-300">New sync data is available from remote:</p>
+                <div class="bg-gray-700 p-4 rounded mb-6 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span>New / Updated:</span>
+                        <span class="font-semibold text-green-400">${syncResult.applied || 0}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Deleted:</span>
+                        <span class="font-semibold text-yellow-400">${syncResult.deleted || 0}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Conflicts:</span>
+                        <span class="font-semibold text-red-400">${syncResult.conflicts || 0}</span>
+                    </div>
+                </div>
+                <div class="flex space-x-4">
+                    <button id="sync-cancel" class="w-1/2 bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded">Batal</button>
+                    <button id="sync-apply" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Terapkan</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById("sync-cancel")?.addEventListener("click", () => {
+        renderUnlock(container);
+    });
+
+    document.getElementById("sync-apply")?.addEventListener("click", async () => {
+        try {
+            await ApplySync();
+            renderUnlock(container);
+        } catch (e: any) {
+            alert("Gagal mengaplikasikan sync: " + e.toString());
+        }
+    });
 }

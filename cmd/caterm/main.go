@@ -32,7 +32,7 @@ func main() {
 	groupService := host.NewGroupService(db)
 	hostService := host.NewHostService(db, v)
 
-	app := NewApp(authService, groupService, hostService)
+	app := NewApp(authService, groupService, hostService, db)
 
 	err = wails.Run(&options.App{
 		Title:  "caterm",
