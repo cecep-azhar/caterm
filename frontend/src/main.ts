@@ -51,6 +51,24 @@ function setupPasswordToggles(container: HTMLElement) {
     });
 }
 
+const techQuotes = [
+    { text: "Innovation distinguishes between a leader and a follower.", author: "Steve Jobs" },
+    { text: "Talk is cheap. Show me the code.", author: "Linus Torvalds" },
+    { text: "Those who can imagine anything, can create the impossible.", author: "Alan Turing" },
+    { text: "The most dangerous phrase in the language is, 'We've always done it this way.'", author: "Grace Hopper" },
+    { text: "Software is a great combination between artistry and engineering.", author: "Bill Gates" },
+    { text: "Software is eating the world, but AI is eating software.", author: "Jensen Huang" },
+    { text: "Move fast and break things. Unless you are breaking stuff, you are not moving fast enough.", author: "Mark Zuckerberg" },
+    { text: "Our industry does not respect tradition — it only respects innovation.", author: "Satya Nadella" },
+    { text: "Engineering is the closest thing to magic that exists in the real world.", author: "Elon Musk" },
+    { text: "If you're competitor-focused, you have to wait... Being customer-focused allows you to be more pioneering.", author: "Jeff Bezos" }
+];
+
+function getRandomTechQuote() {
+    const q = techQuotes[Math.floor(Math.random() * techQuotes.length)];
+    return `<h2 class="text-3xl font-bold mb-3 text-[#e6edf3] leading-snug">"${q.text}"</h2><p class="text-[#38bdf8] font-mono text-lg">— ${q.author}</p>`;
+}
+
 function renderSetup(container: HTMLElement) {
     container.innerHTML = `
         <div class="min-h-screen flex bg-[#0d1117] text-[#e6edf3] font-sans">
@@ -62,7 +80,7 @@ function renderSetup(container: HTMLElement) {
                     </div>
                 </div>
                 <div>
-                    <h2 class="text-4xl font-bold mb-4 text-[#e6edf3]">// KEEP CALM - When stuck, tail -f the logs</h2>
+                    ${getRandomTechQuote()}
                 </div>
                 <div class="text-[#8b949e] text-sm flex items-center space-x-2">
                     <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -144,7 +162,7 @@ function renderUnlock(container: HTMLElement) {
                     </div>
                 </div>
                 <div>
-                    <h2 class="text-4xl font-bold mb-4 text-[#e6edf3]">// KEEP CALM - When stuck, tail -f the logs</h2>
+                    ${getRandomTechQuote()}
                 </div>
                 <div class="text-[#8b949e] text-sm flex items-center space-x-2">
                     <span class="inline-block h-2 w-2 rounded-full bg-emerald-500"></span>
