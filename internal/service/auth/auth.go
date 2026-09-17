@@ -20,15 +20,85 @@ type Service struct {
 	v  *vault.Vault
 	db vault.DB
 
-	mu       sync.Mutex
-	fails    int
-	lastFail time.Time
+	mu          sync.Mutex
+	fails       int
+	lastFail    time.Time
+	idleTimeout time.Duration
+	idleTimer   *time.Timer
+	timerStopCh chan struct{}
+	onAutoLock  func()
 }
 
 func New(v *vault.Vault, db vault.DB) *Service {
 	return &Service{
-		v:  v,
-		db: db,
+		v:           v,
+		db:          db,
+		idleTimeout: 15 * time.Minute, // Default 15 minutes
+	}
+}
+
+func (s *Service) SetIdleTimeout(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.idleTimeout = d
+	s.resetIdleTimerLocked()
+}
+
+func (s *Service) SetOnAutoLock(cb func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.onAutoLock = cb
+}
+
+func (s *Service) Activity() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetIdleTimerLocked()
+}
+
+func (s *Service) StartIdleTimer() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.resetIdleTimerLocked()
+}
+
+func (s *Service) StopIdleTimer() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+		s.idleTimer = nil
+	}
+}
+
+func (s *Service) resetIdleTimerLocked() {
+	if s.idleTimeout <= 0 {
+		if s.idleTimer != nil {
+			s.idleTimer.Stop()
+			s.idleTimer = nil
+		}
+		return
+	}
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+	}
+	s.idleTimer = time.AfterFunc(s.idleTimeout, func() {
+		s.Lock()
+	})
+}
+
+func (s *Service) Lock() {
+	s.mu.Lock()
+	onLock := s.onAutoLock
+	if s.idleTimer != nil {
+		s.idleTimer.Stop()
+		s.idleTimer = nil
+	}
+	s.mu.Unlock()
+
+	s.v.Lock()
+	if onLock != nil {
+		onLock()
 	}
 }
 
@@ -45,7 +115,11 @@ func (s *Service) Init(ctx context.Context, password string) error {
 	if len(password) < 12 {
 		return errors.New("password must be at least 12 characters")
 	}
-	return s.v.Init(ctx, s.db, password)
+	err := s.v.Init(ctx, s.db, password)
+	if err == nil {
+		s.Activity()
+	}
+	return err
 }
 
 func (s *Service) Unlock(ctx context.Context, password string) error {
@@ -74,6 +148,7 @@ func (s *Service) Unlock(ctx context.Context, password string) error {
 	}
 
 	s.fails = 0
+	s.resetIdleTimerLocked()
 	return nil
 }
 
