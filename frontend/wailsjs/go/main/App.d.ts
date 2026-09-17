@@ -31,6 +31,8 @@ export function ListHosts():Promise<Array<host.Host>>;
 
 export function OpenDonationLink():Promise<void>;
 
+export function ResetVault():Promise<void>;
+
 export function Setup(arg1:string):Promise<void>;
 
 export function Unlock(arg1:string):Promise<void>;

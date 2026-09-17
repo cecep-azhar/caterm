@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
 	"path/filepath"
 
 	"caterm/internal/config"
@@ -75,4 +76,22 @@ func (a *App) ApplySync() (*sync.MergeResult, error) {
 	syncDir := filepath.Join(filepath.Dir(config.DataPath()), "sync")
 	importer := sync.NewImporter(a.db, syncDir)
 	return importer.Import(a.ctx, false)
+}
+
+func (a *App) ResetVault() error {
+	if a.ctx == nil {
+		return errors.New("context not initialized")
+	}
+	
+	// Close database connection
+	a.db.Close()
+	
+	// Remove database file
+	dbPath := config.DataPath()
+	if err := os.Remove(dbPath); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	
+	// Restart is usually required, but Wails runtime.WindowReload(a.ctx) can refresh the frontend
+	return nil
 }

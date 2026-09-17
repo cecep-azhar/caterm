@@ -1,5 +1,5 @@
 import './style.css';
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, OpenDonationLink, HardDeleteRecord, ListHosts, CreateHost, ListGroups } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, OpenDonationLink, HardDeleteRecord, ListHosts, CreateHost, ListGroups, ResetVault } from "../wailsjs/go/main/App";
 
 document.addEventListener("DOMContentLoaded", async () => {
     const app = document.getElementById("app");
@@ -133,6 +133,7 @@ function renderUnlock(container: HTMLElement) {
                         <p id="unlock-error" class="text-[#f85149] text-sm hidden mt-2"></p>
                     </div>
                     <button type="submit" class="w-full bg-[#238636] hover:bg-[#2ea043] text-white font-semibold py-3 px-4 rounded-md transition-colors shadow-lg">Unlock</button>
+                    <button type="button" id="btn-reset-vault" class="w-full mt-2 bg-transparent hover:bg-rose-500/10 text-rose-500 border border-rose-500/20 font-semibold py-2 px-4 rounded-md transition-colors text-sm">Reset Vault</button>
                 </form>
             </div>
         </div>
@@ -182,6 +183,17 @@ function renderUnlock(container: HTMLElement) {
         pwdInput.classList.remove("border-[#f85149]", "focus:border-[#f85149]", "focus:ring-[#f85149]/20");
         errorText.classList.add("hidden");
         errorText.textContent = "";
+    });
+
+    document.getElementById("btn-reset-vault")?.addEventListener("click", async () => {
+        if (confirm("Reset Vault will permanently delete your local database. All saved hosts and settings will be lost. Continue?")) {
+            try {
+                await ResetVault();
+                location.reload();
+            } catch (e: any) {
+                alert("Failed to reset vault: " + e.toString());
+            }
+        }
     });
 }
 

@@ -58,6 +58,10 @@ export function OpenDonationLink() {
   return window['go']['main']['App']['OpenDonationLink']();
 }
 
+export function ResetVault() {
+  return window['go']['main']['App']['ResetVault']();
+}
+
 export function Setup(arg1) {
   return window['go']['main']['App']['Setup'](arg1);
 }
