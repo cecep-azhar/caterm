@@ -1,35 +1,40 @@
-FROM debian:12-slim
+FROM debian:12 AS builder
 
-RUN apt-get update -qq && apt-get install -y \
-    curl \
-    git \
-    build-essential \
-    pkg-config \
+RUN apt-get update && apt-get install -y \
+    golang \
     libwebkit2gtk-4.0-dev \
     libgtk-3-dev \
+    npm \
     rpm \
-    sudo \
-    && rm -rf /var/lib/apt/lists/*
+    dpkg-dev \
+    gcc \
+    pkg-config \
+    git
 
-# Install Go 1.22.4
-RUN curl -L https://go.dev/dl/go1.22.4.linux-amd64.tar.gz | tar -C /usr/local -xz
-ENV PATH="/usr/local/go/bin:${PATH}"
-
-# Install Node
-RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install Wails CLI v2.16.0
-RUN go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
-ENV PATH="/root/go/bin:${PATH}"
+RUN go install github.com/wailsapp/wails/v2/cmd/wails@latest
 
 WORKDIR /app
 COPY . .
 
-# Let's write the binary back encoded via base64, or just write it to stdout to capture it,
-# but the proper way is to use a mounted volume and fix the permissions.
-# First, let's fix the Dockerfile to change ownership to the local user via passed envs,
-# or simply pack it as a deb/rpm package directly in the container.
-# For now, let's just create the deb inside the container.
-CMD ["bash", "-c", "wails build -platform linux/amd64 -s -skipbindings && cat build/bin/caterm_new | base64 > /out/caterm.b64"]
+RUN go mod download
+
+RUN /root/go/bin/wails build -platform linux/amd64
+
+WORKDIR /app/build/bin
+
+# Package DEB
+RUN mkdir -p /app/dist && \
+    mkdir -p caterm_1.0.0_amd64/DEBIAN && \
+    mkdir -p caterm_1.0.0_amd64/usr/bin && \
+    cp caterm caterm_1.0.0_amd64/usr/bin/ && \
+    echo "Package: caterm\nVersion: 1.0.0\nArchitecture: amd64\nMaintainer: CECEP <hi@cecepazhar.com>\nDescription: CATERM SSH Client\nDepends: libwebkit2gtk-4.0-37" > caterm_1.0.0_amd64/DEBIAN/control && \
+    dpkg-deb --build caterm_1.0.0_amd64 && \
+    mv caterm_1.0.0_amd64.deb /app/dist/
+
+# Package RPM
+RUN mkdir -p /root/rpmbuild/SOURCES /root/rpmbuild/SPECS /root/rpmbuild/RPMS /root/rpmbuild/SRPMS /root/rpmbuild/BUILD /root/rpmbuild/BUILDROOT && \
+    echo -e "Name: caterm\nVersion: 1.0.0\nRelease: 1\nSummary: CATERM\nLicense: MIT\nRequires: webkit2gtk3\n\n%description\nCATERM SSH Client\n\n%install\nmkdir -p %{buildroot}/usr/bin\ncp /app/build/bin/caterm %{buildroot}/usr/bin/\n\n%files\n/usr/bin/caterm" > /root/rpmbuild/SPECS/caterm.spec && \
+    rpmbuild -bb /root/rpmbuild/SPECS/caterm.spec && \
+    mv /root/rpmbuild/RPMS/x86_64/*.rpm /app/dist/
+
+CMD ["cp", "-r", "/app/dist/.", "/out/"]
