@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         const isInit = await IsInitialized();
         if (isInit) {
             const syncResult = await CheckSyncPending();
-            if (syncResult && (syncResult.applied > 0 || syncResult.deleted > 0 || syncResult.conflicts > 0)) {
+            if (syncResult && (syncResult.added > 0 || syncResult.updated > 0 || syncResult.deleted > 0 || (syncResult.conflicts && syncResult.conflicts.length > 0))) {
                 renderSyncReview(app, syncResult);
             } else {
                 renderUnlock(app);
@@ -237,8 +237,12 @@ function renderSyncReview(container: HTMLElement, syncResult: any) {
                 <h2 class="text-2xl font-bold mb-6 text-[#58a6ff]">Sync Pending</h2>
                 <div class="space-y-4 mb-8 bg-[#0d1117] p-4 rounded-lg border border-[#30363d]">
                     <div class="flex justify-between items-center pb-2 border-b border-[#30363d]">
-                        <span class="text-[#8b949e]">Applied changes:</span>
-                        <span class="font-bold text-[#3fb950]">${syncResult.applied || 0}</span>
+                        <span class="text-[#8b949e]">Added changes:</span>
+                        <span class="font-bold text-[#3fb950]">${syncResult.added || 0}</span>
+                    </div>
+                    <div class="flex justify-between items-center pb-2 border-b border-[#30363d]">
+                        <span class="text-[#8b949e]">Updated changes:</span>
+                        <span class="font-bold text-[#38bdf8]">${syncResult.updated || 0}</span>
                     </div>
                     <div class="flex justify-between items-center pb-2 border-b border-[#30363d]">
                         <span class="text-[#8b949e]">Deleted records:</span>
@@ -246,7 +250,7 @@ function renderSyncReview(container: HTMLElement, syncResult: any) {
                     </div>
                     <div class="flex justify-between items-center">
                         <span class="text-[#8b949e]">Conflicts:</span>
-                        <span class="font-bold text-[#d29922]">${syncResult.conflicts || 0}</span>
+                        <span class="font-bold text-[#d29922]">${syncResult.conflicts ? syncResult.conflicts.length : 0}</span>
                     </div>
                 </div>
                 <div class="flex space-x-4">
