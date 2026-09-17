@@ -41,7 +41,7 @@ func TestSettingsHardDelete(t *testing.T) {
 	sshKeyService := sshkey.NewService(db)
 	auditService := audit.NewService(db)
 
-	terminalService := terminal.NewService()
+	terminalService := terminal.New()
 	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, terminalService, db)
 	app.startup(ctx)
 

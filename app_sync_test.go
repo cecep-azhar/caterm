@@ -12,6 +12,7 @@ import (
 	"caterm/internal/service/snippet"
 	"caterm/internal/service/sshkey"
 	"caterm/internal/service/team"
+	"caterm/internal/service/terminal"
 	"caterm/internal/store"
 	"caterm/internal/vault"
 )
@@ -40,7 +41,8 @@ func TestAppSyncReviewPanelNoAutoApply(t *testing.T) {
 	sshKeyService := sshkey.NewService(db)
 	auditService := audit.NewService(db)
 
-	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, db)
+	terminalService := terminal.New()
+	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, terminalService, db)
 	app.startup(ctx)
 
 	// Hash DB before

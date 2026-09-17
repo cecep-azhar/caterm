@@ -3,7 +3,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
 import { EventsOn, EventsOff } from "../wailsjs/runtime/runtime";
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal, ResizeTerminal } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal } from "../wailsjs/go/main/App";
 
 let activeTab = "hosts";
 let editingHostId: string | null = null;
