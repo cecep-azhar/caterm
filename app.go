@@ -5,6 +5,8 @@ import (
 	"errors"
 	"path/filepath"
 
+	"github.com/wailsapp/wails/v2/pkg/runtime"
+
 	"caterm/internal/config"
 	"caterm/internal/service/audit"
 	"caterm/internal/service/auth"
@@ -12,6 +14,7 @@ import (
 	"caterm/internal/service/snippet"
 	"caterm/internal/service/sshkey"
 	"caterm/internal/service/team"
+	"caterm/internal/service/terminal"
 	"caterm/internal/store"
 	"caterm/internal/sync"
 )
@@ -25,6 +28,7 @@ type App struct {
 	teamService    *team.TeamService
 	sshKeyService  *sshkey.Service
 	auditService   *audit.Service
+	terminalService *terminal.Service
 	db             *store.DB
 }
 
@@ -36,6 +40,7 @@ func NewApp(
 	teamService *team.TeamService,
 	sshKeyService *sshkey.Service,
 	auditService *audit.Service,
+	terminalService *terminal.Service,
 	db *store.DB,
 ) *App {
 	return &App{
@@ -46,12 +51,15 @@ func NewApp(
 		teamService:    teamService,
 		sshKeyService:  sshKeyService,
 		auditService:   auditService,
+		terminalService: terminalService,
 		db:             db,
 	}
 }
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.terminalService.Startup(ctx)
+	a.terminalService.SetEventEmitter(runtime.EventsEmit)
 }
 
 func (a *App) Greet(name string) string {

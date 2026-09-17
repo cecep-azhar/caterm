@@ -7,6 +7,8 @@ import {snippet} from '../models';
 import {team} from '../models';
 import {audit} from '../models';
 
+export function AckTerminal(arg1:string,arg2:number):Promise<void>;
+
 export function AddSSHKey(arg1:string,arg2:string):Promise<sshkey.SSHKey>;
 
 export function ApplySync():Promise<sync.MergeResult>;
@@ -16,6 +18,10 @@ export function ChangePassword(arg1:string,arg2:string):Promise<void>;
 export function CheckSyncPending():Promise<sync.MergeResult>;
 
 export function ClearAuditLogs(arg1:string):Promise<void>;
+
+export function CloseTerminal(arg1:string):Promise<void>;
+
+export function ConnectTerminal(arg1:string,arg2:string,arg3:number,arg4:number):Promise<void>;
 
 export function CreateGroup(arg1:string,arg2:number):Promise<host.Group>;
 
@@ -65,6 +71,8 @@ export function OpenDonationLink():Promise<void>;
 
 export function ResetVault():Promise<void>;
 
+export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
+
 export function Setup(arg1:string):Promise<void>;
 
 export function Unlock(arg1:string):Promise<void>;
@@ -76,3 +84,5 @@ export function UpdateHost(arg1:string,arg2:host.HostInput):Promise<host.Host>;
 export function UpdateSnippet(arg1:string,arg2:snippet.SnippetInput):Promise<snippet.Snippet>;
 
 export function UpdateTeam(arg1:string,arg2:team.TeamInput):Promise<team.Team>;
+
+export function WriteTerminal(arg1:string,arg2:string):Promise<void>;

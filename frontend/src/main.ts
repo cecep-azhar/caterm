@@ -2,7 +2,8 @@ import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault } from "../wailsjs/go/main/App";
+import { EventsOn, EventsOff } from "../wailsjs/runtime/runtime";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal, ResizeTerminal } from "../wailsjs/go/main/App";
 
 let activeTab = "hosts";
 let editingHostId: string | null = null;
@@ -640,32 +641,28 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
 
             currentTerm = term;
 
-            term.writeln('\x1b[32m[CATerm Interactive Terminal Shell v0.1.0]\x1b[0m');
+            const paneID = "pane-1";
+            term.writeln('\x1b[32m[CATerm SSH PTY Engine v0.1.0]\x1b[0m');
             term.writeln(`\x1b[90mConnecting to ${h.username}@${h.hostname}:${h.port}...\x1b[0m`);
-            term.writeln('\x1b[32m✔ Connected to host.\x1b[0m\r\n');
-            
-            const prompt = `\x1b[32m${h.username}@${h.hostname}\x1b[0m:\x1b[34m~\x1b[0m$ `;
-            term.write(prompt);
 
-            let lineBuffer = "";
+            // Wire up real Wails Events for SSH Output
+            EventsOff(`terminal:output:${paneID}`);
+            EventsOn(`terminal:output:${paneID}`, (data: string) => {
+                term.write(data);
+            });
+
+            EventsOff(`terminal:closed:${paneID}`);
+            EventsOn(`terminal:closed:${paneID}`, () => {
+                term.writeln('\r\n\x1b[31m[Connection Closed by Remote Host]\x1b[0m');
+            });
+
+            // Trigger real Go SSH PTY Connection
+            ConnectTerminal(paneID, h.id, 24, 80).catch((err: any) => {
+                term.writeln(`\r\n\x1b[31m✔ SSH Connection Failed: ${err}\x1b[0m`);
+            });
+
             term.onData(data => {
-                const code = data.charCodeAt(0);
-                if (code === 13) {
-                    term.writeln('');
-                    if (lineBuffer.trim().length > 0) {
-                        term.writeln(`\x1b[33m[exec]\x1b[0m ${lineBuffer}`);
-                    }
-                    lineBuffer = "";
-                    term.write(prompt);
-                } else if (code === 127) {
-                    if (lineBuffer.length > 0) {
-                        lineBuffer = lineBuffer.slice(0, -1);
-                        term.write('\b \b');
-                    }
-                } else {
-                    lineBuffer += data;
-                    term.write(data);
-                }
+                WriteTerminal(paneID, data);
             });
         });
     });
@@ -673,6 +670,7 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
     // Terminal Toolbar Button Handlers
     document.getElementById("btn-close-term")?.addEventListener("click", () => {
         document.getElementById("terminal-modal")?.classList.add("hidden");
+        CloseTerminal("pane-1");
         if (sessionTimerInterval) clearInterval(sessionTimerInterval);
     });
 
