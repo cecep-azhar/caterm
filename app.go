@@ -11,6 +11,7 @@ import (
 	"caterm/internal/service/ai"
 	"caterm/internal/service/audit"
 	"caterm/internal/service/auth"
+	"caterm/internal/service/hostkey"
 	"caterm/internal/service/host"
 	"caterm/internal/service/snippet"
 	"caterm/internal/service/sshkey"
@@ -31,6 +32,7 @@ type App struct {
 	auditService    *audit.Service
 	terminalService *terminal.Service
 	aiService       *ai.Service
+	hostKeyStore    *hostkey.Store
 	db              *store.DB
 }
 
