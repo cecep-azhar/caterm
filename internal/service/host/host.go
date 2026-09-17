@@ -229,15 +229,21 @@ type scanner interface {
 
 func scanHost(s scanner) (*Host, error) {
 	var h Host
-	var grpID, delAt sql.NullString
+	var grpID, pwdEnc, pkEnc, delAt sql.NullString
 	if err := s.Scan(
 		&h.ID, &grpID, &h.Name, &h.Hostname, &h.Port, &h.Username, &h.AuthType,
-		&h.EncryptedPassword, &h.EncryptedPrivateKey, &h.CreatedAt, &h.UpdatedAt, &delAt,
+		&pwdEnc, &pkEnc, &h.CreatedAt, &h.UpdatedAt, &delAt,
 	); err != nil {
 		return nil, err
 	}
 	if grpID.Valid {
 		h.GroupID = &grpID.String
+	}
+	if pwdEnc.Valid {
+		h.EncryptedPassword = pwdEnc.String
+	}
+	if pkEnc.Valid {
+		h.EncryptedPrivateKey = pkEnc.String
 	}
 	if delAt.Valid {
 		h.DeletedAt = &delAt.String

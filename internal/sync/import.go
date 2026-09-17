@@ -37,6 +37,7 @@ func (imp *Importer) Import(ctx context.Context, dryRun bool) (*MergeResult, err
 	result := &MergeResult{Skipped: []string{}, Conflicts: []string{}}
 
 	// 1. Read sync files
+	imp.importMeta(ctx)
 	groupsFiles, brokenGroupFiles := imp.readJSONFiles(filepath.Join(imp.syncDir, "groups"))
 	hostsFiles, brokenHostFiles := imp.readJSONFiles(filepath.Join(imp.syncDir, "hosts"))
 
@@ -82,6 +83,28 @@ func (imp *Importer) Import(ctx context.Context, dryRun bool) (*MergeResult, err
 	}
 
 	return result, nil
+}
+
+func (imp *Importer) importMeta(ctx context.Context) {
+	metaPath := filepath.Join(imp.syncDir, "meta.json")
+	b, err := os.ReadFile(metaPath)
+	if err != nil {
+		return
+	}
+
+	var m Meta
+	if err := json.Unmarshal(b, &m); err != nil {
+		return
+	}
+
+	var count int
+	err = imp.db.QueryRowContext(ctx, "SELECT count(*) FROM vault_meta").Scan(&count)
+	if err == nil && count == 0 {
+		now := store.NowUTC()
+		imp.db.ExecContext(ctx, `INSERT INTO vault_meta (
+			id, schema_version, kdf, kdf_salt, kdf_time, kdf_memory, kdf_threads, wrapped_dek, created_at, updated_at
+		) VALUES (1, 1, 'argon2id', ?, 3, 65536, 4, ?, ?, ?)`, m.KDFSalt, m.WrappedDEK, now, now)
+	}
 }
 
 func (imp *Importer) readJSONFiles(dir string) (map[string]map[string]interface{}, []string) {

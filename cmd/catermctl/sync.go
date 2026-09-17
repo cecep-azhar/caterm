@@ -51,6 +51,11 @@ func cmdSync(args []string) {
 		}
 		defer db.Close()
 
+		if err := db.Migrate(context.Background()); err != nil {
+			fmt.Printf("Migration failed: %v\n", err)
+			os.Exit(1)
+		}
+
 		importer := sync.NewImporter(db, syncPath)
 		res, err := importer.Import(context.Background(), *dryRun)
 		if err != nil {

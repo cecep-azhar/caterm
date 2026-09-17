@@ -25,6 +25,8 @@ func main() {
 		cmdVault(os.Args[2:])
 	case "group":
 		cmdGroup(os.Args[2:])
+	case "host":
+		cmdHost(os.Args[2:])
 	case "sync":
 		cmdSync(os.Args[2:])
 	case "util":
