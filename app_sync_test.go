@@ -6,8 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"caterm/internal/service/audit"
 	"caterm/internal/service/auth"
 	"caterm/internal/service/host"
+	"caterm/internal/service/snippet"
+	"caterm/internal/service/sshkey"
+	"caterm/internal/service/team"
 	"caterm/internal/store"
 	"caterm/internal/vault"
 )
@@ -31,8 +35,12 @@ func TestAppSyncReviewPanelNoAutoApply(t *testing.T) {
 	authService := auth.New(v, db)
 	groupService := host.NewGroupService(db)
 	hostService := host.NewHostService(db, v)
+	snippetService := snippet.NewSnippetService(db)
+	teamService := team.NewTeamService(db)
+	sshKeyService := sshkey.NewService(db)
+	auditService := audit.NewService(db)
 
-	app := NewApp(authService, groupService, hostService, db)
+	app := NewApp(authService, groupService, hostService, snippetService, teamService, sshKeyService, auditService, db)
 	app.startup(ctx)
 
 	// Hash DB before

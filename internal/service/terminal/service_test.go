@@ -58,7 +58,7 @@ func TestTerminalService(t *testing.T) {
 	svc.isTest = true
 
 	paneID := "pane-123"
-	svc.StartSession(paneID, sess)
+	svc.StartSession(paneID, sess, client)
 
 	err = svc.Write(paneID, []byte("echo QA_TEST_ECHO\n"))
 	if err != nil {

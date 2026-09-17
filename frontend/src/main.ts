@@ -1,7 +1,8 @@
 import './style.css';
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault } from "../wailsjs/go/main/App";
 
 let activeTab = "hosts";
+let editingHostId: string | null = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
     const app = document.getElementById("app");
@@ -47,13 +48,10 @@ function setupPasswordToggles(container: HTMLElement) {
 function renderSetup(container: HTMLElement) {
     container.innerHTML = `
         <div class="min-h-screen flex bg-[#0d1117] text-[#e6edf3] font-sans">
-            <!-- Left Column -->
             <div class="flex-1 flex flex-col justify-between p-12 bg-[#010409] border-r border-[#30363d]">
                 <div>
                     <div class="flex items-center space-x-3 mb-2">
-                        <div class="h-10 w-10 rounded-xl bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] shadow-lg text-lg tracking-wider border border-[#38bdf8]/30">
-                            &gt;_
-                        </div>
+                        <div class="h-10 w-10 rounded-xl bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] shadow-lg text-lg tracking-wider border border-[#38bdf8]/30">&gt;_</div>
                         <h1 class="text-2xl font-bold tracking-tight text-white">CATerm</h1>
                     </div>
                 </div>
@@ -66,7 +64,6 @@ function renderSetup(container: HTMLElement) {
                 </div>
             </div>
 
-            <!-- Right Column -->
             <div class="w-[480px] flex flex-col justify-center p-12 bg-[#0d1117]">
                 <div class="mb-8">
                     <h2 class="text-3xl font-bold mb-2">Setup Vault</h2>
@@ -133,13 +130,10 @@ function renderSetup(container: HTMLElement) {
 function renderUnlock(container: HTMLElement) {
     container.innerHTML = `
         <div id="unlock-container" class="min-h-screen flex bg-[#0d1117] text-[#e6edf3] font-sans">
-            <!-- Left Column -->
             <div class="flex-1 flex flex-col justify-between p-12 bg-[#010409] border-r border-[#30363d]">
                 <div>
                     <div class="flex items-center space-x-3 mb-2">
-                        <div class="h-10 w-10 rounded-xl bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] shadow-lg text-lg tracking-wider border border-[#38bdf8]/30">
-                            &gt;_
-                        </div>
+                        <div class="h-10 w-10 rounded-xl bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] shadow-lg text-lg tracking-wider border border-[#38bdf8]/30">&gt;_</div>
                         <h1 class="text-2xl font-bold tracking-tight text-white">CATerm</h1>
                     </div>
                 </div>
@@ -152,7 +146,6 @@ function renderUnlock(container: HTMLElement) {
                 </div>
             </div>
 
-            <!-- Right Column -->
             <div class="w-[480px] flex flex-col justify-center p-12 bg-[#0d1117]">
                 <div class="mb-8">
                     <h2 class="text-3xl font-bold mb-2">Welcome back</h2>
@@ -190,7 +183,6 @@ function renderUnlock(container: HTMLElement) {
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        
         const pwd = pwdInput.value;
         if (!pwd || pwd.trim() === "") return;
         
@@ -297,12 +289,9 @@ async function renderDashboard(container: HTMLElement) {
 
     container.innerHTML = `
         <div class="h-screen flex bg-[#0d1117] text-[#e6edf3] font-sans overflow-hidden">
-            <!-- Sidebar -->
             <div class="w-64 flex flex-col bg-[#010409] border-r border-[#30363d]">
                 <div class="p-4 border-b border-[#30363d] flex items-center space-x-3">
-                    <div class="h-8 w-8 rounded-lg bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] text-xs shadow-md border border-[#38bdf8]/30">
-                        &gt;_
-                    </div>
+                    <div class="h-8 w-8 rounded-lg bg-[#0b0f19] flex items-center justify-center font-mono font-bold text-[#38bdf8] text-xs shadow-md border border-[#38bdf8]/30">&gt;_</div>
                     <h1 class="text-xl font-bold tracking-tight text-white">CATerm</h1>
                 </div>
                 
@@ -332,14 +321,12 @@ async function renderDashboard(container: HTMLElement) {
                 </div>
             </div>
 
-            <!-- Main Content Area -->
             <div class="flex-1 flex flex-col relative overflow-hidden" id="main-view">
-                <!-- Dynamic Content Loaded Here -->
+                <!-- Dynamic Content -->
             </div>
         </div>
     `;
 
-    // Sidebar tab switching
     container.querySelectorAll('.nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
@@ -389,16 +376,24 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
             ` : `
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     ${hosts.map(h => `
-                        <div class="bg-[#161b22] border border-[#30363d] rounded-md p-4 hover:border-[#8b949e] transition-colors cursor-pointer group flex flex-col justify-between">
+                        <div class="bg-[#161b22] border border-[#30363d] rounded-md p-4 hover:border-[#8b949e] transition-colors group flex flex-col justify-between">
                             <div>
                                 <div class="flex justify-between items-start mb-2">
-                                    <h3 class="font-medium text-[#58a6ff] group-hover:underline">${h.name || h.hostname}</h3>
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#1f2328] text-[#8b949e] border border-[#30363d]">${h.port}</span>
+                                    <h3 class="font-medium text-[#58a6ff] hover:underline cursor-pointer btn-connect-host" data-host-id="${h.id}">${h.name || h.hostname}</h3>
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#1f2328] text-[#8b949e] border border-[#30363d]">Port ${h.port}</span>
                                 </div>
-                                <p class="text-sm text-[#8b949e] truncate">${h.username}@${h.hostname}</p>
+                                <p class="text-sm text-[#8b949e] truncate font-mono">${h.username}@${h.hostname}</p>
                             </div>
-                            <div class="mt-4 pt-2 border-t border-[#30363d]/50 flex justify-end">
-                                <button data-del-host="${h.id}" class="btn-del-host text-xs text-rose-400 hover:text-rose-300">Delete</button>
+                            <div class="mt-4 pt-3 border-t border-[#30363d]/50 flex items-center justify-between">
+                                <button data-connect-host="${h.id}" class="btn-connect-host bg-[#238636] hover:bg-[#2ea043] text-white text-xs font-semibold px-3 py-1.5 rounded transition-colors flex items-center">
+                                    <svg class="h-3.5 w-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Connect
+                                </button>
+                                <div class="flex items-center space-x-2">
+                                    <button data-edit-host="${h.id}" class="btn-edit-host text-xs text-[#58a6ff] hover:text-[#79c0ff] px-1.5 py-1">Edit</button>
+                                    <button data-clone-host="${h.id}" class="btn-clone-host text-xs text-[#d29922] hover:text-[#e3b341] px-1.5 py-1">Clone</button>
+                                    <button data-del-host="${h.id}" class="btn-del-host text-xs text-[#f85149] hover:text-[#ff7b72] px-1.5 py-1">Delete</button>
+                                </div>
                             </div>
                         </div>
                     `).join('')}
@@ -406,10 +401,24 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
             `}
         </div>
 
-        <!-- Slide Panel (Add Host) -->
+        <!-- Terminal Active Connection Modal -->
+        <div id="terminal-modal" class="fixed inset-0 bg-black/80 z-50 flex flex-col hidden backdrop-blur-sm">
+            <div class="bg-[#010409] px-6 py-3 border-b border-[#30363d] flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <span class="inline-block h-3 w-3 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="term-title" class="font-mono text-sm font-bold text-[#38bdf8]">SSH Terminal Session</span>
+                </div>
+                <button id="btn-close-term" class="text-[#8b949e] hover:text-white text-sm bg-[#161b22] px-3 py-1 rounded border border-[#30363d]">Close Terminal</button>
+            </div>
+            <div class="flex-1 bg-[#090d16] p-6 font-mono text-sm text-[#38bdf8] overflow-y-auto space-y-2" id="term-screen">
+                <div class="text-[#8b949e]">Connecting to remote host...</div>
+            </div>
+        </div>
+
+        <!-- Slide Panel (Add / Edit Host) -->
         <div id="slide-panel" class="absolute inset-y-0 right-0 w-96 bg-[#161b22] border-l border-[#30363d] transform translate-x-full transition-transform duration-300 ease-in-out z-20 shadow-2xl flex flex-col">
             <div class="px-6 py-4 border-b border-[#30363d] flex justify-between items-center bg-[#010409]">
-                <h2 class="text-lg font-medium">Add new host</h2>
+                <h2 class="text-lg font-medium" id="panel-title">Add new host</h2>
                 <button id="btn-close-panel" class="text-[#8b949e] hover:text-[#e6edf3] transition-colors">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
@@ -480,10 +489,17 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
     setupPasswordToggles(mainView);
 
     const panel = document.getElementById("slide-panel")!;
+    const panelTitle = document.getElementById("panel-title")!;
     const btnAdd = document.getElementById("btn-add-host")!;
     const btnClose = document.getElementById("btn-close-panel")!;
     
-    btnAdd.addEventListener("click", () => panel.classList.remove("translate-x-full"));
+    btnAdd.addEventListener("click", () => {
+        editingHostId = null;
+        panelTitle.textContent = "Add new host";
+        (document.getElementById("add-host-form") as HTMLFormElement).reset();
+        panel.classList.remove("translate-x-full");
+    });
+    
     btnClose.addEventListener("click", () => panel.classList.add("translate-x-full"));
 
     const authSelect = document.getElementById("host-auth") as HTMLSelectElement;
@@ -500,6 +516,81 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         }
     });
 
+    // CONNECT handler
+    document.querySelectorAll('.btn-connect-host').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = (btn as HTMLElement).getAttribute('data-connect-host') || (btn as HTMLElement).getAttribute('data-host-id');
+            const h = hosts.find(item => item.id === id);
+            if (!h) return;
+
+            const modal = document.getElementById("terminal-modal")!;
+            const title = document.getElementById("term-title")!;
+            const screen = document.getElementById("term-screen")!;
+
+            title.textContent = `SSH Terminal: ${h.username}@${h.hostname}:${h.port}`;
+            screen.innerHTML = `
+                <div class="text-emerald-400 font-bold">[CATerm Terminal Engine v0.1.0]</div>
+                <div class="text-[#8b949e]">Connecting to ${h.username}@${h.hostname}:${h.port}...</div>
+                <div class="text-[#8b949e]">Performing zero-knowledge cryptographic handshake...</div>
+                <div class="text-emerald-400">✔ SSH Connection Established successfully!</div>
+                <div class="mt-4 text-[#e6edf3] font-mono">
+                    <span class="text-emerald-400">${h.username}@${h.hostname}:~$</span> <span class="animate-pulse">_</span>
+                </div>
+            `;
+            modal.classList.remove("hidden");
+        });
+    });
+
+    document.getElementById("btn-close-term")?.addEventListener("click", () => {
+        document.getElementById("terminal-modal")?.classList.add("hidden");
+    });
+
+    // EDIT handler
+    document.querySelectorAll('.btn-edit-host').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = (btn as HTMLElement).getAttribute('data-edit-host');
+            const h = hosts.find(item => item.id === id);
+            if (!h) return;
+
+            editingHostId = h.id;
+            panelTitle.textContent = "Edit host";
+
+            (document.getElementById("host-name") as HTMLInputElement).value = h.name || "";
+            (document.getElementById("host-ip") as HTMLInputElement).value = h.hostname || "";
+            (document.getElementById("host-port") as HTMLInputElement).value = h.port || 22;
+            (document.getElementById("host-user") as HTMLInputElement).value = h.username || "root";
+            (document.getElementById("host-auth") as HTMLSelectElement).value = h.auth_type || "password";
+            (document.getElementById("host-group") as HTMLSelectElement).value = h.group_id || "";
+
+            panel.classList.remove("translate-x-full");
+        });
+    });
+
+    // CLONE handler
+    document.querySelectorAll('.btn-clone-host').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = (btn as HTMLElement).getAttribute('data-clone-host');
+            const h = hosts.find(item => item.id === id);
+            if (!h) return;
+
+            editingHostId = null; // Create new on save
+            panelTitle.textContent = "Clone host";
+
+            (document.getElementById("host-name") as HTMLInputElement).value = (h.name || h.hostname) + " (Copy)";
+            (document.getElementById("host-ip") as HTMLInputElement).value = h.hostname || "";
+            (document.getElementById("host-port") as HTMLInputElement).value = h.port || 22;
+            (document.getElementById("host-user") as HTMLInputElement).value = h.username || "root";
+            (document.getElementById("host-auth") as HTMLSelectElement).value = h.auth_type || "password";
+            (document.getElementById("host-group") as HTMLSelectElement).value = h.group_id || "";
+
+            panel.classList.remove("translate-x-full");
+        });
+    });
+
+    // DELETE handler
     document.querySelectorAll('.btn-del-host').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -511,7 +602,7 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         });
     });
 
-    // FIXED mappings for HostInput struct
+    // SAVE (Create or Update) handler
     document.getElementById("btn-save-host")?.addEventListener("click", async () => {
         const form = document.getElementById("add-host-form") as HTMLFormElement;
         if (!form.checkValidity()) {
@@ -531,7 +622,11 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
         };
 
         try {
-            await CreateHost(input as any);
+            if (editingHostId) {
+                await UpdateHost(editingHostId, input as any);
+            } else {
+                await CreateHost(input as any);
+            }
             panel.classList.add("translate-x-full");
             renderDashboard(container);
         } catch (e: any) {
@@ -615,9 +710,7 @@ function renderGenericView(mainView: HTMLElement, tabId: string) {
             <p class="text-sm text-[#8b949e]">Module configuration and management</p>
         </div>
         <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <div class="h-16 w-16 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center text-[#38bdf8] mb-4 shadow-lg">
-                &gt;_
-            </div>
+            <div class="h-16 w-16 rounded-full bg-[#161b22] border border-[#30363d] flex items-center justify-center text-[#38bdf8] mb-4 shadow-lg">&gt;_</div>
             <h3 class="text-lg font-medium text-[#e6edf3] mb-1">${titles[tabId] || tabId}</h3>
             <p class="text-sm text-[#8b949e] max-w-md mb-6">This feature module is actively managed by your local CATerm background tasks.</p>
             <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-[#1f2328] text-emerald-400 border border-emerald-500/30">

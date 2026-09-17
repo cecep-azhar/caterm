@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"caterm/internal/sshx"
+	"caterm/internal/sshx/monitor"
+	"caterm/internal/sshx/portforward"
+	"golang.org/x/crypto/ssh"
 )
 
 type Service struct {
@@ -19,8 +23,10 @@ type Service struct {
 type SessionState struct {
 	PaneID      string
 	Session     *sshx.Session
-	Client      interface{} // *ssh.Client interface abstraction
+	Client      *ssh.Client
 	FlowControl *sshx.FlowControl
+	PortForward *portforward.PortForward
+	Monitor     *monitor.Monitor
 	Cancel      context.CancelFunc
 }
 
@@ -46,7 +52,7 @@ func (s *Service) Ack(paneID string, bytes int64) {
 }
 
 // StartSession initializes flow control for a given pane ID
-func (s *Service) StartSession(paneID string, sess *sshx.Session) {
+func (s *Service) StartSession(paneID string, sess *sshx.Session, client *ssh.Client) {
 	ctx, cancel := context.WithCancel(context.Background())
 	if s.ctx != nil {
 		ctx, cancel = context.WithCancel(s.ctx)
@@ -57,6 +63,7 @@ func (s *Service) StartSession(paneID string, sess *sshx.Session) {
 	state := &SessionState{
 		PaneID:      paneID,
 		Session:     sess,
+		Client:      client,
 		FlowControl: fc,
 		Cancel:      cancel,
 	}
@@ -107,6 +114,115 @@ func (s *Service) Resize(paneID string, rows, cols int) error {
 	return state.Session.WindowChange(rows, cols)
 }
 
+// StartPortForward starts a port forwarding tunnel for a session
+func (s *Service) StartPortForward(paneID, localAddr, remoteAddr string) error {
+	s.mu.Lock()
+	state, exists := s.sessions[paneID]
+	s.mu.Unlock()
+
+	if !exists {
+		return fmt.Errorf("session not found: %s", paneID)
+	}
+	if state.Client == nil {
+		return fmt.Errorf("session client not available")
+	}
+
+	if state.PortForward != nil {
+		state.PortForward.Stop()
+	}
+
+	pf := portforward.New(s.ctx, state.Client, localAddr, remoteAddr)
+	if err := pf.Start(); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	state.PortForward = pf
+	s.mu.Unlock()
+
+	return nil
+}
+
+// StopPortForward stops an active port forwarding tunnel for a session
+func (s *Service) StopPortForward(paneID string) error {
+	s.mu.Lock()
+	state, exists := s.sessions[paneID]
+	s.mu.Unlock()
+
+	if !exists {
+		return fmt.Errorf("session not found: %s", paneID)
+	}
+	if state.PortForward == nil {
+		return nil
+	}
+
+	err := state.PortForward.Stop()
+	s.mu.Lock()
+	state.PortForward = nil
+	s.mu.Unlock()
+
+	return err
+}
+
+// StartMonitoring starts collecting telemetry for a session
+func (s *Service) StartMonitoring(paneID string, intervalSeconds int) error {
+	s.mu.Lock()
+	state, exists := s.sessions[paneID]
+	s.mu.Unlock()
+
+	if !exists {
+		return fmt.Errorf("session not found: %s", paneID)
+	}
+	if state.Client == nil {
+		return fmt.Errorf("session client not available")
+	}
+
+	if state.Monitor != nil {
+		state.Monitor.Stop()
+	}
+
+	if intervalSeconds <= 0 {
+		intervalSeconds = 3
+	}
+
+	mon := monitor.New(s.ctx, state.Client)
+	mon.Watch(time.Duration(intervalSeconds)*time.Second, func(stats monitor.Stats, err error) {
+		if err != nil {
+			return
+		}
+		if s.ctx != nil && !s.isTest {
+			s.emitEvent(s.ctx, fmt.Sprintf("terminal:telemetry:%s", paneID), stats)
+		}
+	})
+
+	s.mu.Lock()
+	state.Monitor = mon
+	s.mu.Unlock()
+
+	return nil
+}
+
+// StopMonitoring stops telemetry for a session
+func (s *Service) StopMonitoring(paneID string) error {
+	s.mu.Lock()
+	state, exists := s.sessions[paneID]
+	s.mu.Unlock()
+
+	if !exists {
+		return fmt.Errorf("session not found: %s", paneID)
+	}
+	if state.Monitor == nil {
+		return nil
+	}
+
+	state.Monitor.Stop()
+	s.mu.Lock()
+	state.Monitor = nil
+	s.mu.Unlock()
+
+	return nil
+}
+
 // ClosePane terminates a specific pane's session
 func (s *Service) ClosePane(paneID string) {
 	s.mu.Lock()
@@ -117,6 +233,12 @@ func (s *Service) ClosePane(paneID string) {
 	s.mu.Unlock()
 
 	if exists {
+		if state.PortForward != nil {
+			state.PortForward.Stop()
+		}
+		if state.Monitor != nil {
+			state.Monitor.Stop()
+		}
 		state.Session.Close()
 		state.Cancel()
 		if s.ctx != nil && !s.isTest {

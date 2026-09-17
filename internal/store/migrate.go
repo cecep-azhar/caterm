@@ -66,6 +66,32 @@ var schema = []string{
 		deleted_at TEXT,
 		UNIQUE(hostname, port, key_type)
 	);`,
+	`CREATE TABLE IF NOT EXISTS ssh_keys (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL UNIQUE,
+		private_key TEXT NOT NULL,
+		public_key TEXT NOT NULL,
+		fingerprint TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL
+	);`,
+	`CREATE TABLE IF NOT EXISTS audit_logs (
+		id TEXT PRIMARY KEY,
+		host_id TEXT NOT NULL,
+		command TEXT NOT NULL,
+		output TEXT,
+		exit_code INTEGER NOT NULL DEFAULT 0,
+		created_at TEXT NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_audit_logs_host ON audit_logs(host_id);
+	CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);`,
+	`CREATE TABLE IF NOT EXISTS teams (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		created_at TEXT NOT NULL,
+		updated_at TEXT NOT NULL,
+		deleted_at TEXT
+	);`,
 }
 
 func (db *DB) Migrate(ctx context.Context) error {
