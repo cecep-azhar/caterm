@@ -21,8 +21,13 @@
     )
 )]
 
+pub mod db;
 pub mod error;
+pub mod groups;
 pub mod paths;
+pub mod ssh;
+pub mod store;
+pub mod vault;
 
 pub use error::CatermError;
 

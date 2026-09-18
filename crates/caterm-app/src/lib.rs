@@ -22,6 +22,8 @@
     )
 )]
 
+mod commands;
+
 /// `start` should be captured as close to `main()`'s first line as possible by the
 /// caller, so the printed duration approximates true cold start (REQ-02). Prints
 /// `CATERM_COLD_START_MS=<n>` once the backend considers itself ready (main window
@@ -43,6 +45,19 @@ pub fn run(start: std::time::Instant) {
             println!("CATERM_COLD_START_MS={}", start.elapsed().as_millis());
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            commands::list_hosts,
+            commands::save_host,
+            commands::delete_host,
+            commands::list_groups,
+            commands::save_group,
+            commands::delete_group,
+            commands::validate_vault_password,
+            commands::ssh_connect,
+            commands::ssh_write,
+            commands::ssh_resize,
+            commands::ssh_disconnect,
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

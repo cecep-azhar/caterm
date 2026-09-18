@@ -13,18 +13,26 @@
   },
   "license": "MIT",
   "dependencies": {
-    "@tauri-apps/api": "^2"
+    "@tauri-apps/api": "^2",
+    "@xterm/addon-fit": "^0.11.0",
+    "xterm": "^5.3.0"
   },
   "devDependencies": {
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.65.1",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
-    "@tauri-apps/cli": "^2",
     "@tailwindcss/vite": "^4",
+    "@tauri-apps/cli": "^2",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
     "svelte": "^5.56.3",
     "svelte-check": "^4.6.0",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
-  }
+  },
+  "description": "",
+  "main": "svelte.config.js",
+  "keywords": [],
+  "author": ""
 }

@@ -3,5 +3,18 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "allow-list-hosts",
+    "allow-save-host",
+    "allow-delete-host",
+    "allow-list-groups",
+    "allow-save-group",
+    "allow-delete-group",
+    "allow-validate-vault-password",
+    "allow-ssh-connect",
+    "allow-ssh-write",
+    "allow-ssh-resize",
+    "allow-ssh-disconnect"
+  ]
 }
