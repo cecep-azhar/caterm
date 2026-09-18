@@ -140,11 +140,9 @@ fn spawn_and_measure(exe: &Path, settle_secs: u64, timeout_secs: u64) -> Result<
 
     // A single unreadable process (it may exit between enumeration and query) must not be
     // silently counted as zero — that would under-report the budget. Fold to None instead.
-    let private_bytes = pids
-        .iter()
-        .try_fold(0u64, |acc, p| {
-            private_bytes_for(p.as_u32()).map(|b| acc.saturating_add(b))
-        });
+    let private_bytes = pids.iter().try_fold(0u64, |acc, p| {
+        private_bytes_for(p.as_u32()).map(|b| acc.saturating_add(b))
+    });
 
     let process_count = pids.len();
 
