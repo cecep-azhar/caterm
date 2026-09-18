@@ -45,7 +45,7 @@ fi
 # angka 380 MB dari revisi pertama juga SALAH dan sudah dicabut.
 BUDGET_BINARY_MB="${CATERM_BUDGET_BINARY_MB:-8}"
 BUDGET_COLD_START_MS="${CATERM_BUDGET_COLD_START_MS:-800}"
-BUDGET_PRIVATE_MB="${CATERM_BUDGET_PRIVATE_MB:-180}"
+BUDGET_PRIVATE_MB="${CATERM_BUDGET_PRIVATE_MB:-160}"
 
 # Round UP to the nearest whole MB - never let integer truncation hide an overage.
 BINARY_SIZE_MB=$(((BINARY_SIZE_BYTES + 1048575) / 1048576))

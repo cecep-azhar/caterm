@@ -231,9 +231,59 @@ fn private_bytes_for(pid: u32) -> Option<u64> {
     None
 }
 
-/// Other platforms (macOS): not wired up yet. Returning `None` makes the report say so
-/// instead of quietly substituting the inflated working-set figure.
-#[cfg(not(any(windows, target_os = "linux")))]
+/// macOS: Uses `proc_pidinfo` with `PROC_PIDTASKINFO` to retrieve `pti_resident_size`.
+#[cfg(target_os = "macos")]
+fn private_bytes_for(pid: u32) -> Option<u64> {
+    use std::ffi::c_void;
+
+    const PROC_PIDTASKINFO: i32 = 4;
+    #[repr(C)]
+    struct proc_taskinfo {
+        pti_virtual_size: u64,
+        pti_resident_size: u64,
+        pti_total_user: u64,
+        pti_total_system: u64,
+        pti_threads_user: u64,
+        pti_threads_system: u64,
+        pti_policy: i32,
+        pti_faults: i32,
+        pti_pageins: i32,
+        pti_cow_faults: i32,
+        pti_messages_sent: i32,
+        pti_messages_received: i32,
+        pti_syscalls_mach: i32,
+        pti_syscalls_unix: i32,
+        pti_csw: i32,
+        pti_threadnum: i32,
+        pti_numrunning: i32,
+        pti_priority: i32,
+    }
+
+    extern "C" {
+        fn proc_pidinfo(pid: i32, flavor: i32, arg: u64, buffer: *mut c_void, buffersize: i32) -> i32;
+    }
+
+    let mut info: proc_taskinfo = unsafe { std::mem::zeroed() };
+    let size = std::mem::size_of::<proc_taskinfo>() as i32;
+    let ret = unsafe {
+        proc_pidinfo(
+            pid as i32,
+            PROC_PIDTASKINFO,
+            0,
+            &mut info as *mut _ as *mut c_void,
+            size,
+        )
+    };
+
+    if ret == size {
+        Some(info.pti_resident_size)
+    } else {
+        None
+    }
+}
+
+/// Fallback for other unsupported target operating systems.
+#[cfg(not(any(windows, target_os = "linux", target_os = "macos")))]
 fn private_bytes_for(_pid: u32) -> Option<u64> {
     None
 }
