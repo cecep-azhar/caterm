@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CATerm Sync Cloud - Strategic Proposal</title>
+<style>
+  body { font-family: "Segoe UI", Arial, sans-serif; color: #111; line-height: 1.6; margin: 40px; }
+  h1 { color: #0b0f19; font-size: 32px; border-bottom: 2px solid #58a6ff; padding-bottom: 10px; }
+  h2 { color: #1f6feb; font-size: 24px; margin-top: 30px; }
+  h3 { color: #30363d; font-size: 18px; }
+  .branding { text-align: center; margin-bottom: 40px; }
+  .logo { font-size: 48px; font-weight: bold; color: #0b0f19; font-family: monospace; }
+  .tagline { font-size: 18px; color: #8b949e; }
+  .card { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 20px; margin-bottom: 20px; }
+  .price { font-size: 28px; font-weight: bold; color: #2da44e; }
+  ul { padding-left: 20px; }
+  li { margin-bottom: 8px; }
+  code { background: #eef1f5; padding: 2px 5px; border-radius: 3px; font-family: monospace; }
+  .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #8b949e; border-top: 1px solid #d0d7de; padding-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="branding">
+  <div class="logo">&gt;_ CATerm</div>
+  <div class="tagline">Zero-Knowledge SSH Connection Manager</div>
+</div>
+
+<h1>Strategic Masterplan: CATerm 2.0 & Official Sync Cloud</h1>
+
+<p><strong>Prepared for:</strong> Cecep Saeful Azhar (Founder & Architect)<br>
+<strong>Product:</strong> CATerm (Cecep Azhar + Terminal) & CATerm Sync Cloud</p>
+
+<h2>1. Brand Identity & Positioning</h2>
+<p><strong>Name Philosophy:</strong> <code>CATerm</code> encapsulates the founder's initials (CA) alongside the standard Linux utility <code>cat</code> (streaming output) and <code>Term</code> (Terminal). It establishes immediate technical credibility.</p>
+<p><strong>Visual Branding:</strong>
+<ul>
+  <li><strong>Primary Color:</strong> Dark Slate <code>#0b0f19</code> (Matrix/Hacker aesthetic)</li>
+  <li><strong>Accent Color:</strong> Cyber Blue <code>#58a6ff</code></li>
+  <li><strong>Logo:</strong> A minimalist terminal prompt <code>&gt;_</code> blending into a subtle, sleek cat silhouette or abstract geometric shield (symbolizing security).</li>
+  <li><strong>Tone:</strong> Pragmatic, authoritative, developer-centric, no-nonsense.</li>
+</ul>
+</p>
+
+<h2>2. CATerm Sync Cloud: Monetization & Pricing</h2>
+<p>The core local desktop application remains <strong>100% Free and Open Source (MIT)</strong>. Monetization focuses on convenience, multi-device synchronization, and team collaboration via an official managed cloud.</p>
+
+<div class="card">
+  <h3>Subscription Model (B2C & B2B)</h3>
+  <ul>
+    <li><strong>Trial/Entry:</strong> <span class="price">$1</span> for the 1st Month (Lowering the barrier to entry, hook users into the ecosystem).</li>
+    <li><strong>Individual Pro:</strong> <span class="price">$3</span> / month recurring (Affordable, impulse-buy SaaS tier for freelance developers).</li>
+    <li><strong>Team Expansion:</strong> <span class="price">+$1</span> / month per additional seat/team member (Scales automatically with agency growth).</li>
+  </ul>
+</div>
+
+<h3>End-to-End Encrypted (E2EE) Sync Architecture</h3>
+<p>The Sync Cloud operates as a <em>Zero-Knowledge Relay</em>.
+<ul>
+  <li>The local SQLite database (Vault) is symmetrically encrypted using AES-256-GCM via Argon2id Key Derivation.</li>
+  <li>Sync payloads are heavily obfuscated blobs. The cloud <strong>never</strong> receives the Master Password or Data Encryption Key (DEK).</li>
+  <li>When a team member is added, Public-Key Cryptography (ECDH) is used to exchange vault access asynchronously without exposing secrets to the server.</li>
+</ul>
+</p>
+
+<h2>3. Go-To-Market & Social Media Promotion</h2>
+<p><strong>Open Source Publication Strategy:</strong></p>
+<ul>
+  <li><strong>GitHub Launch:</strong> Publish the v2.0.1 rewrite repository under the MIT license. Ensure a beautiful <code>README.md</code> containing high-quality GIFs of the terminal in action.</li>
+  <li><strong>Product Hunt:</strong> Schedule a launch highlighting <em>"The Open Source, E2EE Alternative to Termius & SecureCRT."</em></li>
+  <li><strong>HackerNews (Show HN):</strong> "Show HN: CATerm – A zero-knowledge SSH manager built in Rust/Wails." Focus on the security architecture (TOFU, local-first).</li>
+  <li><strong>Reddit Communities:</strong> Cross-post tutorials and architectural breakdowns to <code>r/devops</code>, <code>r/selfhosted</code>, <code>r/linux</code>, and <code>r/sysadmin</code>.</li>
+</ul>
+
+<p><strong>Marketing Narrative:</strong> "Stop trusting your production SSH keys to proprietary cloud syncs. Own your vault locally. Sync securely."</p>
+
+<h2>4. Roadmap to v2.0.1 (Next Steps)</h2>
+<ul>
+  <li><strong>Step 1 (Today):</strong> Complete documentation, logo generation, and final polish for v1.2 GA on GitHub.</li>
+  <li><strong>Step 2:</strong> Tag and push <code>v2.0.1</code> to GitHub as the foundational release preparing for the Cloud API bindings.</li>
+  <li><strong>Step 3:</strong> Build the Golang/Rust Cloud Sync API backend (to be hosted on FathCloud/Coolify).</li>
+</ul>
+
+<div class="footer">
+  &copy; 2026 Cecep Saeful Azhar & Fathforce | Confidential Strategic Plan
+</div>
+
+</body>
+</html>
