@@ -1,0 +1,19 @@
+name: Release
+
+# Skeleton only - full packaging/signing logic lands in T2-REL-08. This exists now so the
+# trigger and permissions shape is settled before Fase 8, not invented under release
+# pressure.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  placeholder:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "release packaging belum diimplementasikan - lihat T2-REL-08"
