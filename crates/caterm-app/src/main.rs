@@ -21,5 +21,6 @@
 )]
 
 fn main() {
-    caterm_app_lib::run()
+    let start = std::time::Instant::now();
+    caterm_app_lib::run(start)
 }
