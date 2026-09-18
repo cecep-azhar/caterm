@@ -132,11 +132,28 @@ fn run_bench(exe: Option<PathBuf>, settle_secs: u64, timeout_secs: u64, as_json:
                     report.binary_size_bytes as f64 / 1_048_576.0
                 );
                 println!("cold_start_ms={}", report.cold_start_ms);
-                println!("rss_bytes={}", report.rss_bytes);
-                println!("rss_mb={:.2}", report.rss_bytes as f64 / 1_048_576.0);
+                match report.private_bytes {
+                    Some(b) => {
+                        println!("private_bytes={b}   <-- ANGKA BUDGET REQ-02");
+                        println!("private_mb={:.2}", b as f64 / 1_048_576.0);
+                    }
+                    None => {
+                        println!("private_bytes=null  <-- platform ini belum didukung");
+                        println!("private_mb=null");
+                    }
+                }
+                println!(
+                    "working_set_sum_bytes={}  (transparansi saja - double-count halaman bersama)",
+                    report.working_set_sum_bytes
+                );
+                println!(
+                    "working_set_sum_mb={:.2}",
+                    report.working_set_sum_bytes as f64 / 1_048_576.0
+                );
                 println!("process_count={}", report.process_count);
                 println!("db_query_ms=null");
                 println!("db_query_note={}", report.db_query_note);
+                println!("memory_note={}", report.memory_note);
             }
             0
         }
