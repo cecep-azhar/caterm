@@ -4,9 +4,6 @@
   "version": "2.0.0-dev",
   "identifier": "com.fathforce.caterm",
   "build": {
-    "beforeDevCommand": "npm --prefix ../../frontend run dev",
-    "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm --prefix ../../frontend run build",
     "frontendDist": "../../frontend/build"
   },
   "app": {
