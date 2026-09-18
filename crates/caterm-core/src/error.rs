@@ -268,12 +268,36 @@ mod tests {
                 let sig_head = sig.split('{').next().unwrap_or(&sig);
                 let is_result_of_caterm_error =
                     sig_head.contains("Result<") && sig_head.contains("CatermError");
-                if !is_result_of_caterm_error {
+                let is_marked_infallible = preceded_by_infallible_marker(&lines, i);
+                if !is_result_of_caterm_error && !is_marked_infallible {
                     violations.push(format!("{}:{}: {}", path.display(), i + 1, sig_head.trim()));
                 }
             }
 
             i += 1;
         }
+    }
+
+    /// A `pub fn` is exempt from the `Result<_, CatermError>` requirement only when the
+    /// doc comment immediately above it contains the literal marker `# Infallible` plus a
+    /// one-line reason. This keeps every exemption grep-able and deliberate — a function
+    /// simply lacking a failure mode today is not the same as one that can never grow one.
+    fn preceded_by_infallible_marker(lines: &[&str], pub_fn_line_idx: usize) -> bool {
+        let mut j = pub_fn_line_idx;
+        while j > 0 {
+            j -= 1;
+            let t = lines[j].trim_start();
+            if t.starts_with("///") {
+                if t.contains("# Infallible") {
+                    return true;
+                }
+                continue;
+            }
+            if t.starts_with("#[") {
+                continue;
+            }
+            break;
+        }
+        false
     }
 }
