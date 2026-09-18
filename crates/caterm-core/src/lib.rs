@@ -21,4 +21,8 @@
     )
 )]
 
+pub mod error;
+
+pub use error::CatermError;
+
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");

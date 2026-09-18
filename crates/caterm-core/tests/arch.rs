@@ -7,7 +7,14 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const FORBIDDEN_CRATES: &[&str] = &["tauri", "wry", "tao", "webkit2gtk", "objc", "windows-webview2"];
+const FORBIDDEN_CRATES: &[&str] = &[
+    "tauri",
+    "wry",
+    "tao",
+    "webkit2gtk",
+    "objc",
+    "windows-webview2",
+];
 
 fn is_forbidden(name: &str) -> bool {
     FORBIDDEN_CRATES
@@ -21,7 +28,11 @@ fn workspace_root() -> PathBuf {
     let root = manifest_dir
         .parent()
         .and_then(Path::parent)
-        .unwrap_or_else(|| panic!("caterm-core diharapkan berada di <root>/crates/caterm-core, got {manifest_dir:?}"));
+        .unwrap_or_else(|| {
+            panic!(
+                "caterm-core diharapkan berada di <root>/crates/caterm-core, got {manifest_dir:?}"
+            )
+        });
     root.to_path_buf()
 }
 
@@ -51,10 +62,10 @@ fn scan_rs_files(dir: &Path, visit: &mut dyn FnMut(&Path, &str)) {
         let path = entry.path();
         if path.is_dir() {
             scan_rs_files(&path, visit);
-        } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
-            if let Ok(contents) = std::fs::read_to_string(&path) {
-                visit(&path, &contents);
-            }
+        } else if path.extension().and_then(|e| e.to_str()) == Some("rs")
+            && let Ok(contents) = std::fs::read_to_string(&path)
+        {
+            visit(&path, &contents);
         }
     }
 }
@@ -92,7 +103,10 @@ fn caterm_core_dependency_tree_has_no_gui_crates() {
 
     let mut node_by_id: HashMap<String, &serde_json::Value> = HashMap::new();
     for node in nodes {
-        let id = node["id"].as_str().expect("node id harus string").to_string();
+        let id = node["id"]
+            .as_str()
+            .expect("node id harus string")
+            .to_string();
         node_by_id.insert(id, node);
     }
 
@@ -104,27 +118,32 @@ fn caterm_core_dependency_tree_has_no_gui_crates() {
     let mut violations: Vec<String> = Vec::new();
 
     while let Some(id) = queue.pop_front() {
-        let Some(node) = node_by_id.get(&id) else { continue };
-        let Some(deps) = node["deps"].as_array() else { continue };
+        let Some(node) = node_by_id.get(&id) else {
+            continue;
+        };
+        let Some(deps) = node["deps"].as_array() else {
+            continue;
+        };
         for dep in deps {
             // Lewati edge yang HANYA berupa dev-dependency - fokus pada jejak produksi nyata.
             let only_dev = dep["dep_kinds"]
                 .as_array()
                 .map(|kinds| {
-                    !kinds.is_empty()
-                        && kinds.iter().all(|k| k["kind"].as_str() == Some("dev"))
+                    !kinds.is_empty() && kinds.iter().all(|k| k["kind"].as_str() == Some("dev"))
                 })
                 .unwrap_or(false);
             if only_dev {
                 continue;
             }
 
-            let Some(dep_id) = dep["pkg"].as_str() else { continue };
+            let Some(dep_id) = dep["pkg"].as_str() else {
+                continue;
+            };
             if visited.insert(dep_id.to_string()) {
-                if let Some(name) = id_to_name.get(dep_id) {
-                    if is_forbidden(name) {
-                        violations.push(format!("{name} (via {id})"));
-                    }
+                if let Some(name) = id_to_name.get(dep_id)
+                    && is_forbidden(name)
+                {
+                    violations.push(format!("{name} (via {id})"));
                 }
                 queue.push_back(dep_id.to_string());
             }
@@ -163,7 +182,10 @@ fn caterm_core_source_never_mentions_tauri_directly() {
 /// Melebihi itu berarti logika bisnis bocor ke lapisan binding (K2-1).
 #[test]
 fn tauri_commands_in_caterm_app_are_thin_bindings() {
-    let app_src = workspace_root().join("crates").join("caterm-app").join("src");
+    let app_src = workspace_root()
+        .join("crates")
+        .join("caterm-app")
+        .join("src");
     let mut violations: Vec<String> = Vec::new();
 
     scan_rs_files(&app_src, &mut |path, contents| {
