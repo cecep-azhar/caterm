@@ -3,7 +3,7 @@
 //! returns its result — no business logic here. See `tests/arch.rs` in
 //! `caterm-core` for the guard that enforces this.
 
-use caterm_core::{groups, ssh, store, vault, CatermError};
+use caterm_core::{groups, snippets, ssh, store, vault, CatermError};
 
 #[tauri::command]
 pub fn list_hosts() -> Result<Vec<store::HostRecord>, CatermError> {
@@ -33,6 +33,21 @@ pub fn save_group(input: groups::GroupInput) -> Result<groups::GroupRecord, Cate
 #[tauri::command]
 pub fn delete_group(id: String) -> Result<(), CatermError> {
     groups::delete_group(&id)
+}
+
+#[tauri::command]
+pub fn list_snippets() -> Result<Vec<snippets::SnippetRecord>, CatermError> {
+    snippets::list_snippets()
+}
+
+#[tauri::command]
+pub fn save_snippet(input: snippets::SnippetInput) -> Result<snippets::SnippetRecord, CatermError> {
+    snippets::save_snippet(input)
+}
+
+#[tauri::command]
+pub fn delete_snippet(id: String) -> Result<(), CatermError> {
+    snippets::delete_snippet(&id)
 }
 
 #[tauri::command]

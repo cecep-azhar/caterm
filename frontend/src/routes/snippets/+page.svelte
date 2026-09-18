@@ -1,20 +1,28 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { injectIntoActiveSession, hasActiveSession } from '$lib/stores/activeSession.svelte';
+  import { listSnippets, saveSnippet as saveSnippetApi, deleteSnippet as deleteSnippetApi, type SnippetRecord } from '$lib/api/snippets';
 
   let isAddModalOpen = $state(false);
   let creationStep = $state(1); // 1: command, 2: details
   let injectNotice = $state('');
-  
-  let snippets = $state([
-    { id: 1, label: "Docker Clean All", desc: "Stops and removes all containers, networks, and untagged images", cmd: "docker system prune -a --volumes -f", tags: ["docker", "cleanup"] },
-    { id: 2, label: "Check System Logs", desc: "View the end of journalctl system log", cmd: "journalctl -xe -n 100", tags: ["linux", "debug"] }
-  ]);
+  let backendAvailable = $state(true);
+
+  let snippets = $state<SnippetRecord[]>([]);
 
   let newSnippet = $state({
     cmd: "",
     label: "",
     desc: "",
     tags: ""
+  });
+
+  onMount(async () => {
+    try {
+      snippets = await listSnippets();
+    } catch {
+      backendAvailable = false;
+    }
   });
 
   function resetModal() {
@@ -27,19 +35,34 @@
     if (newSnippet.cmd.trim()) creationStep = 2;
   }
 
-  function saveSnippet(e: Event) {
+  async function saveSnippet(e: Event) {
     e.preventDefault();
     if (!newSnippet.label) return;
-    
-    snippets.push({
-      id: Date.now(),
+
+    const input = {
       label: newSnippet.label,
-      desc: newSnippet.desc,
-      cmd: newSnippet.cmd,
+      description: newSnippet.desc,
+      command: newSnippet.cmd,
       tags: newSnippet.tags.split(',').map(t => t.trim()).filter(Boolean)
-    });
+    };
+
+    try {
+      const saved = await saveSnippetApi(input);
+      snippets = [...snippets, saved];
+    } catch {
+      backendAvailable = false;
+    }
 
     resetModal();
+  }
+
+  async function removeSnippet(id: string) {
+    try {
+      await deleteSnippetApi(id);
+      snippets = snippets.filter((s) => s.id !== id);
+    } catch {
+      backendAvailable = false;
+    }
   }
 
   function injectSnippet(cmd: string) {
@@ -56,6 +79,9 @@
     <div>
       <h1 class="text-2xl font-bold text-white tracking-tight">Command Snippets</h1>
       <p class="text-neutral-400 text-sm mt-1">Save reusable commands to inject instantly into active terminal sessions.</p>
+      {#if !backendAvailable}
+        <p class="text-amber-500 text-xs mt-1">Tauri backend not detected — changes won't be saved to disk.</p>
+      {/if}
     </div>
     <button 
       onclick={() => { resetModal(); isAddModalOpen = true; }}
@@ -75,15 +101,20 @@
         <div class="p-4 border-b border-neutral-800">
           <div class="flex justify-between items-start">
             <h3 class="font-semibold text-white">{snip.label}</h3>
-            <button
-              onclick={() => injectSnippet(snip.cmd)}
-              disabled={!hasActiveSession()}
-              class="text-sky-400 hover:text-sky-300 px-2 py-1 bg-sky-500/10 hover:bg-sky-500/20 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs transition-colors">Inject</button>
+            <div class="flex items-center gap-1">
+              <button
+                onclick={() => injectSnippet(snip.command)}
+                disabled={!hasActiveSession()}
+                class="text-sky-400 hover:text-sky-300 px-2 py-1 bg-sky-500/10 hover:bg-sky-500/20 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs transition-colors">Inject</button>
+              <button
+                onclick={() => removeSnippet(snip.id)}
+                class="text-red-400 hover:text-red-300 px-2 py-1 bg-red-500/10 hover:bg-red-500/20 rounded text-xs transition-colors">Delete</button>
+            </div>
           </div>
-          <p class="text-neutral-400 text-xs mt-1">{snip.desc}</p>
+          <p class="text-neutral-400 text-xs mt-1">{snip.description}</p>
         </div>
         <div class="bg-neutral-950 p-3 font-mono text-sm text-neutral-300 relative">
-          <span class="opacity-50 select-none mr-2">$</span>{snip.cmd}
+          <span class="opacity-50 select-none mr-2">$</span>{snip.command}
         </div>
         <div class="px-4 py-2 bg-neutral-900 flex gap-1 border-t border-neutral-800">
           {#each snip.tags as tag}
