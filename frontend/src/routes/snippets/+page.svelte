@@ -173,6 +173,22 @@
             <input id="snip-tags" bind:value={newSnippet.tags} placeholder="docker, devops, deploy" class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
           </div>
 
+          <div class="flex items-center justify-between p-3 bg-neutral-950 border border-neutral-800 rounded opacity-50">
+            <div>
+              <span class="block text-sm text-neutral-300">Share publicly</span>
+              <span class="block text-xs text-neutral-500">Coming soon</span>
+            </div>
+            <button
+              type="button"
+              disabled
+              role="switch"
+              aria-checked="false"
+              aria-label="Share publicly (coming soon)"
+              class="w-10 h-6 rounded-full bg-neutral-800 border border-neutral-700 cursor-not-allowed relative">
+              <span class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-neutral-500"></span>
+            </button>
+          </div>
+
           <div class="flex justify-between items-center pt-2 border-t border-neutral-800">
             <button 
               type="button"

@@ -43,10 +43,7 @@
     // echo/sshWrite path as real keystrokes below so the terminal output stays consistent.
     function injectCommand(cmd: string) {
       if (!session) return;
-      term.write(cmd);
-      void sshWrite(session.sessionId, cmd).catch(() => {});
-      term.write('\r\n$ ');
-      void sshWrite(session.sessionId, '\r').catch(() => {});
+      void sshWrite(session.sessionId, cmd + '\r').catch(() => {});
     }
 
     function markActive() {
@@ -59,6 +56,8 @@
       `\x1b[1;32mWelcome to CATerm v2\x1b[0m — connecting to \x1b[1;36m${label}\x1b[0m (${address})...`
     );
 
+    let pollTimer: ReturnType<typeof setInterval>;
+
     sshConnect({
       hostId: host?.id ?? address,
       address,
@@ -69,31 +68,35 @@
         if (disposed) return;
         session = opened;
         status = 'connected';
-        term.write(`\r\n\x1b[32mconnected\x1b[0m (session ${opened.sessionId})\r\n$ `);
+        term.write(`\r\n\x1b[32mconnected\x1b[0m (session ${opened.sessionId})\r\n`);
         markActive();
+
+        // Start polling for PTY output
+        pollTimer = setInterval(() => {
+          if (!session) return;
+          import('$lib/api/ssh').then(({ sshRead }) => {
+            sshRead(session!.sessionId)
+              .then((output) => {
+                if (output && output.length > 0) {
+                  term.write(output);
+                }
+              })
+              .catch(() => {});
+          });
+        }, 50);
       })
       .catch((err) => {
         if (disposed) return;
         status = 'offline';
         term.write(
-          `\r\n\x1b[33m[placeholder] SSH backend unavailable, using local echo (${String(err)})\x1b[0m\r\n$ `
+          `\r\n\x1b[31mSSH connection failed (${String(err)})\x1b[0m\r\n`
         );
       });
 
     term.onData((data) => {
-      // Every keystroke is still forwarded to the Rust SSH command even
-      // though it's a placeholder today — this is the real Fase 2 wiring
-      // point, only the transport underneath is fake for now.
+      // Send keystroke to the real Rust SSH PTY backend
       if (session) {
         void sshWrite(session.sessionId, data).catch(() => {});
-      }
-
-      if (data === '\r') {
-        term.write('\r\n$ ');
-      } else if (data === '') {
-        term.write('\b \b');
-      } else {
-        term.write(data);
       }
     });
 
@@ -108,6 +111,7 @@
 
     return () => {
       disposed = true;
+      if (pollTimer) clearInterval(pollTimer);
       window.removeEventListener('resize', handleResize);
       terminalContainer.removeEventListener('click', markActive);
       if (session) {

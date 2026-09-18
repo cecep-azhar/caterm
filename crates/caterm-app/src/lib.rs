@@ -58,6 +58,7 @@ pub fn run(start: std::time::Instant) {
             commands::validate_vault_password,
             commands::ssh_connect,
             commands::ssh_write,
+            commands::ssh_read,
             commands::ssh_resize,
             commands::ssh_disconnect,
         ])

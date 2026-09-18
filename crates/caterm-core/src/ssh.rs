@@ -1,12 +1,15 @@
-//! Placeholder SSH command surface (Fase 2 will replace this with a real
-//! `russh`/`ssh2` transport). Every function below is a stateless stand-in —
-//! no socket is ever opened, `write` just echoes its input back after
-//! validating the session id looks sane — so the Tauri binding layer and the
-//! frontend have a stable, typed contract to build against before any real
-//! transport exists.
+//! Real SSH command surface implemented with `ssh2` and Tokio async channel routing.
+//! Active sessions are maintained in an in-memory session registry.
 
 use crate::error::{CatermError, ValidationError};
+use std::collections::HashMap;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 use serde::{Deserialize, Serialize};
+use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,6 +18,7 @@ pub struct SshConnectRequest {
     pub address: String,
     pub port: u16,
     pub username: String,
+    pub password: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +27,15 @@ pub struct SshSession {
     pub session_id: String,
     pub host_id: String,
 }
+
+struct SessionHandle {
+    tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    output_buffer: Arc<Mutex<Vec<u8>>>,
+    channel: Arc<Mutex<ssh2::Channel>>,
+}
+
+static SESSIONS: Lazy<Arc<Mutex<HashMap<String, SessionHandle>>>> =
+    Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 fn require_non_empty(field: &str, value: &str) -> Result<(), CatermError> {
     if value.trim().is_empty() {
@@ -41,31 +54,186 @@ fn generate_session_id(host_id: &str) -> String {
     format!("ssh-{host_id}-{nanos:x}")
 }
 
-/// Open a (placeholder) SSH session for a host. Never touches the network yet.
+/// Open a real SSH connection & PTY channel via `ssh2`.
 pub fn connect(request: SshConnectRequest) -> Result<SshSession, CatermError> {
     require_non_empty("host_id", &request.host_id)?;
+    require_non_empty("address", &request.address)?;
+    require_non_empty("username", &request.username)?;
+
     let session_id = generate_session_id(&request.host_id);
+    let addr = format!("{}:{}", request.address, if request.port == 0 { 22 } else { request.port });
+
+    let tcp = TcpStream::connect_timeout(
+        &addr.parse().map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Invalid address {addr}: {e}"))))?,
+        Duration::from_secs(10),
+    ).map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Connection failed to {addr}: {e}"))))?;
+
+    let mut sess = ssh2::Session::new()
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH session creation failed: {e}"))))?;
+
+    sess.set_tcp_stream(tcp);
+    sess.handshake()
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH handshake failed: {e}"))))?;
+
+    if let Some(ref pass) = request.password {
+        sess.userauth_password(&request.username, pass)
+            .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Auth failed for user {}: {e}", request.username))))?;
+    } else {
+        // Fallback to agent auth or unauthenticated prompt handling
+        let _ = sess.userauth_agent(&request.username);
+    }
+
+    if !sess.authenticated() {
+        return Err(CatermError::Validation(ValidationError::Generic(
+            format!("Authentication failed for user {}", request.username)
+        )));
+    }
+
+    let mut channel = sess.channel_session()
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Channel creation failed: {e}"))))?;
+
+    channel.request_pty("xterm-256color", None, Some((80, 24, 0, 0)))
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("PTY request failed: {e}"))))?;
+
+    channel.shell()
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Shell request failed: {e}"))))?;
+
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+    let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
+
+    let channel_arc = Arc::new(Mutex::new(channel));
+
+    // Spawn reader background thread
+    let channel_read = Arc::clone(&channel_arc);
+    let buffer_read = Arc::clone(&output_buffer);
+    thread::spawn(move || {
+        let mut buf = [0u8; 4096];
+        loop {
+            let read_res = {
+                if let Ok(mut ch) = channel_read.lock() {
+                    ch.read(&mut buf)
+                } else {
+                    break;
+                }
+            };
+
+            match read_res {
+                Ok(0) => break, // EOF
+                Ok(n) => {
+                    if let Ok(mut out) = buffer_read.lock() {
+                        out.extend_from_slice(&buf[..n]);
+                    }
+                }
+                Err(_) => {
+                    thread::sleep(Duration::from_millis(50));
+                }
+            }
+        }
+    });
+
+    // Spawn writer background thread
+    let channel_write = Arc::clone(&channel_arc);
+    thread::spawn(move || {
+        while let Some(bytes) = rx.blocking_recv() {
+            if let Ok(mut ch) = channel_write.lock() {
+                let _ = ch.write_all(&bytes);
+                let _ = ch.flush();
+            }
+        }
+    });
+
+    let handle = SessionHandle {
+        tx,
+        output_buffer,
+        channel: channel_arc,
+    };
+
+    if let Ok(mut sessions) = SESSIONS.lock() {
+        sessions.insert(session_id.clone(), handle);
+    }
+
     Ok(SshSession {
         session_id,
         host_id: request.host_id,
     })
 }
 
-/// Echoes `data` back verbatim. Fase 2 will forward these bytes over the real
-/// SSH channel instead of echoing them.
+/// Write data to active SSH channel and read available output.
 pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
     require_non_empty("session_id", session_id)?;
-    Ok(data.to_string())
+
+    let (tx, output_buffer) = {
+        let sessions = SESSIONS.lock().map_err(|_| {
+            CatermError::Validation(ValidationError::Generic("Lock failure".into()))
+        })?;
+        let handle = sessions.get(session_id).ok_or_else(|| {
+            CatermError::Validation(ValidationError::Generic(format!("Session {session_id} not found")))
+        })?;
+        (handle.tx.clone(), Arc::clone(&handle.output_buffer))
+    };
+
+    if !data.is_empty() {
+        let _ = tx.blocking_send(data.as_bytes().to_vec());
+    }
+
+    // Give a brief window for response output
+    thread::sleep(Duration::from_millis(20));
+
+    let mut out_bytes = Vec::new();
+    if let Ok(mut buf) = output_buffer.lock() {
+        out_bytes = std::mem::take(&mut *buf);
+    }
+
+    Ok(String::from_utf8_lossy(&out_bytes).to_string())
 }
 
-/// Records a terminal resize. No-op until a real PTY exists on the other end.
-pub fn resize(session_id: &str, _cols: u16, _rows: u16) -> Result<(), CatermError> {
-    require_non_empty("session_id", session_id)
+/// Read available output from active SSH channel without writing.
+pub fn read(session_id: &str) -> Result<String, CatermError> {
+    require_non_empty("session_id", session_id)?;
+    let output_buffer = {
+        let sessions = SESSIONS.lock().map_err(|_| {
+            CatermError::Validation(ValidationError::Generic("Lock failure".into()))
+        })?;
+        let handle = sessions.get(session_id).ok_or_else(|| {
+            CatermError::Validation(ValidationError::Generic(format!("Session {session_id} not found")))
+        })?;
+        Arc::clone(&handle.output_buffer)
+    };
+
+    let mut out_bytes = Vec::new();
+    if let Ok(mut buf) = output_buffer.lock() {
+        out_bytes = std::mem::take(&mut *buf);
+    }
+    Ok(String::from_utf8_lossy(&out_bytes).to_string())
 }
 
-/// Tears down a (placeholder) session. No-op until a real connection exists.
+/// Resize active terminal PTY window.
+pub fn resize(session_id: &str, cols: u16, rows: u16) -> Result<(), CatermError> {
+    require_non_empty("session_id", session_id)?;
+
+    let sessions = SESSIONS.lock().map_err(|_| {
+        CatermError::Validation(ValidationError::Generic("Lock failure".into()))
+    })?;
+    if let Some(handle) = sessions.get(session_id) {
+        if let Ok(mut ch) = handle.channel.lock() {
+            let _ = ch.request_pty_size(cols as u32, rows as u32, None, None);
+        }
+    }
+    Ok(())
+}
+
+/// Disconnect and remove active SSH session.
 pub fn disconnect(session_id: &str) -> Result<(), CatermError> {
-    require_non_empty("session_id", session_id)
+    require_non_empty("session_id", session_id)?;
+
+    if let Ok(mut sessions) = SESSIONS.lock() {
+        if let Some(handle) = sessions.remove(session_id) {
+            if let Ok(mut ch) = handle.channel.lock() {
+                let _ = ch.close();
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -76,30 +244,12 @@ mod tests {
     fn connect_rejects_empty_host_id() {
         let result = connect(SshConnectRequest {
             host_id: "".into(),
-            address: "10.0.0.1".into(),
+            address: "127.0.0.1".into(),
             port: 22,
             username: "root".into(),
+            password: None,
         });
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn connect_returns_session_bound_to_host() {
-        let session = connect(SshConnectRequest {
-            host_id: "host-1".into(),
-            address: "10.0.0.1".into(),
-            port: 22,
-            username: "root".into(),
-        })
-        .expect("connect gagal");
-        assert_eq!(session.host_id, "host-1");
-        assert!(session.session_id.starts_with("ssh-host-1-"));
-    }
-
-    #[test]
-    fn write_echoes_input_when_session_id_present() {
-        let echoed = write("ssh-host-1-abc", "ls -la\n").expect("write gagal");
-        assert_eq!(echoed, "ls -la\n");
     }
 
     #[test]

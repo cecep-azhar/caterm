@@ -24,6 +24,10 @@ export function sshWrite(sessionId: string, data: string): Promise<string> {
   return invoke('ssh_write', { sessionId, data });
 }
 
+export function sshRead(sessionId: string): Promise<string> {
+  return invoke('ssh_read', { sessionId });
+}
+
 export function sshResize(sessionId: string, cols: number, rows: number): Promise<void> {
   return invoke('ssh_resize', { sessionId, cols, rows });
 }

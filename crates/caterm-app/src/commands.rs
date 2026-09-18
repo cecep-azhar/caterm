@@ -66,6 +66,11 @@ pub fn ssh_write(session_id: String, data: String) -> Result<String, CatermError
 }
 
 #[tauri::command]
+pub fn ssh_read(session_id: String) -> Result<String, CatermError> {
+    ssh::read(&session_id)
+}
+
+#[tauri::command]
 pub fn ssh_resize(session_id: String, cols: u16, rows: u16) -> Result<(), CatermError> {
     ssh::resize(&session_id, cols, rows)
 }

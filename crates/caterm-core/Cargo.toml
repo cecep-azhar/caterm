@@ -18,6 +18,11 @@ serde_json.workspace = true
 directories.workspace = true
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
 rand = "0.8"
+ssh2 = "0.9.6"
+tokio = { version = "1.53.1", features = ["full"] }
+async-trait = "0.1.92"
+parking_lot = "0.12.5"
+once_cell = "1.21.4"
 
 [dev-dependencies]
 serde_json.workspace = true

@@ -47,7 +47,7 @@
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
       </div>
       <h2 class="text-lg font-semibold text-white">Dedikasi</h2>
-      <p class="text-neutral-400 text-sm mt-1">Didedikasikan untuk pengembangan perangkat lunak open-source lokal yang kuat, aman, dan tanpa biaya artifisial. Dibuat oleh <strong>Cecep Azhar</strong> (Fathforce).</p>
+      <p class="text-neutral-400 text-sm mt-1">Didedikasikan untuk putraku, <strong>Umar Abdillah</strong>, dan pengembangan perangkat lunak open-source lokal yang kuat, aman, dan tanpa biaya artifisial. Dibuat oleh <strong>Cecep Azhar</strong> (Fathforce).</p>
     </div>
   </div>
 
