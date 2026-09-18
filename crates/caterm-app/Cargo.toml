@@ -1,0 +1,21 @@
+[package]
+name = "caterm-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "CATerm v2 desktop shell — thin Tauri binding layer over caterm-core. No business logic here (K2-1)."
+
+[lib]
+name = "caterm_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+caterm-core = { path = "../caterm-core" }
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true

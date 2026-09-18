@@ -1,0 +1,18 @@
+[package]
+name = "caterm-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "catermctl — headless verification CLI for CATerm v2. The curl-equivalent for a desktop app."
+
+[[bin]]
+name = "catermctl"
+path = "src/main.rs"
+
+[dependencies]
+caterm-core = { path = "../caterm-core" }
+clap.workspace = true
+serde.workspace = true
+serde_json.workspace = true

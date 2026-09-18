@@ -1,28 +1,26 @@
-# Build output
-build/bin/
-build/windows/
-dist/
-*.exe
-*.exe.manifest
-*.dll
-*.so
-*.dylib
-*.test
-*.out
-caterm
-catermctl
-generate_bindings
+# Rust
+/target/
+crates/*/target/
+Cargo.lock.bak
+bench-report.json
 
 # Node / Frontend
 node_modules/
-frontend/dist/
 frontend/node_modules/
-frontend/wailsjs/wailsjs/
+frontend/dist/
+frontend/.svelte-kit/
+
+# Tauri
+crates/caterm-app/target/
+crates/caterm-app/gen/
 
 # Database & Runtime
 *.db
 *.db-wal
 *.db-shm
+
+# Portable mode marker (never ship a real one from a dev machine)
+portable.txt
 
 # IDE & OS
 .DS_Store
@@ -35,3 +33,11 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+
+# Packaging output
+*.exe
+*.msi
+*.dmg
+*.deb
+*.rpm
+*.AppImage

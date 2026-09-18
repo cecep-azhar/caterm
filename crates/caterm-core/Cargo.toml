@@ -1,0 +1,19 @@
+[package]
+name = "caterm-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "CATerm v2 core library — pure Rust, no GUI dependencies. Vault, SSH engine, store, AI copilot logic."
+
+[lib]
+name = "caterm_core"
+path = "src/lib.rs"
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
