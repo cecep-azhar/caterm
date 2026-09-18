@@ -10,6 +10,8 @@ import {audit} from '../models';
 
 export function AckTerminal(arg1:string,arg2:number):Promise<void>;
 
+export function Activity():Promise<void>;
+
 export function AddSSHKey(arg1:string,arg2:string):Promise<sshkey.SSHKey>;
 
 export function ApplySync():Promise<sync.MergeResult>;
@@ -52,8 +54,6 @@ export function GetSSHKey(arg1:string):Promise<sshkey.SSHKey>;
 
 export function GetSyncPath():Promise<string>;
 
-export function Greet(arg1:string):Promise<string>;
-
 export function HardDeleteRecord(arg1:string,arg2:string):Promise<void>;
 
 export function IsInitialized():Promise<boolean>;
@@ -70,11 +70,13 @@ export function ListSnippets():Promise<Array<snippet.Snippet>>;
 
 export function ListTeams():Promise<Array<team.Team>>;
 
+export function Lock():Promise<void>;
+
 export function LogCommand(arg1:string,arg2:string,arg3:string,arg4:number):Promise<void>;
 
 export function OpenDonationLink():Promise<void>;
 
-export function ResetVault():Promise<void>;
+export function ResetVault(arg1:string):Promise<void>;
 
 export function ResizeTerminal(arg1:string,arg2:number,arg3:number):Promise<void>;
 

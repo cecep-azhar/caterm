@@ -1,5 +1,8 @@
 #!/bin/bash
-cd /home/cecepazhar/Project/caterm
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 echo "Running container to build..."
 podman run --name caterm-extract caterm-builder bash -c "wails build -platform linux/amd64 -s"

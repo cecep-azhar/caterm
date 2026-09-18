@@ -3,10 +3,32 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import './style.css';
 import { EventsOn, EventsOff } from "../wailsjs/runtime/runtime";
-import { IsInitialized, Setup, Unlock, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal, GetAIConfig, SaveAIConfig, AskAI, ListSSHKeys, GenerateSSHKey, DeleteSSHKey, ListAuditLogs, ClearAuditLogs, ListSnippets, CreateSnippet, DeleteSnippet, ListTeams, CreateTeam, DeleteTeam } from "../wailsjs/go/main/App";
+import { IsInitialized, Setup, Unlock, Lock, Activity, CheckSyncPending, ApplySync, ListHosts, CreateHost, UpdateHost, DeleteHost, ListGroups, CreateGroup, DeleteGroup, ResetVault, ConnectTerminal, WriteTerminal, CloseTerminal, GetAIConfig, SaveAIConfig, AskAI, ListSSHKeys, GenerateSSHKey, DeleteSSHKey, ListAuditLogs, ClearAuditLogs, ListSnippets, CreateSnippet, DeleteSnippet, ListTeams, CreateTeam, DeleteTeam } from "../wailsjs/go/main/App";
 
 let activeTab = "hosts";
 let editingHostId: string | null = null;
+let lastActivityTime = Date.now();
+
+// Report user activity to Go backend with 5s throttle
+function reportActivity() {
+    const now = Date.now();
+    if (now - lastActivityTime > 5000) {
+        lastActivityTime = now;
+        Activity().catch(console.error);
+    }
+}
+
+document.addEventListener("mousemove", reportActivity);
+document.addEventListener("keydown", reportActivity);
+document.addEventListener("click", reportActivity);
+
+// Listen for auto-lock from backend
+EventsOn("vault:locked", () => {
+    const container = document.getElementById("app-container");
+    if (container) {
+        renderUnlock(container);
+    }
+});
 let sessionTimerInterval: any = null;
 let sessionSeconds = 0;
 
@@ -239,8 +261,10 @@ function renderUnlock(container: HTMLElement) {
 
     document.getElementById("btn-reset-vault")?.addEventListener("click", async () => {
         if (confirm("Reset Vault will permanently delete all saved hosts and settings. Continue?")) {
+            const pwd = prompt("Enter Master Password to confirm reset:");
+            if (!pwd) return;
             try {
-                await ResetVault();
+                await ResetVault(pwd);
                 renderSetup(container);
             } catch (e: any) {
                 alert("Failed to reset vault: " + e.toString());
@@ -347,6 +371,9 @@ async function renderDashboard(container: HTMLElement) {
                         <p class="text-sm font-medium text-[#e6edf3] truncate">Cecep Saeful Azhar</p>
                         <p class="text-xs text-[#8b949e] truncate">cecep.azhtech@gmail.com</p>
                     </div>
+                    <button id="btn-manual-lock" title="Lock Vault" class="p-1.5 hover:bg-[#30363d] rounded text-[#8b949e] hover:text-white transition-colors">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                    </button>
                 </div>
             </div>
 
@@ -362,6 +389,11 @@ async function renderDashboard(container: HTMLElement) {
             activeTab = (link as HTMLElement).getAttribute('data-tab') || 'hosts';
             renderDashboard(container);
         });
+    });
+
+    document.getElementById("btn-manual-lock")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        Lock().catch(console.error);
     });
 
     const mainView = document.getElementById("main-view")!;
@@ -825,15 +857,15 @@ function renderHostsView(mainView: HTMLElement, container: HTMLElement, hosts: a
     document.getElementById("btn-settings")?.addEventListener("click", async () => {
         try {
             const cfg = await GetAIConfig();
-            (document.getElementById("ai-provider") as HTMLSelectElement).value = (cfg && cfg.provider) ? cfg.provider : "9router";
-            (document.getElementById("ai-model") as HTMLInputElement).value = (cfg && cfg.model) ? cfg.model : "ZA126_PRO";
-            (document.getElementById("ai-base-url") as HTMLInputElement).value = (cfg && cfg.base_url) ? cfg.base_url : "http://100.76.150.46:3007/v1";
+            (document.getElementById("ai-provider") as HTMLSelectElement).value = (cfg && cfg.provider) ? cfg.provider : "custom";
+            (document.getElementById("ai-model") as HTMLInputElement).value = (cfg && cfg.model) ? cfg.model : "gpt-4o-mini";
+            (document.getElementById("ai-base-url") as HTMLInputElement).value = (cfg && cfg.base_url) ? cfg.base_url : "https://api.openai.com/v1";
             (document.getElementById("ai-api-key") as HTMLInputElement).value = (cfg && cfg.api_key) ? cfg.api_key : "";
         } catch (e) {
             console.error("Failed to load AI config", e);
-            (document.getElementById("ai-provider") as HTMLSelectElement).value = "9router";
-            (document.getElementById("ai-model") as HTMLInputElement).value = "ZA126_PRO";
-            (document.getElementById("ai-base-url") as HTMLInputElement).value = "http://100.76.150.46:3007/v1";
+            (document.getElementById("ai-provider") as HTMLSelectElement).value = "custom";
+            (document.getElementById("ai-model") as HTMLInputElement).value = "gpt-4o-mini";
+            (document.getElementById("ai-base-url") as HTMLInputElement).value = "https://api.openai.com/v1";
         }
         settingsModal.classList.remove("hidden");
     });
@@ -1312,7 +1344,7 @@ async function renderAuditLogsView(mainView: HTMLElement, container: HTMLElement
     });
 }
 async function renderSettingsView(mainView: HTMLElement, _container: HTMLElement) {
-    let cfg: any = { provider: "9router", model: "ZA126_PRO", base_url: "http://100.76.150.46:3007/v1", api_key: "" };
+    let cfg: any = { provider: "openai", model: "gpt-4o-mini", base_url: "https://api.openai.com/v1", api_key: "" };
     try {
         cfg = await GetAIConfig() || cfg;
     } catch (e) {
@@ -1364,23 +1396,26 @@ async function renderSettingsView(mainView: HTMLElement, _container: HTMLElement
                     AI Copilot & Assistant Provider Settings
                 </h3>
                 <form id="form-save-ai-settings" class="space-y-4">
+                    <div class="flex items-center gap-2 mb-4 bg-purple-500/10 p-3 rounded border border-purple-500/20">
+                        <input type="checkbox" id="settings-ai-enabled" ${cfg.enabled ? 'checked' : ''} class="w-4 h-4 rounded border-[#30363d] text-purple-500 focus:ring-purple-500 bg-[#0d1117]">
+                        <label for="settings-ai-enabled" class="text-sm font-medium text-white">Enable AI Copilot (I consent to sending terminal prompts to the selected third-party API)</label>
+                    </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label class="block text-xs font-mono text-[#8b949e] mb-1">AI PROVIDER</label>
                             <select id="settings-ai-provider" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
-                                <option value="9router" ${cfg.provider === '9router' ? 'selected' : ''}>9Router / Custom OpenAI (Local Fleet)</option>
-                                <option value="openai" ${cfg.provider === 'openai' ? 'selected' : ''}>OpenAI Official</option>
+                                <option value="openai" ${cfg.provider === 'openai' ? 'selected' : ''}>OpenAI Compatible</option>
                                 <option value="anthropic" ${cfg.provider === 'anthropic' ? 'selected' : ''}>Anthropic Claude API</option>
                             </select>
                         </div>
                         <div>
                             <label class="block text-xs font-mono text-[#8b949e] mb-1">MODEL NAME</label>
-                            <input type="text" id="settings-ai-model" value="${cfg.model || 'ZA126_PRO'}" placeholder="ZA126_PRO or gpt-4o" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
+                            <input type="text" id="settings-ai-model" value="${cfg.model || ''}" placeholder="gpt-4o-mini" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-mono text-[#8b949e] mb-1">BASE API URL</label>
-                        <input type="text" id="settings-ai-base-url" value="${cfg.base_url || 'http://100.76.150.46:3007/v1'}" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
+                        <input type="text" id="settings-ai-base-url" value="${cfg.base_url || ''}" placeholder="https://api.openai.com/v1" class="w-full bg-[#0d1117] border border-[#30363d] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[#58a6ff]">
                     </div>
                     <div>
                         <label class="block text-xs font-mono text-[#8b949e] mb-1">API KEY (OPTIONAL FOR LOCAL PROXY)</label>
@@ -1408,13 +1443,14 @@ async function renderSettingsView(mainView: HTMLElement, _container: HTMLElement
 
     document.getElementById("form-save-ai-settings")?.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const enabled = (document.getElementById("settings-ai-enabled") as HTMLInputElement).checked;
         const provider = (document.getElementById("settings-ai-provider") as HTMLSelectElement).value;
         const model = (document.getElementById("settings-ai-model") as HTMLInputElement).value;
         const base_url = (document.getElementById("settings-ai-base-url") as HTMLInputElement).value;
         const api_key = (document.getElementById("settings-ai-api-key") as HTMLInputElement).value;
 
         try {
-            await SaveAIConfig({ provider, model, base_url, api_key } as any);
+            await SaveAIConfig({ enabled, provider, model, base_url, api_key } as any);
             alert("AI Settings saved successfully!");
         } catch (err: any) {
             alert("Error saving AI settings: " + err.toString());
@@ -1423,8 +1459,10 @@ async function renderSettingsView(mainView: HTMLElement, _container: HTMLElement
 
     document.getElementById("btn-settings-reset-vault")?.addEventListener("click", async () => {
         if (confirm("DANGER: Are you sure you want to reset your vault? This will erase all saved hosts, groups, and snippets!")) {
+            const pwd = prompt("Enter Master Password to confirm reset:");
+            if (!pwd) return;
             try {
-                await ResetVault();
+                await ResetVault(pwd);
                 alert("Vault reset successful.");
                 location.reload();
             } catch (err: any) {

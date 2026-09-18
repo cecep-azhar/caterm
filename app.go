@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -11,6 +12,7 @@ import (
 	"caterm/internal/service/ai"
 	"caterm/internal/service/audit"
 	"caterm/internal/service/auth"
+	"caterm/internal/service/hostkey"
 	"caterm/internal/service/host"
 	"caterm/internal/service/snippet"
 	"caterm/internal/service/sshkey"
@@ -31,6 +33,7 @@ type App struct {
 	auditService    *audit.Service
 	terminalService *terminal.Service
 	aiService       *ai.Service
+	hostKeyStore    *hostkey.Store
 	db              *store.DB
 }
 
@@ -64,11 +67,28 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	a.terminalService.Startup(ctx)
 	a.terminalService.SetEventEmitter(runtime.EventsEmit)
+
+	a.authService.SetOnAutoLock(func() {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "vault:locked")
+		}
+	})
+	a.authService.StartIdleTimer()
 }
 
-func (a *App) Greet(name string) string {
-	return "Hello " + name
+func (a *App) Lock() error {
+	a.authService.Lock()
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "vault:locked")
+	}
+	return nil
 }
+
+func (a *App) Activity() {
+	a.authService.Activity()
+}
+
+
 
 func (a *App) IsInitialized() (bool, error) {
 	if a.ctx == nil {
@@ -110,13 +130,32 @@ func (a *App) ApplySync() (*sync.MergeResult, error) {
 	return importer.Import(a.ctx, false)
 }
 
-func (a *App) ResetVault() error {
+func (a *App) ResetVault(password string) error {
 	if a.ctx == nil {
 		return errors.New("context not initialized")
 	}
 
-	_, err := a.db.ExecContext(a.ctx, "DELETE FROM vault_meta; DELETE FROM groups; DELETE FROM hosts;")
-	return err
+	// Verify master password before allowing destructive reset
+	if err := a.authService.Unlock(a.ctx, password); err != nil {
+		return fmt.Errorf("master password verification failed: %w", err)
+	}
+
+	tables := []string{
+		"vault_meta", "hosts", "groups", "snippets",
+		"ssh_keys", "audit_logs", "host_keys", "settings", "teams",
+	}
+
+	tx, err := a.db.BeginTx(a.ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, tbl := range tables {
+		_, _ = tx.ExecContext(a.ctx, fmt.Sprintf("DELETE FROM %s;", tbl))
+	}
+
+	return tx.Commit()
 }
 
 // SSH Key Bindings
