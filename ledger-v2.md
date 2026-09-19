@@ -12,7 +12,8 @@
 ## Utang Teknis & Task Selesai (19 Sep 2026)
 - [x] **Clippy Cleanup**: 14 titik `.unwrap()` di `crates/caterm-app/src/commands.rs` diatasi dengan `run_blocking` helper. `cargo clippy --workspace` kini lulus 0 error/0 warning!
 - [x] **`T2-SSH-04` — TOFU Host Key Verification**: Menambahkan verifikasi `known_hosts` otomatis pada `ssh::connect`. Celah MITM berhasil ditutup.
-- [x] **`T2-TOOL-05` — SSH Keys Manager**: Implementasi backend Rust (`caterm-core/src/keys.rs`) & UI SvelteKit (`/ssh-keys`). Private key disimpan terenkripsi AES-256-GCM di SQLite database lokal. Mendukung pembuatan Ed25519 & RSA-4096, import PEM OpenSSH/PKCS#8, proteksi penghapusan key yang sedang terpakai Host, serta pengintegrasian method `AuthMethod::KeyId` ke koneksi SSH.
+- [x] **`T2-TOOL-05` — SSH Keys Manager**: Implementasi backend Rust (`caterm-core/src/keys.rs`) & UI SvelteKit (`/ssh-keys`). Private key disimpan terenkripsi AES-256-GCM di SQLite database lokal.
+- [x] **`T2-TOOL-06` — Deploy public key**: Fitur `Deploy to Server` di UI SSH Keys. Deploy idempoten ke `~/.ssh/authorized_keys` menggunakan backend `ssh2` channel exec.
 
 ## Keputusan Desain (Membutuhkan Konfirmasi Pemilik)
 * **DX-1 (ssh2 -> russh)**: Default -> **DILEWATI SEMENTARA**. Karena Port Forwarding dan Monitoring akan ditulis, saya membuat interface backend `TunnelManager` dan `MonitorManager` yang terisolasi dari core `ssh2::Session` sehingga nanti migrasi ke `russh` dapat dilakukan pada level konektor inti.

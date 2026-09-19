@@ -1,10 +1,19 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { listKeys, generateKey, importKey, deleteKey, type KeyRecord } from '$lib/api/keys';
+  import { listKeys, generateKey, importKey, deleteKey, deployPublicKey, type KeyRecord } from '$lib/api/keys';
+  import { listHosts, type HostRecord } from '$lib/api/hosts';
 
   let keys: KeyRecord[] = [];
+  let hosts: HostRecord[] = [];
   let isLoading = true;
   let errorMsg = '';
+  let successMsg = '';
+
+  // Deploy modal
+  let showDeployModal = false;
+  let deployKeyId = '';
+  let deployHostId = '';
+  let isDeploying = false;
 
   // Generate modal
   let showGenerateModal = false;
@@ -22,8 +31,9 @@
   async function loadKeys() {
     isLoading = true;
     errorMsg = '';
+    successMsg = '';
     try {
-      keys = await listKeys();
+      [keys, hosts] = await Promise.all([listKeys(), listHosts()]);
     } catch (e: any) {
       errorMsg = String(e);
     } finally {
@@ -37,6 +47,7 @@
     if (!generateName.trim()) return;
     isGenerating = true;
     errorMsg = '';
+    successMsg = '';
     try {
       await generateKey({ name: generateName, algorithm: generateAlg });
       showGenerateModal = false;
@@ -53,6 +64,7 @@
     if (!importName.trim() || !importPem.trim()) return;
     isImporting = true;
     errorMsg = '';
+    successMsg = '';
     try {
       await importKey(importName, importPem, importPassphrase || undefined);
       showImportModal = false;
@@ -70,11 +82,37 @@
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Hapus kunci "${name}"?\n(Pastikan tidak sedang digunakan oleh Host)`)) return;
     errorMsg = '';
+    successMsg = '';
     try {
       await deleteKey(id);
       await loadKeys();
     } catch (e: any) {
       errorMsg = String(e);
+    }
+  }
+
+  function openDeployModal(keyId: string) {
+    deployKeyId = keyId;
+    deployHostId = hosts.length > 0 ? hosts[0].id : '';
+    showDeployModal = true;
+    errorMsg = '';
+    successMsg = '';
+  }
+
+  async function handleDeploy() {
+    if (!deployKeyId || !deployHostId) return;
+    isDeploying = true;
+    errorMsg = '';
+    successMsg = '';
+    try {
+      await deployPublicKey(deployHostId, deployKeyId);
+      showDeployModal = false;
+      const targetHost = hosts.find(h => h.id === deployHostId);
+      successMsg = `Kunci public berhasil di-deploy ke server ${targetHost?.label || deployHostId}!`;
+    } catch (e: any) {
+      errorMsg = String(e);
+    } finally {
+      isDeploying = false;
     }
   }
 </script>
@@ -88,7 +126,7 @@
     </div>
     <div class="flex-1">
       <h1 class="text-2xl font-bold text-white">SSH Keys</h1>
-      <p class="text-sm text-neutral-400">Manage, generate, and import SSH keypairs (RSA / ED25519) securely stored in the local vault.</p>
+      <p class="text-sm text-neutral-400">Manage, generate, import, and deploy SSH keypairs (RSA / ED25519) securely stored in the local vault.</p>
     </div>
     <button on:click={() => showImportModal = true} class="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors border border-neutral-700">
       Import
@@ -101,6 +139,12 @@
   {#if errorMsg}
     <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
       {errorMsg}
+    </div>
+  {/if}
+
+  {#if successMsg}
+    <div class="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400 text-sm">
+      {successMsg}
     </div>
   {/if}
 
@@ -146,18 +190,61 @@
             <span class="text-xs text-neutral-500" title={key.createdAt}>
               {new Date(key.createdAt).toLocaleDateString()}
             </span>
-            <button 
-              on:click={() => handleDelete(key.id, key.name)}
-              class="text-xs text-rose-500 hover:text-rose-400 font-medium px-2 py-1 rounded hover:bg-rose-500/10 transition-colors"
-            >
-              Delete
-            </button>
+            <div class="flex items-center gap-2">
+              <button 
+                on:click={() => openDeployModal(key.id)}
+                class="text-xs text-sky-400 hover:text-sky-300 font-medium px-2 py-1 rounded hover:bg-sky-500/10 transition-colors"
+              >
+                Deploy to Server
+              </button>
+              <button 
+                on:click={() => handleDelete(key.id, key.name)}
+                class="text-xs text-rose-500 hover:text-rose-400 font-medium px-2 py-1 rounded hover:bg-rose-500/10 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         </div>
       {/each}
     </div>
   {/if}
 </div>
+
+{#if showDeployModal}
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="bg-neutral-900 border border-neutral-800 rounded-xl w-full max-w-md shadow-2xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Deploy Public Key to Remote Server</h3>
+    
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-neutral-400 mb-1">Target Host</label>
+        {#if hosts.length === 0}
+          <div class="p-3 bg-neutral-950 border border-neutral-800 rounded-lg text-sm text-neutral-500">
+            No hosts available. Add a host in the Hosts tab first.
+          </div>
+        {:else}
+          <select bind:value={deployHostId} class="w-full bg-black/40 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors">
+            {#each hosts as h}
+              <option value={h.id}>{h.label} ({h.username}@{h.address})</option>
+            {/each}
+          </select>
+        {/if}
+      </div>
+      <p class="text-xs text-neutral-500">
+        CATerm will automatically connect using the host's current saved credentials and append this key to `~/.ssh/authorized_keys`.
+      </p>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-6">
+      <button on:click={() => showDeployModal = false} class="px-4 py-2 text-neutral-400 hover:text-white transition-colors text-sm font-medium">Cancel</button>
+      <button on:click={handleDeploy} disabled={!deployHostId || isDeploying} class="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
+        {isDeploying ? 'Deploying...' : 'Deploy Public Key'}
+      </button>
+    </div>
+  </div>
+</div>
+{/if}
 
 {#if showGenerateModal}
 <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">

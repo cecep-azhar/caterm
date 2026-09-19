@@ -59,6 +59,7 @@ pub fn run(start: std::time::Instant) {
             commands::generate_key,
             commands::import_key,
             commands::delete_key,
+            commands::deploy_public_key,
             commands::validate_vault_password,
             commands::ssh_connect,
             commands::ssh_write,

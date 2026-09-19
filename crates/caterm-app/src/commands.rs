@@ -36,6 +36,11 @@ pub async fn delete_key(id: String) -> Result<(), CatermError> {
 }
 
 #[tauri::command]
+pub async fn deploy_public_key(host_id: String, key_id: String) -> Result<(), CatermError> {
+    run_blocking(move || keys::deploy_public_key(&host_id, &key_id)).await
+}
+
+#[tauri::command]
 pub async fn list_hosts() -> Result<Vec<store::HostRecord>, CatermError> {
     run_blocking(store::list_hosts).await
 }

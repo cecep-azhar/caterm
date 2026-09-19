@@ -29,3 +29,7 @@ export function importKey(name: string, privateKeyPem: string, passphrase?: stri
 export function deleteKey(id: string): Promise<void> {
   return invoke('delete_key', { id });
 }
+
+export function deployPublicKey(hostId: string, keyId: string): Promise<void> {
+  return invoke('deploy_public_key', { hostId, keyId });
+}
