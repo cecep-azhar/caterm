@@ -1,31 +1,23 @@
 <script lang="ts">
   import { validateVaultPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
   import { exportEncryptedBackup, importEncryptedBackup } from '$lib/api/backup';
+  import { showToast } from '$lib/stores/uiNotifications.svelte';
 
   let activeTab = $state('updates'); // 'updates' | 'subscription' | 'sync' | 'security' | 'backup'
   let vaultPassword = $state('');
-  let vaultMessage = $state('');
-  let vaultMessageKind = $state<'error' | 'success'>('error');
 
   let backupPassphrase = $state('');
-  let backupMsg = $state('');
-  let backupMsgKind = $state<'error' | 'success'>('error');
   let restorePassphrase = $state('');
-  let restoreMsg = $state('');
-  let restoreMsgKind = $state<'error' | 'success'>('error');
 
   async function handleExport(e: Event) {
     e.preventDefault();
-    backupMsg = '';
     if (backupPassphrase.length < 8) {
-      backupMsgKind = 'error';
-      backupMsg = 'Passphrase must be at least 8 characters.';
+      showToast('Passphrase minimal 8 karakter.', 'error');
       return;
     }
 
     try {
-      backupMsgKind = 'success';
-      backupMsg = 'Generating and encrypting backup...';
+      showToast('Membuat backup terenkripsi...', 'info');
       const b64 = await exportEncryptedBackup(backupPassphrase);
       
       const blob = new Blob([b64], { type: 'text/plain' });
@@ -36,21 +28,17 @@
       a.click();
       URL.revokeObjectURL(url);
 
-      backupMsgKind = 'success';
-      backupMsg = `Backup saved successfully!`;
+      showToast('Backup berhasil disimpan!', 'success');
       backupPassphrase = '';
-    } catch (err) {
-      backupMsgKind = 'error';
-      backupMsg = err.message || String(err);
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal export backup', 'error');
     }
   }
 
   async function handleImport(e: Event) {
     e.preventDefault();
-    restoreMsg = '';
     if (restorePassphrase.length < 8) {
-      restoreMsgKind = 'error';
-      restoreMsg = 'Passphrase must be at least 8 characters.';
+      showToast('Passphrase minimal 8 karakter.', 'error');
       return;
     }
 
@@ -62,28 +50,24 @@
         const file = input.files?.[0];
         if (!file) return;
         
-        restoreMsgKind = 'success';
-        restoreMsg = 'Decrypting and importing backup...';
+        showToast('Mendekripsi dan mengimpor backup...', 'info');
         
         const reader = new FileReader();
         reader.onload = async (event) => {
           try {
             const b64 = event.target?.result as string;
             const importedCount = await importEncryptedBackup(b64, restorePassphrase);
-            restoreMsgKind = 'success';
-            restoreMsg = `Restore complete. Successfully imported ${importedCount} records.`;
+            showToast(`Restore berhasil! Memulihkan ${importedCount} data.`, 'success');
             restorePassphrase = '';
-          } catch (err) {
-            restoreMsgKind = 'error';
-            restoreMsg = (err as { message?: string })?.message || String(err);
+          } catch (err: any) {
+            showToast(err?.message || 'Gagal restore backup', 'error');
           }
         };
         reader.readAsText(file);
       };
       input.click();
-    } catch (err) {
-      restoreMsgKind = 'error';
-      restoreMsg = (err as { message?: string })?.message || String(err);
+    } catch (err: any) {
+      showToast(err?.message || 'Gagal restore backup', 'error');
     }
   }
 
@@ -91,14 +75,13 @@
     e.preventDefault();
     try {
       await validateVaultPassword(vaultPassword);
-      vaultMessageKind = 'success';
-      vaultMessage = 'Master password valid dan tersimpan.';
+      showToast('Master password valid dan tersimpan.', 'success');
       vaultPassword = '';
     } catch (err) {
-      vaultMessageKind = 'error';
-      vaultMessage =
+      const msg =
         (err as { message?: string })?.message ??
         `Password vault minimal ${MIN_VAULT_PASSWORD_LEN} karakter.`;
+      showToast(msg, 'error');
     }
   }
 </script>
