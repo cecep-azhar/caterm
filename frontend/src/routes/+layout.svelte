@@ -1,29 +1,28 @@
 <script lang="ts">
   import "../app.css";
   import LockScreen from '$lib/components/LockScreen.svelte';
-  import { getTabs, closeTab } from '$lib/stores/sessionTabs.svelte';
+  import NotificationCenter from '$lib/components/NotificationCenter.svelte';
+  import Logo from '$lib/components/Logo.svelte';
 
   let { children } = $props();
 
   let isUnlocked = $state(false);
-  const sessionTabs = $derived(getTabs());
 </script>
 
 {#if !isUnlocked}
   <LockScreen onUnlocked={() => isUnlocked = true} />
 {:else}
 <div class="flex h-screen bg-[#0e0e0e] text-neutral-300 font-sans">
+  <NotificationCenter />
   <!-- Sidebar -->
   <aside class="w-16 md:w-64 border-r border-neutral-800 flex flex-col justify-between shrink-0">
     <div>
       <div class="h-12 border-b border-neutral-800 flex items-center justify-between px-4">
         <div class="flex items-center gap-2">
-          <div class="w-6 h-6 rounded bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center font-bold text-white text-xs">
-            C
-          </div>
+          <Logo size={24} mode="dark" />
           <span class="font-bold text-white text-lg tracking-wide hidden md:block">CATerm</span>
         </div>
-        <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono hidden md:block">v2.0.5</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono hidden md:block">v2.0.4</span>
       </div>
       
       <nav class="p-2 space-y-1 text-sm font-medium">
@@ -69,11 +68,11 @@
       <div class="p-2 rounded-lg bg-neutral-900/60 border border-neutral-800/50 flex items-center justify-between">
         <div class="hidden md:flex items-center gap-2 overflow-hidden">
           <div class="w-7 h-7 rounded-full bg-sky-500/20 text-sky-400 font-bold text-xs flex items-center justify-center shrink-0 border border-sky-500/30">
-            CA
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
           </div>
           <div class="truncate text-xs">
-            <p class="font-medium text-white truncate">Cecep Saeful...</p>
-            <p class="text-[10px] text-neutral-500 truncate">cecep.azhtech@gmail.com</p>
+            <p class="font-medium text-white truncate">Local Vault</p>
+            <p class="text-[10px] text-emerald-400 truncate font-mono">Encrypted • Active</p>
           </div>
         </div>
         <button onclick={() => isUnlocked = false} title="Lock Vault" class="p-1.5 text-neutral-400 hover:text-amber-400 hover:bg-neutral-800 rounded transition-colors">

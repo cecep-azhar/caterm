@@ -1,10 +1,6 @@
 <script lang="ts">
   import { validateVaultPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
   import { exportEncryptedBackup, importEncryptedBackup } from '$lib/api/backup';
-  import { save } from '@tauri-apps/plugin-dialog';
-  import { writeTextFile } from '@tauri-apps/plugin-fs';
-  import { open } from '@tauri-apps/plugin-dialog';
-  import { readTextFile } from '@tauri-apps/plugin-fs';
 
   let activeTab = $state('updates'); // 'updates' | 'subscription' | 'sync' | 'security' | 'backup'
   let vaultPassword = $state('');
@@ -32,21 +28,18 @@
       backupMsg = 'Generating and encrypting backup...';
       const b64 = await exportEncryptedBackup(backupPassphrase);
       
-      const filePath = await save({
-        filters: [{ name: 'CATerm Vault Backup', extensions: ['catb'] }],
-        defaultPath: 'caterm-backup.catb',
-      });
+      const blob = new Blob([b64], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `caterm-backup-${new Date().toISOString().split('T')[0]}.catb`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-      if (filePath) {
-        await writeTextFile(filePath, b64);
-        backupMsgKind = 'success';
-        backupMsg = `Backup saved successfully to ${filePath}`;
-        backupPassphrase = '';
-      } else {
-        backupMsgKind = 'error';
-        backupMsg = 'Backup cancelled.';
-      }
-    } catch (err: any) {
+      backupMsgKind = 'success';
+      backupMsg = `Backup saved successfully!`;
+      backupPassphrase = '';
+    } catch (err) {
       backupMsgKind = 'error';
       backupMsg = err.message || String(err);
     }
@@ -62,28 +55,35 @@
     }
 
     try {
-      const selectedPath = await open({
-        filters: [{ name: 'CATerm Vault Backup', extensions: ['catb'] }],
-        multiple: false,
-      });
-
-      if (selectedPath && !Array.isArray(selectedPath)) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.catb,.enc,.txt';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        
         restoreMsgKind = 'success';
         restoreMsg = 'Decrypting and importing backup...';
         
-        const b64 = await readTextFile(selectedPath);
-        const importedCount = await importEncryptedBackup(b64, restorePassphrase);
-        
-        restoreMsgKind = 'success';
-        restoreMsg = `Restore complete. Successfully imported ${importedCount} records.`;
-        restorePassphrase = '';
-      } else {
-        restoreMsgKind = 'error';
-        restoreMsg = 'Import cancelled.';
-      }
-    } catch (err: any) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const b64 = event.target?.result as string;
+            const importedCount = await importEncryptedBackup(b64, restorePassphrase);
+            restoreMsgKind = 'success';
+            restoreMsg = `Restore complete. Successfully imported ${importedCount} records.`;
+            restorePassphrase = '';
+          } catch (err) {
+            restoreMsgKind = 'error';
+            restoreMsg = (err as { message?: string })?.message || String(err);
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    } catch (err) {
       restoreMsgKind = 'error';
-      restoreMsg = err.message || String(err);
+      restoreMsg = (err as { message?: string })?.message || String(err);
     }
   }
 

@@ -3,7 +3,9 @@
 //! returns its result — no business logic here. See `tests/arch.rs` in
 //! `caterm-core` for the guard that enforces this.
 
-use caterm_core::{backup, groups, keys, monitor, sftp, snippets, ssh, store, tunnels, vault, CatermError};
+use caterm_core::{
+    CatermError, backup, groups, keys, monitor, sftp, snippets, ssh, store, tunnels, vault,
+};
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
 where
@@ -21,7 +23,9 @@ pub async fn list_tunnels() -> Result<Vec<tunnels::TunnelRecord>, CatermError> {
 }
 
 #[tauri::command]
-pub async fn save_tunnel(input: tunnels::TunnelInput) -> Result<tunnels::TunnelRecord, CatermError> {
+pub async fn save_tunnel(
+    input: tunnels::TunnelInput,
+) -> Result<tunnels::TunnelRecord, CatermError> {
     run_blocking(move || tunnels::save_tunnel(input)).await
 }
 
@@ -40,17 +44,27 @@ pub async fn stop_tunnel(id: String) -> Result<(), CatermError> {
     run_blocking(move || tunnels::stop_tunnel(&id)).await
 }
 #[tauri::command]
-pub async fn list_remote_dir(host_id: String, remote_path: String) -> Result<Vec<sftp::SftpFileEntry>, CatermError> {
+pub async fn list_remote_dir(
+    host_id: String,
+    remote_path: String,
+) -> Result<Vec<sftp::SftpFileEntry>, CatermError> {
     run_blocking(move || sftp::list_remote_dir(&host_id, &remote_path)).await
 }
 
 #[tauri::command]
-pub async fn read_remote_file(host_id: String, remote_path: String) -> Result<Vec<u8>, CatermError> {
+pub async fn read_remote_file(
+    host_id: String,
+    remote_path: String,
+) -> Result<Vec<u8>, CatermError> {
     run_blocking(move || sftp::read_remote_file(&host_id, &remote_path)).await
 }
 
 #[tauri::command]
-pub async fn write_remote_file(host_id: String, remote_path: String, data: Vec<u8>) -> Result<(), CatermError> {
+pub async fn write_remote_file(
+    host_id: String,
+    remote_path: String,
+    data: Vec<u8>,
+) -> Result<(), CatermError> {
     run_blocking(move || sftp::write_remote_file(&host_id, &remote_path, &data)).await
 }
 
@@ -64,7 +78,10 @@ pub async fn export_encrypted_backup(passphrase: String) -> Result<String, Cater
 }
 
 #[tauri::command]
-pub async fn import_encrypted_backup(encrypted_b64: String, passphrase: String) -> Result<usize, CatermError> {
+pub async fn import_encrypted_backup(
+    encrypted_b64: String,
+    passphrase: String,
+) -> Result<usize, CatermError> {
     run_blocking(move || backup::import_encrypted_backup(&encrypted_b64, &passphrase)).await
 }
 #[tauri::command]
@@ -83,7 +100,11 @@ pub async fn generate_key(input: keys::KeyInput) -> Result<keys::KeyRecord, Cate
 }
 
 #[tauri::command]
-pub async fn import_key(name: String, private_key_pem: String, passphrase: Option<String>) -> Result<keys::KeyRecord, CatermError> {
+pub async fn import_key(
+    name: String,
+    private_key_pem: String,
+    passphrase: Option<String>,
+) -> Result<keys::KeyRecord, CatermError> {
     run_blocking(move || keys::import_key(&name, &private_key_pem, passphrase.as_deref())).await
 }
 
@@ -133,7 +154,9 @@ pub async fn list_snippets() -> Result<Vec<snippets::SnippetRecord>, CatermError
 }
 
 #[tauri::command]
-pub async fn save_snippet(input: snippets::SnippetInput) -> Result<snippets::SnippetRecord, CatermError> {
+pub async fn save_snippet(
+    input: snippets::SnippetInput,
+) -> Result<snippets::SnippetRecord, CatermError> {
     run_blocking(move || snippets::save_snippet(input)).await
 }
 
@@ -144,7 +167,17 @@ pub async fn delete_snippet(id: String) -> Result<(), CatermError> {
 
 #[tauri::command]
 pub async fn validate_vault_password(password: String) -> Result<(), CatermError> {
-    run_blocking(move || vault::validate_master_password(&password)).await
+    run_blocking(move || vault::unlock_vault(&password)).await
+}
+
+#[tauri::command]
+pub async fn is_vault_initialized() -> Result<bool, CatermError> {
+    run_blocking(vault::is_vault_initialized).await
+}
+
+#[tauri::command]
+pub async fn reset_vault() -> Result<(), CatermError> {
+    run_blocking(vault::reset_vault).await
 }
 
 #[tauri::command]

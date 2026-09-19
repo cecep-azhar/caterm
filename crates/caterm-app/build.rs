@@ -12,6 +12,8 @@ const COMMANDS: &[&str] = &[
     "save_snippet",
     "delete_snippet",
     "validate_vault_password",
+    "is_vault_initialized",
+    "reset_vault",
     "ssh_connect",
     "ssh_write",
     "ssh_resize",

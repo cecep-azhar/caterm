@@ -15,6 +15,8 @@
     "allow-save-snippet",
     "allow-delete-snippet",
     "allow-validate-vault-password",
+    "allow-is-vault-initialized",
+    "allow-reset-vault",
     "allow-ssh-connect",
     "allow-ssh-write",
     "allow-ssh-resize",

@@ -19,6 +19,10 @@ directories.workspace = true
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
 rand = "0.8"
 ssh2 = "0.9.6"
+argon2 = "0.5"
+secrecy = "0.8"
+zeroize = "1.8"
+hex = "0.4"
 aes-gcm = "0.10"
 sha2 = "0.10"
 base64 = "0.22"

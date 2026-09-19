@@ -2,20 +2,20 @@
 //! Exports all hosts, groups, snippets, and keys as an encrypted JSON archive.
 //! Imports and merges encrypted backup archives with integrity validation.
 
-use crate::db::open_db;
-use crate::error::{CatermError, ValidationError, VaultError};
+use crate::error::{CatermError, VaultError};
+use crate::groups::{self, GroupInput, GroupRecord};
 use crate::keys::{self, KeyRecord};
-use crate::snippets::{self, Snippet};
-use crate::store::{self, Host};
+use crate::snippets::{self, SnippetInput, SnippetRecord};
+use crate::store::{self, HostInput, HostRecord};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultBackupPayload {
     pub version: String,
     pub timestamp: u64,
-    pub hosts: Vec<Host>,
-    pub groups: Vec<crate::groups::Group>,
-    pub snippets: Vec<Snippet>,
+    pub hosts: Vec<HostRecord>,
+    pub groups: Vec<GroupRecord>,
+    pub snippets: Vec<SnippetRecord>,
     pub keys: Vec<KeyRecord>,
 }
 
@@ -28,7 +28,7 @@ pub fn export_encrypted_backup(passphrase: &str) -> Result<String, CatermError> 
     }
 
     let hosts = store::list_hosts()?;
-    let groups = crate::groups::list_groups()?;
+    let groups = groups::list_groups()?;
     let snippets = snippets::list_snippets()?;
     let keys = keys::list_keys()?;
 
@@ -59,7 +59,7 @@ pub fn export_encrypted_backup(passphrase: &str) -> Result<String, CatermError> 
         .hash_password_into(passphrase.as_bytes(), salt, &mut derived_key)
         .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
 
-    let encrypted_b64 = crate::secret::encrypt_secret(&json_bytes, &derived_key)?;
+    let encrypted_b64 = crate::secret::encrypt_bytes(&derived_key, &json_bytes)?;
     Ok(encrypted_b64)
 }
 
@@ -73,30 +73,49 @@ pub fn import_encrypted_backup(encrypted_b64: &str, passphrase: &str) -> Result<
         .hash_password_into(passphrase.as_bytes(), salt, &mut derived_key)
         .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
 
-    let decrypted_bytes = crate::secret::decrypt_secret(encrypted_b64, &derived_key)?;
+    let decrypted_bytes = crate::secret::decrypt_bytes(&derived_key, encrypted_b64)?;
     let payload: VaultBackupPayload = serde_json::from_slice(&decrypted_bytes)
         .map_err(|e| CatermError::Vault(VaultError::Generic(format!("Corrupt backup file: {}", e))))?;
 
     let mut imported_count = 0;
 
     for host in payload.hosts {
-        store::save_host(host)?;
+        store::save_host(HostInput {
+            id: Some(host.id),
+            label: host.label,
+            address: host.address,
+            port: host.port,
+            username: host.username,
+            auth_method: host.auth_method,
+            tags: host.tags,
+            secret: None,
+        })?;
         imported_count += 1;
     }
 
     for group in payload.groups {
-        crate::groups::save_group(group)?;
+        groups::save_group(GroupInput {
+            id: Some(group.id),
+            name: group.name,
+            color: group.color,
+            host_ids: group.host_ids,
+        })?;
         imported_count += 1;
     }
 
     for snippet in payload.snippets {
-        snippets::save_snippet(snippet)?;
+        snippets::save_snippet(SnippetInput {
+            id: Some(snippet.id),
+            label: snippet.label,
+            description: snippet.description,
+            command: snippet.command,
+            tags: snippet.tags,
+        })?;
         imported_count += 1;
     }
 
     for key in payload.keys {
-        // save imported keys directly
-        keys::import_key(&key.name, &key.public_key, "")?;
+        keys::import_key(&key.name, &key.public_key, None)?;
         imported_count += 1;
     }
 

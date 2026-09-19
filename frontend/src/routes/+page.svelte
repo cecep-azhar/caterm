@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
+  import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
 
   let hosts = $state<HostRecord[]>([]);
   let vaultKeys = $state<KeyRecord[]>([]);
@@ -70,6 +71,7 @@
   async function handleSaveHost() {
     if (!formLabel || !formAddress || !formUsername) {
       errorMsg = 'Label, Host/IP, and Username are required.';
+      showToast(errorMsg, 'error');
       return;
     }
     isLoading = true;
@@ -88,21 +90,25 @@
       };
       await saveHost(input);
       isAddModalOpen = false;
+      showToast(editingId ? 'Host berhasil diperbarui' : 'Host berhasil ditambahkan', 'success');
       await refreshHosts();
     } catch (err: any) {
       errorMsg = typeof err === 'string' ? err : (err?.message || 'Failed to save host');
+      showToast(errorMsg, 'error');
     } finally {
       isLoading = false;
     }
   }
 
   async function handleDelete(id: string) {
-    if (confirm('Are you sure you want to delete this host?')) {
+    const confirmed = await confirmModal('Apakah Anda yakin ingin menghapus host ini dari database?', 'Hapus Host', true, 'Hapus', 'Batal');
+    if (confirmed) {
       try {
         await deleteHost(id);
+        showToast('Host berhasil dihapus', 'success');
         await refreshHosts();
       } catch (err: any) {
-        alert(err?.message || 'Failed to delete host');
+        showToast(err?.message || 'Gagal menghapus host', 'error');
       }
     }
   }
