@@ -63,10 +63,13 @@ pub fn connect(request: SshConnectRequest) -> Result<SshSession, CatermError> {
     let session_id = generate_session_id(&request.host_id);
     let addr = format!("{}:{}", request.address, if request.port == 0 { 22 } else { request.port });
 
-    let tcp = TcpStream::connect_timeout(
+    let tcp = std::net::TcpStream::connect_timeout(
         &addr.parse().map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Invalid address {addr}: {e}"))))?,
         Duration::from_secs(10),
     ).map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Connection failed to {addr}: {e}"))))?;
+    
+    tcp.set_nonblocking(false)
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to set blocking TCP stream: {e}"))))?;
 
     let mut sess = ssh2::Session::new()
         .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH session creation failed: {e}"))))?;
@@ -101,6 +104,9 @@ pub fn connect(request: SshConnectRequest) -> Result<SshSession, CatermError> {
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
     let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
 
+    // Set session to non-blocking so our reader loop doesn't hold the lock forever
+    sess.set_blocking(false);
+
     let channel_arc = Arc::new(Mutex::new(channel));
 
     // Spawn reader background thread
@@ -124,8 +130,12 @@ pub fn connect(request: SshConnectRequest) -> Result<SshSession, CatermError> {
                         out.extend_from_slice(&buf[..n]);
                     }
                 }
-                Err(_) => {
-                    thread::sleep(Duration::from_millis(50));
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::WouldBlock {
+                        thread::sleep(Duration::from_millis(10));
+                    } else {
+                        break;
+                    }
                 }
             }
         }

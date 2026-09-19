@@ -10,8 +10,18 @@
   let {
     host = null,
     hostLabel = 'Local Terminal',
-    hostIp = '127.0.0.1'
-  }: { host?: HostRecord | null; hostLabel?: string; hostIp?: string } = $props();
+    hostIp = '127.0.0.1',
+    onSplitRight,
+    onSplitDown,
+    onClose
+  }: { 
+    host?: HostRecord | null; 
+    hostLabel?: string; 
+    hostIp?: string;
+    onSplitRight?: () => void;
+    onSplitDown?: () => void;
+    onClose?: () => void;
+  } = $props();
 
   const label = $derived(host?.label ?? hostLabel);
   const address = $derived(host?.address ?? hostIp);
@@ -136,9 +146,24 @@
       <span class="text-white font-medium">{label}</span>
       <span class="text-neutral-500">({address})</span>
     </div>
-    <div class="flex gap-2 text-neutral-500">
-      <span>SSH</span>
-      <span>UTF-8</span>
+    <div class="flex items-center gap-2 text-neutral-400">
+      {#if onSplitRight}
+        <button onclick={onSplitRight} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Right (Vertical)">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
+        </button>
+      {/if}
+      {#if onSplitDown}
+        <button onclick={onSplitDown} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Down (Horizontal)">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3 12h18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
+        </button>
+      {/if}
+      {#if onClose}
+        <button onclick={onClose} class="hover:text-rose-400 p-0.5 rounded transition-colors" title="Close Pane">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      {/if}
+      <span class="ml-1 text-neutral-500">SSH</span>
+      <span class="text-neutral-500">UTF-8</span>
     </div>
   </div>
   <div bind:this={terminalContainer} class="flex-1 p-2 overflow-hidden"></div>

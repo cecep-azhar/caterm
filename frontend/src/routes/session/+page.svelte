@@ -50,23 +50,23 @@
 
   <div class="flex-1 w-full h-full overflow-hidden">
     {#if layout === 1}
-      <TerminalPane host={pane(0)} />
+      <TerminalPane host={pane(0)} onSplitRight={() => layout = 3} onSplitDown={() => layout = 2} />
     {:else if layout === 2}
       <div class="flex flex-col h-full gap-2">
-        <div class="flex-1 min-h-0"><TerminalPane host={pane(0)} /></div>
-        <div class="flex-1 min-h-0"><TerminalPane host={pane(1)} /></div>
+        <div class="flex-1 min-h-0"><TerminalPane host={pane(0)} onSplitRight={() => layout = 4} onClose={() => layout = 1} /></div>
+        <div class="flex-1 min-h-0"><TerminalPane host={pane(1)} onClose={() => layout = 1} /></div>
       </div>
     {:else if layout === 3}
       <div class="flex h-full gap-2">
-        <div class="flex-1 min-w-0"><TerminalPane host={pane(0)} /></div>
-        <div class="flex-1 min-w-0"><TerminalPane host={pane(1)} /></div>
+        <div class="flex-1 min-w-0"><TerminalPane host={pane(0)} onSplitDown={() => layout = 4} onClose={() => layout = 1} /></div>
+        <div class="flex-1 min-w-0"><TerminalPane host={pane(1)} onClose={() => layout = 1} /></div>
       </div>
     {:else if layout === 4}
       <div class="grid grid-cols-2 grid-rows-2 h-full gap-2">
-        <div class="min-h-0 min-w-0"><TerminalPane host={pane(0)} /></div>
-        <div class="min-h-0 min-w-0"><TerminalPane host={pane(1)} /></div>
-        <div class="min-h-0 min-w-0"><TerminalPane host={pane(2)} /></div>
-        <div class="min-h-0 min-w-0"><TerminalPane host={pane(3)} /></div>
+        <div class="min-h-0 min-w-0"><TerminalPane host={pane(0)} onClose={() => layout = 3} /></div>
+        <div class="min-h-0 min-w-0"><TerminalPane host={pane(1)} onClose={() => layout = 3} /></div>
+        <div class="min-h-0 min-w-0"><TerminalPane host={pane(2)} onClose={() => layout = 2} /></div>
+        <div class="min-h-0 min-w-0"><TerminalPane host={pane(3)} onClose={() => layout = 2} /></div>
       </div>
     {/if}
   </div>

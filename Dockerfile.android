@@ -1,0 +1,32 @@
+FROM rust:latest
+
+RUN apt-get update && apt-get install -y \
+    nodejs npm \
+    curl unzip wget git \
+    openjdk-21-jdk \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+ENV ANDROID_HOME=/opt/android-sdk
+ENV ANDROID_NDK_HOME=/ndk/25.2.9519653
+ENV PATH=/home/cecepazhar/.hermes/hermes-agent/venv/bin:/home/cecepazhar/.hermes/hermes-agent/node_modules/.bin:/home/cecepazhar/.hermes/node/bin:/home/cecepazhar/.hermes/node:/home/cecepazhar/.local/bin:/home/cecepazhar/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/cmdline-tools/latest/bin:/platform-tools
+
+# Download & Setup Android SDK Cmdline Tools
+RUN mkdir -p /cmdline-tools && \
+    wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip -O cmdline-tools.zip && \
+    unzip -q cmdline-tools.zip -d /cmdline-tools && \
+    mv /cmdline-tools/cmdline-tools /cmdline-tools/latest && \
+    rm cmdline-tools.zip
+
+# Accept Licenses & Install NDK, Build Tools, and Platforms
+RUN yes | sdkmanager --licenses && \
+    sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;25.2.9519653"
+
+# Rust Targets for Android
+RUN rustup target add aarch64-linux-android armv7-linux-androideabi i686-linux-android x86_64-linux-android
+
+# Tauri CLI
+RUN npm install -g @tauri-apps/cli
+
+WORKDIR /app

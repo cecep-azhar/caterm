@@ -58,7 +58,7 @@
         C
       </div>
       <div>
-        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.0.3</span></h1>
+        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.0.4</span></h1>
         <p class="text-xs text-neutral-400">Enterprise SSH Manager & Prompt Studio</p>
       </div>
     </div>

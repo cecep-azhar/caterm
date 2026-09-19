@@ -6,78 +6,76 @@
 use caterm_core::{groups, snippets, ssh, store, vault, CatermError};
 
 #[tauri::command]
-pub fn list_hosts() -> Result<Vec<store::HostRecord>, CatermError> {
-    store::list_hosts()
+pub async fn list_hosts() -> Result<Vec<store::HostRecord>, CatermError> {
+    tokio::task::spawn_blocking(store::list_hosts).await.unwrap()
 }
 
 #[tauri::command]
-pub fn save_host(input: store::HostInput) -> Result<store::HostRecord, CatermError> {
-    store::save_host(input)
+pub async fn save_host(input: store::HostInput) -> Result<store::HostRecord, CatermError> {
+    tokio::task::spawn_blocking(move || store::save_host(input)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn delete_host(id: String) -> Result<(), CatermError> {
-    store::delete_host(&id)
+pub async fn delete_host(id: String) -> Result<(), CatermError> {
+    tokio::task::spawn_blocking(move || store::delete_host(&id)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn list_groups() -> Result<Vec<groups::GroupRecord>, CatermError> {
-    groups::list_groups()
+pub async fn list_groups() -> Result<Vec<groups::GroupRecord>, CatermError> {
+    tokio::task::spawn_blocking(groups::list_groups).await.unwrap()
 }
 
 #[tauri::command]
-pub fn save_group(input: groups::GroupInput) -> Result<groups::GroupRecord, CatermError> {
-    groups::save_group(input)
+pub async fn save_group(input: groups::GroupInput) -> Result<groups::GroupRecord, CatermError> {
+    tokio::task::spawn_blocking(move || groups::save_group(input)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn delete_group(id: String) -> Result<(), CatermError> {
-    groups::delete_group(&id)
+pub async fn delete_group(id: String) -> Result<(), CatermError> {
+    tokio::task::spawn_blocking(move || groups::delete_group(&id)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn list_snippets() -> Result<Vec<snippets::SnippetRecord>, CatermError> {
-    snippets::list_snippets()
+pub async fn list_snippets() -> Result<Vec<snippets::SnippetRecord>, CatermError> {
+    tokio::task::spawn_blocking(snippets::list_snippets).await.unwrap()
 }
 
 #[tauri::command]
-pub fn save_snippet(input: snippets::SnippetInput) -> Result<snippets::SnippetRecord, CatermError> {
-    snippets::save_snippet(input)
+pub async fn save_snippet(input: snippets::SnippetInput) -> Result<snippets::SnippetRecord, CatermError> {
+    tokio::task::spawn_blocking(move || snippets::save_snippet(input)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn delete_snippet(id: String) -> Result<(), CatermError> {
-    snippets::delete_snippet(&id)
+pub async fn delete_snippet(id: String) -> Result<(), CatermError> {
+    tokio::task::spawn_blocking(move || snippets::delete_snippet(&id)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn validate_vault_password(password: String) -> Result<(), CatermError> {
-    vault::validate_master_password(&password)
+pub async fn validate_vault_password(password: String) -> Result<(), CatermError> {
+    tokio::task::spawn_blocking(move || vault::validate_master_password(&password)).await.unwrap()
 }
 
 #[tauri::command]
 pub async fn ssh_connect(request: ssh::SshConnectRequest) -> Result<ssh::SshSession, CatermError> {
-    tokio::task::spawn_blocking(move || ssh::connect(request))
-        .await
-        .expect("Tauri tokio runtime shutdown or task panicked")
+    tokio::task::spawn_blocking(move || ssh::connect(request)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn ssh_write(session_id: String, data: String) -> Result<String, CatermError> {
-    ssh::write(&session_id, &data)
+pub async fn ssh_write(session_id: String, data: String) -> Result<String, CatermError> {
+    tokio::task::spawn_blocking(move || ssh::write(&session_id, &data)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn ssh_read(session_id: String) -> Result<String, CatermError> {
-    ssh::read(&session_id)
+pub async fn ssh_read(session_id: String) -> Result<String, CatermError> {
+    tokio::task::spawn_blocking(move || ssh::read(&session_id)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn ssh_resize(session_id: String, cols: u16, rows: u16) -> Result<(), CatermError> {
-    ssh::resize(&session_id, cols, rows)
+pub async fn ssh_resize(session_id: String, cols: u16, rows: u16) -> Result<(), CatermError> {
+    tokio::task::spawn_blocking(move || ssh::resize(&session_id, cols, rows)).await.unwrap()
 }
 
 #[tauri::command]
-pub fn ssh_disconnect(session_id: String) -> Result<(), CatermError> {
-    ssh::disconnect(&session_id)
+pub async fn ssh_disconnect(session_id: String) -> Result<(), CatermError> {
+    tokio::task::spawn_blocking(move || ssh::disconnect(&session_id)).await.unwrap()
 }

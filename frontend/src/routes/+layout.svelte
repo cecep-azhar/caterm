@@ -21,7 +21,7 @@
           </div>
           <span class="font-bold text-white text-lg tracking-wide hidden md:block">CATerm</span>
         </div>
-        <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono hidden md:block">v2.0.3</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono hidden md:block">v2.0.4</span>
       </div>
       
       <nav class="p-2 space-y-1 text-sm font-medium">
