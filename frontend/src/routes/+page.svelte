@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
+  import { listKeys, type KeyRecord } from '$lib/api/keys';
 
   let hosts = $state<HostRecord[]>([]);
+  let vaultKeys = $state<KeyRecord[]>([]);
   let searchQuery = $state('');
   let isAddModalOpen = $state(false);
   let isLoading = $state(false);
@@ -15,8 +17,9 @@
   let formAddress = $state('');
   let formPort = $state(22);
   let formUsername = $state('root');
-  let formAuthType = $state<'password' | 'key'>('password');
+  let formAuthType = $state<'password' | 'key' | 'keyId'>('password');
   let formKeyPath = $state('');
+  let formKeyId = $state('');
   let formSecret = $state('');
   let formTags = $state('');
 
@@ -27,8 +30,9 @@
   async function refreshHosts() {
     try {
       hosts = await listHosts();
-    } catch (err: any) {
-      console.error('Failed to load hosts:', err);
+      vaultKeys = await listKeys();
+    } catch (e: any) {
+      errorMsg = String(e);
     }
   }
 
@@ -56,6 +60,7 @@
     formUsername = host.username;
     formAuthType = host.authMethod.type;
     formKeyPath = host.authMethod.type === 'key' ? host.authMethod.path : '';
+    formKeyId = host.authMethod.type === 'keyId' ? host.authMethod.id : '';
     formSecret = '';
     formTags = host.tags.join(', ');
     errorMsg = '';
@@ -76,7 +81,7 @@
         address: formAddress,
         port: Number(formPort) || 22,
         username: formUsername,
-        authMethod: formAuthType === 'password' ? { type: 'password' } : { type: 'key', path: formKeyPath },
+        authMethod: formAuthType === 'password' ? { type: 'password' } : (formAuthType === 'keyId' ? { type: 'keyId', id: formKeyId } : { type: 'key', path: formKeyPath }),
         tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
         // Blank = leave whatever's stored untouched (edit) or no secret at all (create).
         secret: formSecret ? formSecret : undefined
@@ -270,8 +275,12 @@
               Password
             </label>
             <label class="flex items-center gap-2 text-xs text-neutral-300">
+              <input type="radio" value="keyId" bind:group={formAuthType} class="text-sky-600 focus:ring-0" />
+              Vault Key
+            </label>
+            <label class="flex items-center gap-2 text-xs text-neutral-300">
               <input type="radio" value="key" bind:group={formAuthType} class="text-sky-600 focus:ring-0" />
-              SSH Private Key
+              Local File
             </label>
           </div>
           {#if formAuthType === 'key'}
@@ -281,7 +290,18 @@
               placeholder="/home/user/.ssh/id_ed25519"
               class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500 mb-3"
             />
+          {:else if formAuthType === 'keyId'}
+            <select
+              bind:value={formKeyId}
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500 mb-3"
+            >
+              <option value="" disabled>-- Select a key from vault --</option>
+              {#each vaultKeys as k}
+                <option value={k.id}>{k.name} ({k.algorithm})</option>
+              {/each}
+            </select>
           {/if}
+          {#if formAuthType !== 'keyId'}
           <label class="block text-xs font-medium text-neutral-400 mb-1">
             {formAuthType === 'key' ? 'Key Passphrase (optional)' : 'Password'}
           </label>
@@ -291,6 +311,7 @@
             placeholder={editingId && editingHadSecret ? 'Kosongkan untuk tidak mengubah' : (formAuthType === 'key' ? 'Kosongkan jika key tidak berpassphrase' : 'Wajib diisi agar bisa connect')}
             class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
           />
+          {/if}
           <p class="text-neutral-500 text-xs mt-1">Disimpan terenkripsi (AES-256-GCM) di database lokal — tidak pernah dikirim balik ke UI.</p>
         </div>
 

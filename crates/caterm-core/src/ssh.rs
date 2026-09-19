@@ -78,6 +78,50 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     sess.handshake()
         .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH handshake failed: {e}"))))?;
 
+    // TOFU Host Key Verification (REQ-18, T2-SSH-04)
+    let data_info = crate::paths::resolve_data_dir()?;
+    let kh_file = data_info.path.join("known_hosts");
+    if let Some(parent) = kh_file.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    let mut known_hosts = sess.known_hosts()
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to initialize known_hosts: {e}"))))?;
+
+    if kh_file.exists() {
+        let _ = known_hosts.read_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH);
+    }
+
+    if let Some((key, key_type)) = sess.host_key() {
+        let check = known_hosts.check_port(&host.address, port, key);
+        match check {
+            ssh2::CheckResult::Match => {
+                // Verified successfully against known_hosts
+            }
+            ssh2::CheckResult::NotFound => {
+                // Trust On First Use: record the new key
+                known_hosts.add(&host.address, key, &format!("Added by CATerm for {}", host.label), key_type.into())
+                    .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to record TOFU host key: {e}"))))?;
+                let _ = known_hosts.write_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH);
+            }
+            ssh2::CheckResult::Mismatch => {
+                return Err(CatermError::Validation(ValidationError::Generic(format!(
+                    "WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! Host key for {} ({}) does not match known_hosts record.",
+                    host.label, host.address
+                ))));
+            }
+            ssh2::CheckResult::Failure => {
+                return Err(CatermError::Validation(ValidationError::Generic(
+                    "Host key verification check failed unexpectedly.".into()
+                )));
+            }
+        }
+    } else {
+        return Err(CatermError::Validation(ValidationError::Generic(
+            "Remote server did not present a host key.".into()
+        )));
+    }
+
     match &host.auth_method {
         AuthMethod::Password => {
             let password = secret.ok_or_else(|| {
@@ -100,6 +144,16 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                     CatermError::Validation(ValidationError::Generic(format!(
                         "Auth via SSH key gagal untuk {} ({}): {e}",
                         host.username, expanded
+                    )))
+                })?;
+        }
+        AuthMethod::KeyId { id } => {
+            let priv_pem = crate::keys::get_private_key(id)?;
+            sess.userauth_pubkey_memory(&host.username, None, &priv_pem, None)
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!(
+                        "Auth via Vault Key ID gagal untuk {}: {e}",
+                        host.username
                     )))
                 })?;
         }

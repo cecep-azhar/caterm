@@ -1,28 +1,225 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { listKeys, generateKey, importKey, deleteKey, type KeyRecord } from '$lib/api/keys';
+
+  let keys: KeyRecord[] = [];
+  let isLoading = true;
+  let errorMsg = '';
+
+  // Generate modal
+  let showGenerateModal = false;
+  let generateName = '';
+  let generateAlg = 'Ed25519';
+  let isGenerating = false;
+
+  // Import modal
+  let showImportModal = false;
+  let importName = '';
+  let importPem = '';
+  let importPassphrase = '';
+  let isImporting = false;
+
+  async function loadKeys() {
+    isLoading = true;
+    errorMsg = '';
+    try {
+      keys = await listKeys();
+    } catch (e: any) {
+      errorMsg = String(e);
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  onMount(loadKeys);
+
+  async function handleGenerate() {
+    if (!generateName.trim()) return;
+    isGenerating = true;
+    errorMsg = '';
+    try {
+      await generateKey({ name: generateName, algorithm: generateAlg });
+      showGenerateModal = false;
+      generateName = '';
+      await loadKeys();
+    } catch (e: any) {
+      errorMsg = String(e);
+    } finally {
+      isGenerating = false;
+    }
+  }
+
+  async function handleImport() {
+    if (!importName.trim() || !importPem.trim()) return;
+    isImporting = true;
+    errorMsg = '';
+    try {
+      await importKey(importName, importPem, importPassphrase || undefined);
+      showImportModal = false;
+      importName = '';
+      importPem = '';
+      importPassphrase = '';
+      await loadKeys();
+    } catch (e: any) {
+      errorMsg = String(e);
+    } finally {
+      isImporting = false;
+    }
+  }
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Hapus kunci "${name}"?\n(Pastikan tidak sedang digunakan oleh Host)`)) return;
+    errorMsg = '';
+    try {
+      await deleteKey(id);
+      await loadKeys();
+    } catch (e: any) {
+      errorMsg = String(e);
+    }
+  }
 </script>
 
 <div class="max-w-4xl mx-auto space-y-6">
   <div class="flex items-center gap-3">
     <div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg border border-rose-500/20">
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+      </svg>
     </div>
-    <div>
+    <div class="flex-1">
       <h1 class="text-2xl font-bold text-white">SSH Keys</h1>
       <p class="text-sm text-neutral-400">Manage, generate, and import SSH keypairs (RSA / ED25519) securely stored in the local vault.</p>
     </div>
+    <button on:click={() => showImportModal = true} class="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors border border-neutral-700">
+      Import
+    </button>
+    <button on:click={() => showGenerateModal = true} class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm transition-colors shadow shadow-sky-600/20">
+      Generate
+    </button>
   </div>
 
-  <div class="p-8 border border-neutral-800 rounded-xl bg-neutral-900/30 text-center flex flex-col items-center justify-center">
-    <svg class="w-12 h-12 text-neutral-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-    <h3 class="text-lg font-medium text-white mb-2">No keys in vault</h3>
-    <p class="text-sm text-neutral-400 max-w-md">Generate a new ED25519 keypair or import an existing private key to authenticate securely without passwords.</p>
-    <div class="mt-6 flex gap-3">
-      <button class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm font-medium transition-colors border border-neutral-700">
-        Import Key
-      </button>
-      <button class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-sky-600/20">
-        Generate Keypair
+  {#if errorMsg}
+    <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+      {errorMsg}
+    </div>
+  {/if}
+
+  {#if isLoading}
+    <div class="p-8 text-center text-neutral-500 text-sm">Loading keys...</div>
+  {:else if keys.length === 0}
+    <div class="p-8 border border-neutral-800 rounded-xl bg-neutral-900/30 text-center flex flex-col items-center justify-center">
+      <svg class="w-12 h-12 text-neutral-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+      </svg>
+      <h3 class="text-lg font-medium text-white mb-2">No keys in vault</h3>
+      <p class="text-sm text-neutral-400 max-w-md">Generate a new ED25519 keypair or import an existing private key to authenticate securely without passwords.</p>
+      <div class="mt-6 flex gap-3">
+        <button on:click={() => showImportModal = true} class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm font-medium transition-colors border border-neutral-700">
+          Import Key
+        </button>
+        <button on:click={() => showGenerateModal = true} class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-sky-600/20">
+          Generate Keypair
+        </button>
+      </div>
+    </div>
+  {:else}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {#each keys as key (key.id)}
+        <div class="flex flex-col p-4 bg-neutral-900 border border-neutral-800 rounded-xl hover:border-neutral-700 transition-colors group">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-medium text-white flex items-center gap-2">
+              <svg class="w-4 h-4 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path></svg>
+              {key.name}
+            </h3>
+            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-400 font-mono">
+              {key.algorithm}
+            </span>
+          </div>
+          
+          <div class="space-y-2 mb-4">
+            <div class="bg-black/30 rounded p-2 text-xs font-mono text-neutral-500 break-all select-all">
+              {key.fingerprint}
+            </div>
+          </div>
+          
+          <div class="mt-auto pt-3 border-t border-neutral-800/50 flex justify-between items-center opacity-40 group-hover:opacity-100 transition-opacity">
+            <span class="text-xs text-neutral-500" title={key.createdAt}>
+              {new Date(key.createdAt).toLocaleDateString()}
+            </span>
+            <button 
+              on:click={() => handleDelete(key.id, key.name)}
+              class="text-xs text-rose-500 hover:text-rose-400 font-medium px-2 py-1 rounded hover:bg-rose-500/10 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
+</div>
+
+{#if showGenerateModal}
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="bg-neutral-900 border border-neutral-800 rounded-xl w-full max-w-md shadow-2xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Generate New SSH Key</h3>
+    
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-neutral-400 mb-1">Key Name</label>
+        <input type="text" bind:value={generateName} placeholder="e.g. Personal Desktop, Production Admin" class="w-full bg-black/40 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-neutral-400 mb-1">Algorithm</label>
+        <select bind:value={generateAlg} class="w-full bg-black/40 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors">
+          <option value="Ed25519">Ed25519 (Recommended, fast & secure)</option>
+          <option value="RSA-4096">RSA-4096 (Legacy compatibility)</option>
+        </select>
+      </div>
+      <p class="text-xs text-neutral-500">
+        The private key will be generated locally and stored securely encrypted in your vault. It will never leave this device.
+      </p>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-6">
+      <button on:click={() => showGenerateModal = false} class="px-4 py-2 text-neutral-400 hover:text-white transition-colors text-sm font-medium">Cancel</button>
+      <button on:click={handleGenerate} disabled={!generateName.trim() || isGenerating} class="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
+        {isGenerating ? 'Generating...' : 'Generate Key'}
       </button>
     </div>
   </div>
 </div>
+{/if}
+
+{#if showImportModal}
+<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+  <div class="bg-neutral-900 border border-neutral-800 rounded-xl w-full max-w-2xl shadow-2xl p-6">
+    <h3 class="text-lg font-semibold text-white mb-4">Import SSH Private Key</h3>
+    
+    <div class="space-y-4">
+      <div>
+        <label class="block text-xs font-medium text-neutral-400 mb-1">Key Name</label>
+        <input type="text" bind:value={importName} placeholder="e.g. AWS Legacy Key" class="w-full bg-black/40 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-neutral-400 mb-1">Private Key (PEM Format)</label>
+        <textarea bind:value={importPem} rows="6" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..." class="w-full font-mono bg-black/40 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors resize-none"></textarea>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-neutral-400 mb-1">Passphrase (if key is encrypted)</label>
+        <input type="password" bind:value={importPassphrase} placeholder="Leave blank if not encrypted" class="w-full bg-black/40 border border-neutral-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-sky-500 transition-colors" />
+      </div>
+      <p class="text-xs text-neutral-500">
+        Your key will be re-encrypted using the local vault's zero-knowledge master password.
+      </p>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-6">
+      <button on:click={() => showImportModal = false} class="px-4 py-2 text-neutral-400 hover:text-white transition-colors text-sm font-medium">Cancel</button>
+      <button on:click={handleImport} disabled={!importName.trim() || !importPem.trim() || isImporting} class="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors">
+        {isImporting ? 'Importing...' : 'Import Key'}
+      </button>
+    </div>
+  </div>
+</div>
+{/if}

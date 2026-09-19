@@ -4,7 +4,7 @@
 // boundary; that is zero-knowledge vault territory for a later phase.
 import { invoke } from '@tauri-apps/api/core';
 
-export type AuthMethod = { type: 'password' } | { type: 'key'; path: string };
+export type AuthMethod = { type: 'password' } | { type: 'key'; path: string } | { type: 'keyId'; id: string };
 
 export interface HostRecord {
   id: string;

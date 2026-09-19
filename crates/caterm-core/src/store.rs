@@ -17,10 +17,11 @@ use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum AuthMethod {
     Password,
     Key { path: String },
+    KeyId { id: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
