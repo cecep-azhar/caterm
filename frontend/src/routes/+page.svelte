@@ -7,6 +7,8 @@
   let isAddModalOpen = $state(false);
   let isLoading = $state(false);
   let errorMsg = $state('');
+  let editingId = $state<string | null>(null);
+  let editingHadSecret = $state(false);
 
   // Form State
   let formLabel = $state('');
@@ -15,6 +17,7 @@
   let formUsername = $state('root');
   let formAuthType = $state<'password' | 'key'>('password');
   let formKeyPath = $state('');
+  let formSecret = $state('');
   let formTags = $state('');
 
   onMount(async () => {
@@ -30,13 +33,31 @@
   }
 
   function openAddModal() {
+    editingId = null;
+    editingHadSecret = false;
     formLabel = '';
     formAddress = '';
     formPort = 22;
     formUsername = 'root';
     formAuthType = 'password';
     formKeyPath = '';
+    formSecret = '';
     formTags = '';
+    errorMsg = '';
+    isAddModalOpen = true;
+  }
+
+  function openEditModal(host: HostRecord) {
+    editingId = host.id;
+    editingHadSecret = host.hasSecret;
+    formLabel = host.label;
+    formAddress = host.address;
+    formPort = host.port;
+    formUsername = host.username;
+    formAuthType = host.authMethod.type;
+    formKeyPath = host.authMethod.type === 'key' ? host.authMethod.path : '';
+    formSecret = '';
+    formTags = host.tags.join(', ');
     errorMsg = '';
     isAddModalOpen = true;
   }
@@ -50,12 +71,15 @@
     errorMsg = '';
     try {
       const input: HostInput = {
+        id: editingId ?? undefined,
         label: formLabel,
         address: formAddress,
         port: Number(formPort) || 22,
         username: formUsername,
         authMethod: formAuthType === 'password' ? { type: 'password' } : { type: 'key', path: formKeyPath },
-        tags: formTags.split(',').map(t => t.trim()).filter(Boolean)
+        tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
+        // Blank = leave whatever's stored untouched (edit) or no secret at all (create).
+        secret: formSecret ? formSecret : undefined
       };
       await saveHost(input);
       isAddModalOpen = false;
@@ -137,7 +161,13 @@
             <div class="flex items-center justify-between mb-2">
               <span class="font-bold text-white text-base truncate">{host.label}</span>
               <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button 
+                <button
+                  onclick={() => openEditModal(host)}
+                  class="p-1 text-neutral-400 hover:text-sky-400 rounded transition-colors"
+                  title="Edit Host">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                </button>
+                <button
                   onclick={() => handleDelete(host.id)}
                   class="p-1 text-neutral-400 hover:text-rose-400 rounded transition-colors"
                   title="Delete Host">
@@ -148,7 +178,7 @@
 
             <div class="space-y-1 font-mono text-xs text-neutral-400">
               <p><span class="text-neutral-500">Address:</span> <span class="text-sky-400">{host.username}@{host.address}:{host.port}</span></p>
-              <p><span class="text-neutral-500">Auth:</span> <span class="text-neutral-300">{host.authMethod.type}</span></p>
+              <p><span class="text-neutral-500">Auth:</span> <span class="text-neutral-300">{host.authMethod.type}</span> {#if host.hasSecret}<span class="text-emerald-500">• tersimpan</span>{:else}<span class="text-amber-500">• belum ada password</span>{/if}</p>
             </div>
 
             {#if host.tags.length > 0}
@@ -162,8 +192,8 @@
 
           <div class="pt-4 mt-4 border-t border-neutral-800/80 flex items-center justify-between">
             <span class="text-[10px] text-neutral-500">ID: {host.id.slice(0, 8)}</span>
-            <a 
-              href="/session?host={host.id}&address={host.address}&username={host.username}&port={host.port}"
+            <a
+              href="/session?host={host.id}"
               class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-400 hover:text-white rounded-md text-xs font-medium border border-sky-500/30 transition-all flex items-center gap-1.5">
               <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
               Connect
@@ -180,7 +210,7 @@
   <div class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
     <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
       <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
-        <h3 class="text-lg font-bold text-white">Add New SSH Host</h3>
+        <h3 class="text-lg font-bold text-white">{editingId ? 'Edit SSH Host' : 'Add New SSH Host'}</h3>
         <button onclick={() => isAddModalOpen = false} class="text-neutral-500 hover:text-neutral-300 text-xl font-bold">×</button>
       </div>
 
@@ -245,13 +275,23 @@
             </label>
           </div>
           {#if formAuthType === 'key'}
-            <input 
-              type="text" 
-              bind:value={formKeyPath} 
+            <input
+              type="text"
+              bind:value={formKeyPath}
               placeholder="/home/user/.ssh/id_ed25519"
-              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500 mb-3"
             />
           {/if}
+          <label class="block text-xs font-medium text-neutral-400 mb-1">
+            {formAuthType === 'key' ? 'Key Passphrase (optional)' : 'Password'}
+          </label>
+          <input
+            type="password"
+            bind:value={formSecret}
+            placeholder={editingId && editingHadSecret ? 'Kosongkan untuk tidak mengubah' : (formAuthType === 'key' ? 'Kosongkan jika key tidak berpassphrase' : 'Wajib diisi agar bisa connect')}
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+          />
+          <p class="text-neutral-500 text-xs mt-1">Disimpan terenkripsi (AES-256-GCM) di database lokal — tidak pernah dikirim balik ke UI.</p>
         </div>
 
         <div>

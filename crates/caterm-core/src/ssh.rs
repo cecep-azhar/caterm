@@ -145,8 +145,8 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
             match read_res {
                 Ok(0) => break, // EOF
                 Ok(n) => {
-                    if let Ok(mut out) = buffer_read.lock() {
-                        out.extend_from_slice(&buf[..n]);
+                    if let (Ok(mut out), Some(chunk)) = (buffer_read.lock(), buf.get(..n)) {
+                        out.extend_from_slice(chunk);
                     }
                 }
                 Err(e) => {
@@ -243,10 +243,10 @@ pub fn resize(session_id: &str, cols: u16, rows: u16) -> Result<(), CatermError>
     let sessions = SESSIONS.lock().map_err(|_| {
         CatermError::Validation(ValidationError::Generic("Lock failure".into()))
     })?;
-    if let Some(handle) = sessions.get(session_id) {
-        if let Ok(mut ch) = handle.channel.lock() {
-            let _ = ch.request_pty_size(cols as u32, rows as u32, None, None);
-        }
+    if let Some(handle) = sessions.get(session_id)
+        && let Ok(mut ch) = handle.channel.lock()
+    {
+        let _ = ch.request_pty_size(cols as u32, rows as u32, None, None);
     }
     Ok(())
 }
@@ -255,12 +255,11 @@ pub fn resize(session_id: &str, cols: u16, rows: u16) -> Result<(), CatermError>
 pub fn disconnect(session_id: &str) -> Result<(), CatermError> {
     require_non_empty("session_id", session_id)?;
 
-    if let Ok(mut sessions) = SESSIONS.lock() {
-        if let Some(handle) = sessions.remove(session_id) {
-            if let Ok(mut ch) = handle.channel.lock() {
-                let _ = ch.close();
-            }
-        }
+    if let Ok(mut sessions) = SESSIONS.lock()
+        && let Some(handle) = sessions.remove(session_id)
+        && let Ok(mut ch) = handle.channel.lock()
+    {
+        let _ = ch.close();
     }
     Ok(())
 }

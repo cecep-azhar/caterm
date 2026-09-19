@@ -1,10 +1,12 @@
 <script lang="ts">
   import "../app.css";
   import LockScreen from '$lib/components/LockScreen.svelte';
+  import { getTabs, closeTab } from '$lib/stores/sessionTabs.svelte';
 
   let { children } = $props();
 
   let isUnlocked = $state(false);
+  const sessionTabs = $derived(getTabs());
 </script>
 
 {#if !isUnlocked}
@@ -81,12 +83,19 @@
   <main class="flex-1 flex flex-col h-screen overflow-hidden">
     <!-- Top Bar (Sessions Tab System Placeholder) -->
     <header class="h-12 border-b border-neutral-800 flex items-center px-4 bg-neutral-900 shrink-0 overflow-x-auto">
-      <div class="flex gap-2 text-sm">
-        <button class="px-3 py-1 bg-neutral-800 text-white rounded-t-md border-t border-l border-r border-neutral-700 font-medium">Dashboard <span class="text-neutral-500 ml-1 text-xs">⌘1</span></button>
-        <button class="px-3 py-1 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 rounded-t-md transition-colors">
-          <a href="/session" class="w-full h-full block">Session 1 <span class="text-neutral-600 ml-1 text-xs">⌘2</span></a>
-        </button>
-        <button class="px-3 py-1 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 rounded-t-md transition-colors">Session 2 <span class="text-neutral-600 ml-1 text-xs">⌘3</span></button>
+      <div class="flex gap-2 text-sm items-center">
+        <a href="/" class="px-3 py-1 bg-neutral-800 text-white rounded-t-md border-t border-l border-r border-neutral-700 font-medium">Dashboard</a>
+        {#each sessionTabs as tab (tab.id)}
+          <div class="flex items-center gap-1 px-1 text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50 rounded-t-md transition-colors">
+            <a href="/session" class="py-1 pl-2">{tab.host.label}</a>
+            <button
+              onclick={() => closeTab(tab.id)}
+              class="p-0.5 rounded hover:bg-neutral-700 hover:text-rose-400"
+              title="Tutup sesi {tab.host.label}">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        {/each}
       </div>
     </header>
     

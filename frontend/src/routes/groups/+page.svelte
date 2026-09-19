@@ -7,6 +7,7 @@
   let backendAvailable = $state(true);
   let groups = $state<GroupRecord[]>([]);
   let availableHosts = $state<HostRecord[]>([]);
+  let editingId = $state<string | null>(null);
 
   let newGroup = $state({
     name: "",
@@ -28,21 +29,37 @@
     return availableHosts.find((h) => h.id === id)?.label ?? id;
   }
 
+  function openAddModal() {
+    editingId = null;
+    newGroup = { name: "", color: "#3b82f6", selectedHosts: [] };
+    isAddModalOpen = true;
+  }
+
+  function openEditModal(group: GroupRecord) {
+    editingId = group.id;
+    newGroup = { name: group.name, color: group.color, selectedHosts: [...group.hostIds] };
+    isAddModalOpen = true;
+  }
+
   async function createGroup(e: Event) {
     e.preventDefault();
     if (!newGroup.name) return;
 
     try {
       const saved = await saveGroup({
+        id: editingId ?? undefined,
         name: newGroup.name,
         color: newGroup.color,
         hostIds: newGroup.selectedHosts
       });
-      groups = [...groups, saved];
+      groups = editingId
+        ? groups.map((g) => (g.id === saved.id ? saved : g))
+        : [...groups, saved];
     } catch {
       backendAvailable = false;
     }
 
+    editingId = null;
     newGroup = { name: "", color: "#3b82f6", selectedHosts: [] };
     isAddModalOpen = false;
   }
@@ -74,8 +91,8 @@
         <p class="text-amber-500 text-xs mt-1">Tauri backend not detected — changes won't be saved to disk.</p>
       {/if}
     </div>
-    <button 
-      onclick={() => isAddModalOpen = true}
+    <button
+      onclick={openAddModal}
       class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-md transition-colors flex items-center gap-2">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
       Create Group
@@ -101,8 +118,11 @@
           {/if}
         </div>
         <div class="mt-4 pt-3 border-t border-neutral-800/80 flex justify-end gap-2">
+          <button onclick={() => openEditModal(group)} class="px-3 py-1 bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Edit</button>
           <button onclick={() => removeGroup(group.id)} class="px-3 py-1 bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Delete</button>
-          <button class="px-3 py-1 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">Launch All</button>
+          {#if group.hostIds.length > 0}
+            <a href="/session?hosts={group.hostIds.join(',')}" class="px-3 py-1 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">Launch All</a>
+          {/if}
         </div>
       </div>
     {/each}
@@ -113,7 +133,7 @@
 {#if isAddModalOpen}
   <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 max-w-lg w-full space-y-4">
-      <h3 class="text-xl font-bold text-white">Create Host Group</h3>
+      <h3 class="text-xl font-bold text-white">{editingId ? 'Edit Host Group' : 'Create Host Group'}</h3>
       
       <form onsubmit={createGroup} class="space-y-4">
         <div>

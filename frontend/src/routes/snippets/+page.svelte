@@ -7,6 +7,7 @@
   let creationStep = $state(1); // 1: command, 2: details
   let injectNotice = $state('');
   let backendAvailable = $state(true);
+  let editingId = $state<string | null>(null);
 
   let snippets = $state<SnippetRecord[]>([]);
 
@@ -26,9 +27,17 @@
   });
 
   function resetModal() {
+    editingId = null;
     newSnippet = { cmd: "", label: "", desc: "", tags: "" };
     creationStep = 1;
     isAddModalOpen = false;
+  }
+
+  function openEditModal(snip: SnippetRecord) {
+    editingId = snip.id;
+    newSnippet = { cmd: snip.command, label: snip.label, desc: snip.description, tags: snip.tags.join(', ') };
+    creationStep = 2;
+    isAddModalOpen = true;
   }
 
   function nextStep() {
@@ -40,6 +49,7 @@
     if (!newSnippet.label) return;
 
     const input = {
+      id: editingId ?? undefined,
       label: newSnippet.label,
       description: newSnippet.desc,
       command: newSnippet.cmd,
@@ -48,7 +58,9 @@
 
     try {
       const saved = await saveSnippetApi(input);
-      snippets = [...snippets, saved];
+      snippets = editingId
+        ? snippets.map((s) => (s.id === saved.id ? saved : s))
+        : [...snippets, saved];
     } catch {
       backendAvailable = false;
     }
@@ -107,6 +119,9 @@
                 disabled={!hasActiveSession()}
                 class="text-sky-400 hover:text-sky-300 px-2 py-1 bg-sky-500/10 hover:bg-sky-500/20 disabled:opacity-40 disabled:cursor-not-allowed rounded text-xs transition-colors">Inject</button>
               <button
+                onclick={() => openEditModal(snip)}
+                class="text-neutral-400 hover:text-white px-2 py-1 bg-neutral-800 hover:bg-neutral-700 rounded text-xs transition-colors">Edit</button>
+              <button
                 onclick={() => removeSnippet(snip.id)}
                 class="text-red-400 hover:text-red-300 px-2 py-1 bg-red-500/10 hover:bg-red-500/20 rounded text-xs transition-colors">Delete</button>
             </div>
@@ -131,7 +146,7 @@
   <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 max-w-lg w-full space-y-4">
       <div class="flex justify-between items-center border-b border-neutral-800 pb-3">
-        <h3 class="text-xl font-bold text-white">Add Snippet</h3>
+        <h3 class="text-xl font-bold text-white">{editingId ? 'Edit Snippet' : 'Add Snippet'}</h3>
         <span class="text-xs text-neutral-500 font-medium bg-neutral-800 px-2 py-1 rounded">Step {creationStep} of 2</span>
       </div>
       
