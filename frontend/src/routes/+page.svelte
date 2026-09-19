@@ -1,87 +1,282 @@
 <script lang="ts">
-  let isReportModalOpen = $state(false);
+  import { onMount } from 'svelte';
+  import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
+
+  let hosts = $state<HostRecord[]>([]);
+  let searchQuery = $state('');
+  let isAddModalOpen = $state(false);
+  let isLoading = $state(false);
+  let errorMsg = $state('');
+
+  // Form State
+  let formLabel = $state('');
+  let formAddress = $state('');
+  let formPort = $state(22);
+  let formUsername = $state('root');
+  let formAuthType = $state<'password' | 'key'>('password');
+  let formKeyPath = $state('');
+  let formTags = $state('');
+
+  onMount(async () => {
+    await refreshHosts();
+  });
+
+  async function refreshHosts() {
+    try {
+      hosts = await listHosts();
+    } catch (err: any) {
+      console.error('Failed to load hosts:', err);
+    }
+  }
+
+  function openAddModal() {
+    formLabel = '';
+    formAddress = '';
+    formPort = 22;
+    formUsername = 'root';
+    formAuthType = 'password';
+    formKeyPath = '';
+    formTags = '';
+    errorMsg = '';
+    isAddModalOpen = true;
+  }
+
+  async function handleSaveHost() {
+    if (!formLabel || !formAddress || !formUsername) {
+      errorMsg = 'Label, Host/IP, and Username are required.';
+      return;
+    }
+    isLoading = true;
+    errorMsg = '';
+    try {
+      const input: HostInput = {
+        label: formLabel,
+        address: formAddress,
+        port: Number(formPort) || 22,
+        username: formUsername,
+        authMethod: formAuthType === 'password' ? { type: 'password' } : { type: 'key', path: formKeyPath },
+        tags: formTags.split(',').map(t => t.trim()).filter(Boolean)
+      };
+      await saveHost(input);
+      isAddModalOpen = false;
+      await refreshHosts();
+    } catch (err: any) {
+      errorMsg = typeof err === 'string' ? err : (err?.message || 'Failed to save host');
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (confirm('Are you sure you want to delete this host?')) {
+      try {
+        await deleteHost(id);
+        await refreshHosts();
+      } catch (err: any) {
+        alert(err?.message || 'Failed to delete host');
+      }
+    }
+  }
+
+  let filteredHosts = $derived(
+    hosts.filter(h => 
+      h.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      h.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      h.username.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
 </script>
 
-<div class="max-w-4xl mx-auto space-y-8">
-  <div>
-    <h1 class="text-3xl font-bold text-white tracking-tight">Welcome to CATerm</h1>
-    <p class="text-neutral-400 mt-2">Zero-Knowledge, Local-First, High-Performance Terminal & Host Manager.</p>
-  </div>
-
-  <!-- Feature Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    <div class="p-5 bg-neutral-900 border border-neutral-800 rounded-lg">
-      <div class="w-10 h-10 bg-indigo-500/10 text-indigo-400 rounded-lg flex items-center justify-center mb-3">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
-      </div>
-      <h2 class="text-lg font-semibold text-white">E2EE Storage</h2>
-      <p class="text-neutral-400 text-sm mt-1">Zero-Knowledge local encryption. Your host keys and credentials never leave your system unencrypted.</p>
+<div class="max-w-6xl mx-auto space-y-6">
+  <!-- Header & Actions -->
+  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-bold text-white tracking-tight">Hosts Management</h1>
+      <p class="text-sm text-neutral-400 mt-1">Manage saved SSH hosts, connection profiles, and credentials.</p>
     </div>
-
-    <div class="p-5 bg-neutral-900 border border-neutral-800 rounded-lg">
-      <div class="w-10 h-10 bg-emerald-500/10 text-emerald-400 rounded-lg flex items-center justify-center mb-3">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+    
+    <div class="flex items-center gap-3 w-full sm:w-auto">
+      <div class="relative flex-1 sm:w-64">
+        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        <input 
+          type="text"
+          bind:value={searchQuery}
+          placeholder="Search hosts..."
+          class="w-full pl-9 pr-4 py-2 bg-neutral-900 border border-neutral-800 rounded-lg text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-sky-500"
+        />
       </div>
-      <h2 class="text-lg font-semibold text-white">SFTP Browser</h2>
-      <p class="text-neutral-400 text-sm mt-1">Built-in high speed SFTP file transfers alongside active SSH split terminals.</p>
-    </div>
 
-    <div class="p-5 bg-neutral-900 border border-neutral-800 rounded-lg">
-      <div class="w-10 h-10 bg-sky-500/10 text-sky-400 rounded-lg flex items-center justify-center mb-3">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
-      </div>
-      <h2 class="text-lg font-semibold text-white">Audit Log</h2>
-      <p class="text-neutral-400 text-sm mt-1">Local audit logging for commands and security operations for auditability.</p>
-    </div>
-
-    <div class="p-5 bg-neutral-900 border border-neutral-800 rounded-lg">
-      <div class="w-10 h-10 bg-purple-500/10 text-purple-400 rounded-lg flex items-center justify-center mb-3">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-      </div>
-      <h2 class="text-lg font-semibold text-white">AI Terminal Assistant</h2>
-      <p class="text-neutral-400 text-sm mt-1">Integrated local & cloud AI command helper for command generation.</p>
-    </div>
-
-    <div class="p-5 bg-neutral-900 border border-neutral-800 rounded-lg md:col-span-2">
-      <div class="w-10 h-10 bg-amber-500/10 text-amber-400 rounded-lg flex items-center justify-center mb-3">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
-      </div>
-      <h2 class="text-lg font-semibold text-white">Dedikasi</h2>
-      <p class="text-neutral-400 text-sm mt-1">Didedikasikan untuk putraku, <strong>Umar Abdillah</strong>, dan pengembangan perangkat lunak open-source lokal yang kuat, aman, dan tanpa biaya artifisial. Dibuat oleh <strong>Cecep Azhar</strong> (Fathforce).</p>
+      <button 
+        onclick={openAddModal}
+        class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg shadow-lg shadow-sky-600/20 transition-colors flex items-center gap-2 shrink-0">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Add Host
+      </button>
     </div>
   </div>
 
-  <!-- Action Bar -->
-  <div class="pt-4 border-t border-neutral-800 flex justify-between items-center">
-    <button 
-      onclick={() => isReportModalOpen = true}
-      class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-sm font-medium rounded-md transition-colors flex items-center gap-2">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-      Report Issue
-    </button>
-  </div>
+  <!-- Hosts Table / Cards -->
+  {#if filteredHosts.length === 0}
+    <div class="p-12 border border-neutral-800 rounded-xl bg-neutral-900/30 text-center flex flex-col items-center justify-center">
+      <div class="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-500 mb-4">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
+      </div>
+      <h3 class="text-lg font-medium text-white mb-1">No saved hosts found</h3>
+      <p class="text-sm text-neutral-400 max-w-sm mb-6">Create your first host entry to connect via interactive SSH PTY terminal.</p>
+      <button 
+        onclick={openAddModal}
+        class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors">
+        + Add Host
+      </button>
+    </div>
+  {:else}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {#each filteredHosts as host (host.id)}
+        <div class="p-5 bg-neutral-900 border border-neutral-800 rounded-xl hover:border-neutral-700 transition-colors flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <span class="font-bold text-white text-base truncate">{host.label}</span>
+              <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onclick={() => handleDelete(host.id)}
+                  class="p-1 text-neutral-400 hover:text-rose-400 rounded transition-colors"
+                  title="Delete Host">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-1 font-mono text-xs text-neutral-400">
+              <p><span class="text-neutral-500">Address:</span> <span class="text-sky-400">{host.username}@{host.address}:{host.port}</span></p>
+              <p><span class="text-neutral-500">Auth:</span> <span class="text-neutral-300">{host.authMethod.type}</span></p>
+            </div>
+
+            {#if host.tags.length > 0}
+              <div class="flex flex-wrap gap-1 mt-3">
+                {#each host.tags as tag}
+                  <span class="px-2 py-0.5 rounded text-[10px] bg-neutral-800 text-neutral-300 border border-neutral-700">{tag}</span>
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <div class="pt-4 mt-4 border-t border-neutral-800/80 flex items-center justify-between">
+            <span class="text-[10px] text-neutral-500">ID: {host.id.slice(0, 8)}</span>
+            <a 
+              href="/session?host={host.id}&address={host.address}&username={host.username}&port={host.port}"
+              class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-400 hover:text-white rounded-md text-xs font-medium border border-sky-500/30 transition-all flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              Connect
+            </a>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
-<!-- Report Issue Modal -->
-{#if isReportModalOpen}
-  <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 max-w-md w-full space-y-4">
-      <h3 class="text-xl font-bold text-white">Report an Issue</h3>
-      <p class="text-neutral-400 text-sm">Send bug reports or suggestions directly to the author email below:</p>
-      <div class="p-3 bg-neutral-950 border border-neutral-800 rounded font-mono text-sm text-sky-400">
-        cecep.azhtech@gmail.com
+<!-- Add Host Modal -->
+{#if isAddModalOpen}
+  <div class="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+    <div class="bg-neutral-900 border border-neutral-800 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <h3 class="text-lg font-bold text-white">Add New SSH Host</h3>
+        <button onclick={() => isAddModalOpen = false} class="text-neutral-500 hover:text-neutral-300 text-xl font-bold">×</button>
       </div>
-      <div class="flex justify-end gap-2 pt-2">
+
+      {#if errorMsg}
+        <div class="p-3 text-xs rounded bg-rose-500/10 border border-rose-500/30 text-rose-400">
+          {errorMsg}
+        </div>
+      {/if}
+
+      <div class="space-y-4 text-sm">
+        <div>
+          <label class="block text-xs font-medium text-neutral-400 mb-1">Host Label / Name *</label>
+          <input 
+            type="text" 
+            bind:value={formLabel} 
+            placeholder="Production VPS / YPC Server"
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-neutral-400 mb-1">Host / IP Address *</label>
+            <input 
+              type="text" 
+              bind:value={formAddress} 
+              placeholder="100.76.150.46 or vps.domain.com"
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+            />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-neutral-400 mb-1">Port</label>
+            <input 
+              type="number" 
+              bind:value={formPort} 
+              placeholder="22"
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-neutral-400 mb-1">Username *</label>
+          <input 
+            type="text" 
+            bind:value={formUsername} 
+            placeholder="root / cecep"
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-neutral-400 mb-1">Authentication Method</label>
+          <div class="flex gap-4 mb-2">
+            <label class="flex items-center gap-2 text-xs text-neutral-300">
+              <input type="radio" value="password" bind:group={formAuthType} class="text-sky-600 focus:ring-0" />
+              Password
+            </label>
+            <label class="flex items-center gap-2 text-xs text-neutral-300">
+              <input type="radio" value="key" bind:group={formAuthType} class="text-sky-600 focus:ring-0" />
+              SSH Private Key
+            </label>
+          </div>
+          {#if formAuthType === 'key'}
+            <input 
+              type="text" 
+              bind:value={formKeyPath} 
+              placeholder="/home/user/.ssh/id_ed25519"
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+            />
+          {/if}
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-neutral-400 mb-1">Tags (Comma-separated)</label>
+          <input 
+            type="text" 
+            bind:value={formTags} 
+            placeholder="prod, vps, tailscale"
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-lg text-white focus:outline-none focus:border-sky-500"
+          />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 pt-4 border-t border-neutral-800">
         <button 
-          onclick={() => isReportModalOpen = false} 
-          class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-sm font-medium">
-          Close
+          onclick={() => isAddModalOpen = false} 
+          class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-sm font-medium">
+          Cancel
         </button>
-        <a 
-          href="mailto:cecep.azhtech@gmail.com?subject=CATerm%20Issue%20Report" 
-          class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded text-sm font-medium">
-          Open Mail App
-        </a>
+        <button 
+          onclick={handleSaveHost}
+          disabled={isLoading}
+          class="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg text-sm font-medium shadow-lg shadow-sky-600/20">
+          {isLoading ? 'Saving...' : 'Save Host'}
+        </button>
       </div>
     </div>
   </div>
