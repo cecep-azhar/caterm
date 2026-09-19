@@ -9,11 +9,12 @@
   let isUnlocked = $state(false);
 </script>
 
+<NotificationCenter />
+
 {#if !isUnlocked}
   <LockScreen onUnlocked={() => isUnlocked = true} />
 {:else}
 <div class="flex h-screen bg-[#0e0e0e] text-neutral-300 font-sans">
-  <NotificationCenter />
   <!-- Sidebar -->
   <aside class="w-16 md:w-64 border-r border-neutral-800 flex flex-col justify-between shrink-0">
     <div>
