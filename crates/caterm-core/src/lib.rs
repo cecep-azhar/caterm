@@ -21,11 +21,13 @@
     )
 )]
 
+pub mod backup;
 pub mod db;
 pub mod error;
 pub mod groups;
 pub mod paths;
 pub mod secret;
+pub mod sftp;
 pub mod snippets;
 pub mod ssh;
 pub mod store;

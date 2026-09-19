@@ -1,10 +1,91 @@
 <script lang="ts">
   import { validateVaultPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
+  import { exportEncryptedBackup, importEncryptedBackup } from '$lib/api/backup';
+  import { save } from '@tauri-apps/plugin-dialog';
+  import { writeTextFile } from '@tauri-apps/plugin-fs';
+  import { open } from '@tauri-apps/plugin-dialog';
+  import { readTextFile } from '@tauri-apps/plugin-fs';
 
-  let activeTab = $state('updates'); // 'updates' | 'subscription' | 'sync' | 'security'
+  let activeTab = $state('updates'); // 'updates' | 'subscription' | 'sync' | 'security' | 'backup'
   let vaultPassword = $state('');
   let vaultMessage = $state('');
   let vaultMessageKind = $state<'error' | 'success'>('error');
+
+  let backupPassphrase = $state('');
+  let backupMsg = $state('');
+  let backupMsgKind = $state<'error' | 'success'>('error');
+  let restorePassphrase = $state('');
+  let restoreMsg = $state('');
+  let restoreMsgKind = $state<'error' | 'success'>('error');
+
+  async function handleExport(e: Event) {
+    e.preventDefault();
+    backupMsg = '';
+    if (backupPassphrase.length < 8) {
+      backupMsgKind = 'error';
+      backupMsg = 'Passphrase must be at least 8 characters.';
+      return;
+    }
+
+    try {
+      backupMsgKind = 'success';
+      backupMsg = 'Generating and encrypting backup...';
+      const b64 = await exportEncryptedBackup(backupPassphrase);
+      
+      const filePath = await save({
+        filters: [{ name: 'CATerm Vault Backup', extensions: ['catb'] }],
+        defaultPath: 'caterm-backup.catb',
+      });
+
+      if (filePath) {
+        await writeTextFile(filePath, b64);
+        backupMsgKind = 'success';
+        backupMsg = `Backup saved successfully to ${filePath}`;
+        backupPassphrase = '';
+      } else {
+        backupMsgKind = 'error';
+        backupMsg = 'Backup cancelled.';
+      }
+    } catch (err: any) {
+      backupMsgKind = 'error';
+      backupMsg = err.message || String(err);
+    }
+  }
+
+  async function handleImport(e: Event) {
+    e.preventDefault();
+    restoreMsg = '';
+    if (restorePassphrase.length < 8) {
+      restoreMsgKind = 'error';
+      restoreMsg = 'Passphrase must be at least 8 characters.';
+      return;
+    }
+
+    try {
+      const selectedPath = await open({
+        filters: [{ name: 'CATerm Vault Backup', extensions: ['catb'] }],
+        multiple: false,
+      });
+
+      if (selectedPath && !Array.isArray(selectedPath)) {
+        restoreMsgKind = 'success';
+        restoreMsg = 'Decrypting and importing backup...';
+        
+        const b64 = await readTextFile(selectedPath);
+        const importedCount = await importEncryptedBackup(b64, restorePassphrase);
+        
+        restoreMsgKind = 'success';
+        restoreMsg = `Restore complete. Successfully imported ${importedCount} records.`;
+        restorePassphrase = '';
+      } else {
+        restoreMsgKind = 'error';
+        restoreMsg = 'Import cancelled.';
+      }
+    } catch (err: any) {
+      restoreMsgKind = 'error';
+      restoreMsg = err.message || String(err);
+    }
+  }
 
   async function updateVaultPassword(e: Event) {
     e.preventDefault();
@@ -49,6 +130,11 @@
       onclick={() => activeTab = 'security'} 
       class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'security' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
       Vault Security
+    </button>
+    <button 
+      onclick={() => activeTab = 'backup'} 
+      class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'backup' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
+      Backup & Restore
     </button>
     <button 
       onclick={() => activeTab = 'shortcuts'} 
@@ -170,6 +256,58 @@
           Update Vault Master Password
         </button>
       </form>
+    </div>
+  {:else if activeTab === 'backup'}
+    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-8">
+      <div>
+        <h2 class="text-lg font-semibold text-white">Vault Backup & Restore</h2>
+        <p class="text-neutral-400 text-sm mt-1">Export your local vault (hosts, snippets, keys) as an encrypted backup file, or restore from one.</p>
+      </div>
+
+      <div class="space-y-4">
+        <h3 class="text-base font-semibold text-white">Export Backup</h3>
+        <p class="text-xs text-neutral-400">Protects your entire configuration using an AES-256-GCM encryption key derived from your passphrase via Argon2id.</p>
+        <form onsubmit={handleExport} class="max-w-md space-y-4 pt-2">
+          <div>
+            <label class="block text-xs font-medium text-neutral-400 uppercase mb-1">Backup Encryption Passphrase (min 8 chars)</label>
+            <input
+              type="password"
+              minlength="8"
+              required
+              bind:value={backupPassphrase}
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
+          </div>
+          {#if backupMsg}
+            <p class="text-xs {backupMsgKind === 'success' ? 'text-emerald-500' : 'text-red-500'}">{backupMsg}</p>
+          {/if}
+          <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">
+            Generate Encrypted Backup...
+          </button>
+        </form>
+      </div>
+
+      <hr class="border-neutral-800" />
+
+      <div class="space-y-4">
+        <h3 class="text-base font-semibold text-white">Restore Backup</h3>
+        <p class="text-xs text-neutral-400">Restoring merges the backup contents with your current vault. Existing records with the same IDs will be updated.</p>
+        <form onsubmit={handleImport} class="max-w-md space-y-4 pt-2">
+          <div>
+            <label class="block text-xs font-medium text-neutral-400 uppercase mb-1">Backup Decryption Passphrase</label>
+            <input
+              type="password"
+              required
+              bind:value={restorePassphrase}
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
+          </div>
+          {#if restoreMsg}
+            <p class="text-xs {restoreMsgKind === 'success' ? 'text-emerald-500' : 'text-red-500'}">{restoreMsg}</p>
+          {/if}
+          <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-md transition-colors">
+            Select Backup File and Restore...
+          </button>
+        </form>
+      </div>
     </div>
   {:else if activeTab === 'shortcuts'}
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-6">

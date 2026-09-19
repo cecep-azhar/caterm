@@ -3,7 +3,7 @@
 //! returns its result — no business logic here. See `tests/arch.rs` in
 //! `caterm-core` for the guard that enforces this.
 
-use caterm_core::{groups, keys, monitor, snippets, ssh, store, tunnels, vault, CatermError};
+use caterm_core::{backup, groups, keys, monitor, sftp, snippets, ssh, store, tunnels, vault, CatermError};
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
 where
@@ -38,6 +38,34 @@ pub async fn start_tunnel(id: String) -> Result<(), CatermError> {
 #[tauri::command]
 pub async fn stop_tunnel(id: String) -> Result<(), CatermError> {
     run_blocking(move || tunnels::stop_tunnel(&id)).await
+}
+#[tauri::command]
+pub async fn list_remote_dir(host_id: String, remote_path: String) -> Result<Vec<sftp::SftpFileEntry>, CatermError> {
+    run_blocking(move || sftp::list_remote_dir(&host_id, &remote_path)).await
+}
+
+#[tauri::command]
+pub async fn read_remote_file(host_id: String, remote_path: String) -> Result<Vec<u8>, CatermError> {
+    run_blocking(move || sftp::read_remote_file(&host_id, &remote_path)).await
+}
+
+#[tauri::command]
+pub async fn write_remote_file(host_id: String, remote_path: String, data: Vec<u8>) -> Result<(), CatermError> {
+    run_blocking(move || sftp::write_remote_file(&host_id, &remote_path, &data)).await
+}
+
+#[tauri::command]
+pub async fn delete_remote_file(host_id: String, remote_path: String) -> Result<(), CatermError> {
+    run_blocking(move || sftp::delete_remote_file(&host_id, &remote_path)).await
+}
+#[tauri::command]
+pub async fn export_encrypted_backup(passphrase: String) -> Result<String, CatermError> {
+    run_blocking(move || backup::export_encrypted_backup(&passphrase)).await
+}
+
+#[tauri::command]
+pub async fn import_encrypted_backup(encrypted_b64: String, passphrase: String) -> Result<usize, CatermError> {
+    run_blocking(move || backup::import_encrypted_backup(&encrypted_b64, &passphrase)).await
 }
 #[tauri::command]
 pub async fn list_keys() -> Result<Vec<keys::KeyRecord>, CatermError> {
