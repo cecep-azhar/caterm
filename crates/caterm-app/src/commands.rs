@@ -56,8 +56,8 @@ pub async fn validate_vault_password(password: String) -> Result<(), CatermError
 }
 
 #[tauri::command]
-pub async fn ssh_connect(request: ssh::SshConnectRequest) -> Result<ssh::SshSession, CatermError> {
-    tokio::task::spawn_blocking(move || ssh::connect(request)).await.unwrap()
+pub async fn ssh_connect(host_id: String) -> Result<ssh::SshSession, CatermError> {
+    tokio::task::spawn_blocking(move || ssh::connect(&host_id)).await.unwrap()
 }
 
 #[tauri::command]

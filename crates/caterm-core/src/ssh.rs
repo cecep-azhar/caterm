@@ -1,25 +1,22 @@
 //! Real SSH command surface implemented with `ssh2` and Tokio async channel routing.
 //! Active sessions are maintained in an in-memory session registry.
+//!
+//! `connect` takes only a saved host id — never raw connection details from the frontend.
+//! It resolves the host record and its decrypted credential via
+//! `crate::store::load_host_for_connect` internally, so a plaintext password/passphrase
+//! never has to cross the Tauri IPC boundary on every connect (it was already saved,
+//! encrypted, once via `store::save_host`).
 
 use crate::error::{CatermError, ValidationError};
+use crate::store::AuthMethod;
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use once_cell::sync::Lazy;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SshConnectRequest {
-    pub host_id: String,
-    pub address: String,
-    pub port: u16,
-    pub username: String,
-    pub password: Option<String>,
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,20 +51,23 @@ fn generate_session_id(host_id: &str) -> String {
     format!("ssh-{host_id}-{nanos:x}")
 }
 
-/// Open a real SSH connection & PTY channel via `ssh2`.
-pub fn connect(request: SshConnectRequest) -> Result<SshSession, CatermError> {
-    require_non_empty("host_id", &request.host_id)?;
-    require_non_empty("address", &request.address)?;
-    require_non_empty("username", &request.username)?;
+/// Opens a real SSH connection & PTY channel via `ssh2` for a saved host. Looks the host
+/// (and its decrypted credential, if any) up via `crate::store::load_host_for_connect` —
+/// the frontend only ever supplies a `host_id`.
+pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
+    require_non_empty("host_id", host_id)?;
 
-    let session_id = generate_session_id(&request.host_id);
-    let addr = format!("{}:{}", request.address, if request.port == 0 { 22 } else { request.port });
+    let (host, secret) = crate::store::load_host_for_connect(host_id)?;
+
+    let session_id = generate_session_id(&host.id);
+    let port = if host.port == 0 { 22 } else { host.port };
+    let addr = format!("{}:{port}", host.address);
 
     let tcp = std::net::TcpStream::connect_timeout(
         &addr.parse().map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Invalid address {addr}: {e}"))))?,
         Duration::from_secs(10),
     ).map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Connection failed to {addr}: {e}"))))?;
-    
+
     tcp.set_nonblocking(false)
         .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to set blocking TCP stream: {e}"))))?;
 
@@ -78,17 +78,36 @@ pub fn connect(request: SshConnectRequest) -> Result<SshSession, CatermError> {
     sess.handshake()
         .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH handshake failed: {e}"))))?;
 
-    if let Some(ref pass) = request.password {
-        sess.userauth_password(&request.username, pass)
-            .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Auth failed for user {}: {e}", request.username))))?;
-    } else {
-        // Fallback to agent auth or unauthenticated prompt handling
-        let _ = sess.userauth_agent(&request.username);
+    match &host.auth_method {
+        AuthMethod::Password => {
+            let password = secret.ok_or_else(|| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Password belum diset untuk host '{}' — edit host dan isi password terlebih dahulu.",
+                    host.label
+                )))
+            })?;
+            sess.userauth_password(&host.username, &password).map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Auth failed for user {}: {e}",
+                    host.username
+                )))
+            })?;
+        }
+        AuthMethod::Key { path } => {
+            let expanded = crate::paths::expand_tilde(path);
+            sess.userauth_pubkey_file(&host.username, None, Path::new(&expanded), secret.as_deref())
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!(
+                        "Auth via SSH key gagal untuk {} ({}): {e}",
+                        host.username, expanded
+                    )))
+                })?;
+        }
     }
 
     if !sess.authenticated() {
         return Err(CatermError::Validation(ValidationError::Generic(
-            format!("Authentication failed for user {}", request.username)
+            format!("Authentication failed for user {}", host.username)
         )));
     }
 
@@ -164,7 +183,7 @@ pub fn connect(request: SshConnectRequest) -> Result<SshSession, CatermError> {
 
     Ok(SshSession {
         session_id,
-        host_id: request.host_id,
+        host_id: host.id,
     })
 }
 
@@ -252,14 +271,11 @@ mod tests {
 
     #[test]
     fn connect_rejects_empty_host_id() {
-        let result = connect(SshConnectRequest {
-            host_id: "".into(),
-            address: "127.0.0.1".into(),
-            port: 22,
-            username: "root".into(),
-            password: None,
-        });
-        assert!(result.is_err());
+        // Fails at the `require_non_empty` guard, before ever touching the real on-disk
+        // store — unlike a made-up-but-non-empty id, which would hit `store::load_host_for_connect`
+        // and thus the real per-OS data dir (not something a unit test should touch; there is
+        // no dependency-injection seam here yet to point it at a temp dir instead).
+        assert!(connect("").is_err());
     }
 
     #[test]

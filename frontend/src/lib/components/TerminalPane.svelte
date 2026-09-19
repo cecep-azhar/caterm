@@ -3,28 +3,28 @@
   import { Terminal } from 'xterm';
   import { FitAddon } from '@xterm/addon-fit';
   import 'xterm/css/xterm.css';
-  import { sshConnect, sshWrite, sshResize, sshDisconnect, type SshSession } from '$lib/api/ssh';
+  import { sshConnect, sshWrite, sshResize, sshDisconnect, sshRead, type SshSession } from '$lib/api/ssh';
   import type { HostRecord } from '$lib/api/hosts';
   import { setActiveSession, clearActiveSession } from '$lib/stores/activeSession.svelte';
 
   let {
-    host = null,
-    hostLabel = 'Local Terminal',
-    hostIp = '127.0.0.1',
+    host,
     onSplitRight,
     onSplitDown,
     onClose
-  }: { 
-    host?: HostRecord | null; 
-    hostLabel?: string; 
-    hostIp?: string;
+  }: {
+    host: HostRecord;
     onSplitRight?: () => void;
     onSplitDown?: () => void;
     onClose?: () => void;
   } = $props();
 
-  const label = $derived(host?.label ?? hostLabel);
-  const address = $derived(host?.address ?? hostIp);
+  function errorMessage(err: unknown): string {
+    if (err && typeof err === 'object' && 'message' in err) {
+      return String((err as { message?: unknown }).message);
+    }
+    return String(err);
+  }
 
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
   let terminalContainer: HTMLDivElement;
@@ -58,22 +58,17 @@
 
     function markActive() {
       if (session) {
-        setActiveSession({ sessionId: session.sessionId, label, inject: injectCommand });
+        setActiveSession({ sessionId: session.sessionId, label: host.label, inject: injectCommand });
       }
     }
 
     term.writeln(
-      `\x1b[1;32mWelcome to CATerm v2\x1b[0m — connecting to \x1b[1;36m${label}\x1b[0m (${address})...`
+      `\x1b[1;32mWelcome to CATerm v2\x1b[0m — connecting to \x1b[1;36m${host.label}\x1b[0m (${host.address})...`
     );
 
     let pollTimer: ReturnType<typeof setInterval>;
 
-    sshConnect({
-      hostId: host?.id ?? address,
-      address,
-      port: host?.port ?? 22,
-      username: host?.username ?? 'root'
-    })
+    sshConnect(host.id)
       .then((opened) => {
         if (disposed) return;
         session = opened;
@@ -84,23 +79,19 @@
         // Start polling for PTY output
         pollTimer = setInterval(() => {
           if (!session) return;
-          import('$lib/api/ssh').then(({ sshRead }) => {
-            sshRead(session!.sessionId)
-              .then((output) => {
-                if (output && output.length > 0) {
-                  term.write(output);
-                }
-              })
-              .catch(() => {});
-          });
+          sshRead(session.sessionId)
+            .then((output) => {
+              if (output && output.length > 0) {
+                term.write(output);
+              }
+            })
+            .catch(() => {});
         }, 50);
       })
       .catch((err) => {
         if (disposed) return;
         status = 'offline';
-        term.write(
-          `\r\n\x1b[31mSSH connection failed (${String(err)})\x1b[0m\r\n`
-        );
+        term.write(`\r\n\x1b[31mSSH connection failed: ${errorMessage(err)}\x1b[0m\r\n`);
       });
 
     term.onData((data) => {
@@ -143,8 +134,8 @@
             ? 'bg-amber-500'
             : 'bg-neutral-600'}"
       ></span>
-      <span class="text-white font-medium">{label}</span>
-      <span class="text-neutral-500">({address})</span>
+      <span class="text-white font-medium">{host.label}</span>
+      <span class="text-neutral-500">({host.address})</span>
     </div>
     <div class="flex items-center gap-2 text-neutral-400">
       {#if onSplitRight}

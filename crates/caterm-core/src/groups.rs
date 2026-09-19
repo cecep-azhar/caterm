@@ -215,7 +215,9 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                secret: None,
             },
+            "test-local-key",
         )
         .expect("gagal buat host")
         .id

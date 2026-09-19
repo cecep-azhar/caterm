@@ -1,23 +1,17 @@
-// JS <-> Rust binding for SSH sessions. Backed by the placeholder engine in
-// crates/caterm-core/src/ssh.rs today (no real socket yet, `write` just
-// echoes) — the contract here is what Fase 2's real `russh`/`ssh2` transport
-// will fill in without the frontend needing to change.
+// JS <-> Rust binding for SSH sessions. Backed by the real `ssh2` engine in
+// crates/caterm-core/src/ssh.rs — `sshConnect` only ever takes a saved host id, never raw
+// connection details: the backend resolves the host record and its encrypted-at-rest
+// credential itself (crate::store::load_host_for_connect) so plaintext never has to be
+// re-sent over IPC on every connect.
 import { invoke } from '@tauri-apps/api/core';
-
-export interface SshConnectRequest {
-  hostId: string;
-  address: string;
-  port: number;
-  username: string;
-}
 
 export interface SshSession {
   sessionId: string;
   hostId: string;
 }
 
-export function sshConnect(request: SshConnectRequest): Promise<SshSession> {
-  return invoke('ssh_connect', { request });
+export function sshConnect(hostId: string): Promise<SshSession> {
+  return invoke('ssh_connect', { hostId });
 }
 
 export function sshWrite(sessionId: string, data: string): Promise<string> {

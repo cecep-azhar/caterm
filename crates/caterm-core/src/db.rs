@@ -32,6 +32,7 @@ pub fn open_encrypted(data_dir: &Path, passphrase: &str) -> Result<Connection, C
         })?;
 
     init_schema(&conn)?;
+    migrate_hosts_secret_column(&conn)?;
     Ok(conn)
 }
 
@@ -67,6 +68,25 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
          );",
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal inisialisasi skema: {e}"))))
+}
+
+/// Adds the `secret_enc` column to `hosts` for databases created before host credential
+/// encryption existed. `CREATE TABLE IF NOT EXISTS` above never alters an existing table,
+/// so this migration is what actually gets older `caterm.db` files up to date.
+fn migrate_hosts_secret_column(conn: &Connection) -> Result<(), CatermError> {
+    let has_column: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('hosts') WHERE name = 'secret_enc'")
+        .and_then(|mut stmt| stmt.exists([]))
+        .unwrap_or(false);
+    if !has_column {
+        conn.execute_batch("ALTER TABLE hosts ADD COLUMN secret_enc TEXT")
+            .map_err(|e| {
+                CatermError::Db(DbError::Generic(format!(
+                    "gagal migrasi kolom secret_enc: {e}"
+                )))
+            })?;
+    }
+    Ok(())
 }
 
 /// Opens the encrypted database at the resolved data dir, keyed with the local vault key.

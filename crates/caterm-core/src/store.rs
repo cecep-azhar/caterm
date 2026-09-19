@@ -2,10 +2,13 @@
 //! — every row here lives encrypted at rest, replacing the earlier plaintext `hosts.json`
 //! placeholder this module used before the vault existed.
 //!
-//! No secret material (passwords, private key contents) is ever written here. Credentials
-//! remain zero-knowledge vault territory (Fase 1) and stay out of scope until a real
-//! password-derived unlock flow exists — `AuthMethod::Key` only carries a filesystem path,
-//! never key bytes, and `AuthMethod::Password` carries nothing at all.
+//! Host credentials (password, or an SSH key's passphrase) are encrypted independently via
+//! `crate::secret` before being written to the `secret_enc` column — see that module for the
+//! key derivation. Plaintext secrets only ever exist transiently: on the way in (`HostInput`)
+//! and on the way back out to `crate::ssh` for an actual connection attempt
+//! (`load_host_for_connect`). `HostRecord`, the shape returned over IPC to the frontend,
+//! never carries the plaintext — only `has_secret`, so the UI can say "already set".
+//! `AuthMethod::Key` still only carries a filesystem path, never key bytes.
 
 use crate::db;
 use crate::error::{CatermError, DbError};
@@ -32,6 +35,9 @@ pub struct HostRecord {
     pub tags: Vec<String>,
     pub created_at: u64,
     pub updated_at: u64,
+    /// Whether a password/passphrase is already stored for this host. Never the secret
+    /// itself — just enough for the UI to render "leave blank to keep current password".
+    pub has_secret: bool,
 }
 
 /// Payload for `save_host`: same shape as `HostRecord` minus the fields the
@@ -47,6 +53,10 @@ pub struct HostInput {
     pub username: String,
     pub auth_method: AuthMethod,
     pub tags: Vec<String>,
+    /// Write-only. `None` (field omitted) = leave the stored secret untouched. `Some("")` =
+    /// clear it. `Some(s)` = encrypt `s` and store it, replacing whatever was there.
+    #[serde(default)]
+    pub secret: Option<String>,
 }
 
 fn now_unix() -> u64 {
@@ -67,6 +77,7 @@ fn generate_id() -> String {
 fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
     let auth_json: String = row.get("auth_method")?;
     let tags_json: String = row.get("tags")?;
+    let secret_enc: Option<String> = row.get("secret_enc")?;
     let auth_method: AuthMethod = serde_json::from_str(&auth_json).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
     })?;
@@ -83,6 +94,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
         tags,
         created_at: row.get::<_, i64>("created_at")? as u64,
         updated_at: row.get::<_, i64>("updated_at")? as u64,
+        has_secret: secret_enc.map(|s| !s.is_empty()).unwrap_or(false),
     })
 }
 
@@ -91,7 +103,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
 pub(crate) fn list_hosts_in(conn: &Connection) -> Result<Vec<HostRecord>, CatermError> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, label, address, port, username, auth_method, tags, created_at, updated_at \
+            "SELECT id, label, address, port, username, auth_method, tags, created_at, updated_at, secret_enc \
              FROM hosts ORDER BY created_at ASC",
         )
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal query hosts: {e}"))))?;
@@ -106,21 +118,30 @@ pub(crate) fn list_hosts_in(conn: &Connection) -> Result<Vec<HostRecord>, Caterm
     Ok(out)
 }
 
-pub(crate) fn save_host_in(conn: &Connection, input: HostInput) -> Result<HostRecord, CatermError> {
+pub(crate) fn save_host_in(
+    conn: &Connection,
+    input: HostInput,
+    local_key: &str,
+) -> Result<HostRecord, CatermError> {
     let now = now_unix();
     let id = input.id.filter(|id| !id.is_empty());
-    let created_at = match &id {
+    let (created_at, existing_secret_enc): (u64, Option<String>) = match &id {
         Some(existing_id) => conn
             .query_row(
-                "SELECT created_at FROM hosts WHERE id = ?1",
+                "SELECT created_at, secret_enc FROM hosts WHERE id = ?1",
                 params![existing_id],
-                |r| r.get::<_, i64>(0),
+                |r| Ok((r.get::<_, i64>(0)? as u64, r.get::<_, Option<String>>(1)?)),
             )
-            .map(|v| v as u64)
-            .unwrap_or(now),
-        None => now,
+            .unwrap_or((now, None)),
+        None => (now, None),
     };
     let id = id.unwrap_or_else(generate_id);
+
+    let secret_enc: Option<String> = match input.secret.as_deref() {
+        None => existing_secret_enc,
+        Some("") => None,
+        Some(plaintext) => Some(crate::secret::encrypt(local_key, plaintext)?),
+    };
 
     let auth_json = serde_json::to_string(&input.auth_method)
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal serialisasi auth_method: {e}"))))?;
@@ -128,8 +149,8 @@ pub(crate) fn save_host_in(conn: &Connection, input: HostInput) -> Result<HostRe
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal serialisasi tags: {e}"))))?;
 
     conn.execute(
-        "INSERT INTO hosts (id, label, address, port, username, auth_method, tags, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+        "INSERT INTO hosts (id, label, address, port, username, auth_method, tags, created_at, updated_at, secret_enc)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
          ON CONFLICT(id) DO UPDATE SET
             label = excluded.label,
             address = excluded.address,
@@ -137,7 +158,8 @@ pub(crate) fn save_host_in(conn: &Connection, input: HostInput) -> Result<HostRe
             username = excluded.username,
             auth_method = excluded.auth_method,
             tags = excluded.tags,
-            updated_at = excluded.updated_at",
+            updated_at = excluded.updated_at,
+            secret_enc = excluded.secret_enc",
         params![
             id,
             input.label,
@@ -147,7 +169,8 @@ pub(crate) fn save_host_in(conn: &Connection, input: HostInput) -> Result<HostRe
             auth_json,
             tags_json,
             created_at as i64,
-            now as i64
+            now as i64,
+            secret_enc
         ],
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal menyimpan host: {e}"))))?;
@@ -162,6 +185,7 @@ pub(crate) fn save_host_in(conn: &Connection, input: HostInput) -> Result<HostRe
         tags: input.tags,
         created_at,
         updated_at: now,
+        has_secret: secret_enc.map(|s| !s.is_empty()).unwrap_or(false),
     })
 }
 
@@ -187,7 +211,9 @@ pub fn list_hosts() -> Result<Vec<HostRecord>, CatermError> {
 /// Insert a new host (empty/absent `id`) or update an existing one in place,
 /// preserving its original `created_at`.
 pub fn save_host(input: HostInput) -> Result<HostRecord, CatermError> {
-    save_host_in(&db::open()?, input)
+    let data_dir = crate::paths::resolve_data_dir()?.path;
+    let local_key = crate::vault::load_or_create_local_key(&data_dir)?;
+    save_host_in(&db::open()?, input, &local_key)
 }
 
 /// Remove a host by id. Errors if no host with that id exists.
@@ -195,10 +221,42 @@ pub fn delete_host(id: &str) -> Result<(), CatermError> {
     delete_host_in(&db::open()?, id)
 }
 
+fn load_host_for_connect_in(
+    conn: &Connection,
+    id: &str,
+    local_key: &str,
+) -> Result<(HostRecord, Option<String>), CatermError> {
+    let (host, secret_enc): (HostRecord, Option<String>) = conn
+        .query_row(
+            "SELECT id, label, address, port, username, auth_method, tags, created_at, updated_at, secret_enc \
+             FROM hosts WHERE id = ?1",
+            params![id],
+            |row| Ok((row_to_host(row)?, row.get::<_, Option<String>>("secret_enc")?)),
+        )
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("host {id} tidak ditemukan: {e}"))))?;
+
+    let secret = match secret_enc {
+        Some(enc) if !enc.is_empty() => Some(crate::secret::decrypt(local_key, &enc)?),
+        _ => None,
+    };
+    Ok((host, secret))
+}
+
+/// Crate-internal: resolves a host plus its decrypted secret (password, or SSH key
+/// passphrase) for `crate::ssh` to actually open a connection with. The plaintext never
+/// travels any further than this — it is not part of `HostRecord` and never crosses IPC.
+pub(crate) fn load_host_for_connect(id: &str) -> Result<(HostRecord, Option<String>), CatermError> {
+    let data_dir = crate::paths::resolve_data_dir()?.path;
+    let local_key = crate::vault::load_or_create_local_key(&data_dir)?;
+    load_host_for_connect_in(&db::open()?, id, &local_key)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    const TEST_KEY: &str = "test-local-key";
 
     struct TempDb(Connection, PathBuf);
 
@@ -233,7 +291,9 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec!["test".into()],
+                secret: None,
             },
+            TEST_KEY,
         )
         .expect("save_host gagal");
 
@@ -256,9 +316,12 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                secret: Some("hunter2".into()),
             },
+            TEST_KEY,
         )
         .expect("save_host gagal");
+        assert!(first.has_secret);
 
         let updated = save_host_in(
             &db.0,
@@ -272,16 +335,61 @@ mod tests {
                     path: "/home/user/.ssh/id_ed25519".into(),
                 },
                 tags: vec!["prod".into()],
+                secret: None,
             },
+            TEST_KEY,
         )
         .expect("save_host gagal");
 
         assert_eq!(updated.id, first.id);
         assert_eq!(updated.created_at, first.created_at);
+        // `secret: None` on the update must not wipe the password saved above.
+        assert!(updated.has_secret);
 
         let all = list_hosts_in(&db.0).expect("list_hosts gagal");
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].label, "Updated");
+
+        let (_, decrypted) = load_host_for_connect_in(&db.0, &first.id, TEST_KEY).expect("load gagal");
+        assert_eq!(decrypted.as_deref(), Some("hunter2"));
+    }
+
+    #[test]
+    fn empty_string_secret_clears_it() {
+        let db = TempDb::new("clear_secret");
+        let host = save_host_in(
+            &db.0,
+            HostInput {
+                id: None,
+                label: "Host".into(),
+                address: "10.0.0.9".into(),
+                port: 22,
+                username: "root".into(),
+                auth_method: AuthMethod::Password,
+                tags: vec![],
+                secret: Some("hunter2".into()),
+            },
+            TEST_KEY,
+        )
+        .expect("save_host gagal");
+        assert!(host.has_secret);
+
+        let cleared = save_host_in(
+            &db.0,
+            HostInput {
+                id: Some(host.id.clone()),
+                label: "Host".into(),
+                address: "10.0.0.9".into(),
+                port: 22,
+                username: "root".into(),
+                auth_method: AuthMethod::Password,
+                tags: vec![],
+                secret: Some("".into()),
+            },
+            TEST_KEY,
+        )
+        .expect("save_host gagal");
+        assert!(!cleared.has_secret);
     }
 
     #[test]
@@ -297,7 +405,9 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                secret: None,
             },
+            TEST_KEY,
         )
         .expect("save_host gagal");
 
@@ -319,7 +429,9 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                secret: None,
             },
+            TEST_KEY,
         )
         .expect("save_host gagal");
 

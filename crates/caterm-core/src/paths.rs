@@ -84,6 +84,44 @@ pub fn db_path(data_dir: &std::path::Path) -> PathBuf {
     data_dir.join("caterm.db")
 }
 
+/// Expands a leading `~` or `~/...` in an SSH key path to the user's home directory.
+/// Paths without a leading `~` are returned unchanged.
+/// # Infallible: falls back to the original string when the home directory can't be
+/// resolved rather than failing the whole connect flow — there is no error to report.
+pub fn expand_tilde(path: &str) -> String {
+    let Some(rest) = path.strip_prefix('~') else {
+        return path.to_string();
+    };
+    let Some(base) = directories::BaseDirs::new() else {
+        return path.to_string();
+    };
+    let home = base.home_dir();
+    if let Some(rest) = rest.strip_prefix('/') {
+        home.join(rest).to_string_lossy().into_owned()
+    } else if rest.is_empty() {
+        home.to_string_lossy().into_owned()
+    } else {
+        path.to_string()
+    }
+}
+
+#[cfg(test)]
+mod expand_tilde_tests {
+    use super::expand_tilde;
+
+    #[test]
+    fn leaves_absolute_paths_unchanged() {
+        assert_eq!(expand_tilde("/home/user/.ssh/id_ed25519"), "/home/user/.ssh/id_ed25519");
+    }
+
+    #[test]
+    fn expands_leading_tilde_slash() {
+        let expanded = expand_tilde("~/.ssh/id_ed25519");
+        assert!(!expanded.starts_with('~'));
+        assert!(expanded.ends_with("/.ssh/id_ed25519"));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

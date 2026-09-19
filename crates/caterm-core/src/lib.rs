@@ -25,6 +25,7 @@ pub mod db;
 pub mod error;
 pub mod groups;
 pub mod paths;
+pub mod secret;
 pub mod snippets;
 pub mod ssh;
 pub mod store;

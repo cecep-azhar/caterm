@@ -16,6 +16,8 @@ export interface HostRecord {
   tags: string[];
   createdAt: number;
   updatedAt: number;
+  /** Whether a password/passphrase is already stored for this host (never the value itself). */
+  hasSecret: boolean;
 }
 
 export interface HostInput {
@@ -26,6 +28,9 @@ export interface HostInput {
   username: string;
   authMethod: AuthMethod;
   tags: string[];
+  /** Write-only. Omit to leave the stored secret untouched, "" to clear it, or a new
+   * password/passphrase to (re)encrypt and store it. Never comes back out via HostRecord. */
+  secret?: string;
 }
 
 export function listHosts(): Promise<HostRecord[]> {
