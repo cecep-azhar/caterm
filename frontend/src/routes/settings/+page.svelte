@@ -5,9 +5,15 @@
 
   let activeTab = $state('updates'); // 'updates' | 'subscription' | 'sync' | 'security' | 'backup'
   let vaultPassword = $state('');
+  let vaultMessage = $state('');
+  let vaultMessageKind = $state<'success' | 'error'>('success');
 
   let backupPassphrase = $state('');
+  let backupMsg = $state('');
+  let backupMsgKind = $state<'success' | 'error'>('success');
   let restorePassphrase = $state('');
+  let restoreMsg = $state('');
+  let restoreMsgKind = $state<'success' | 'error'>('success');
 
   async function handleExport(e: Event) {
     e.preventDefault();
@@ -252,8 +258,9 @@
         <p class="text-xs text-neutral-400">Protects your entire configuration using an AES-256-GCM encryption key derived from your passphrase via Argon2id.</p>
         <form onsubmit={handleExport} class="max-w-md space-y-4 pt-2">
           <div>
-            <label class="block text-xs font-medium text-neutral-400 uppercase mb-1">Backup Encryption Passphrase (min 8 chars)</label>
+            <label for="backup-pass" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Backup Encryption Passphrase (min 8 chars)</label>
             <input
+              id="backup-pass"
               type="password"
               minlength="8"
               required
@@ -276,8 +283,9 @@
         <p class="text-xs text-neutral-400">Restoring merges the backup contents with your current vault. Existing records with the same IDs will be updated.</p>
         <form onsubmit={handleImport} class="max-w-md space-y-4 pt-2">
           <div>
-            <label class="block text-xs font-medium text-neutral-400 uppercase mb-1">Backup Decryption Passphrase</label>
+            <label for="restore-pass" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Backup Decryption Passphrase</label>
             <input
+              id="restore-pass"
               type="password"
               required
               bind:value={restorePassphrase}

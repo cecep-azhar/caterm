@@ -3,10 +3,12 @@
   import LockScreen from '$lib/components/LockScreen.svelte';
   import NotificationCenter from '$lib/components/NotificationCenter.svelte';
   import Logo from '$lib/components/Logo.svelte';
+  import { getTabs, closeTab } from '$lib/stores/sessionTabs.svelte';
 
   let { children } = $props();
 
   let isUnlocked = $state(false);
+  let sessionTabs = $derived(getTabs());
 </script>
 
 <NotificationCenter />

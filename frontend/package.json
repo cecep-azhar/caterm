@@ -31,6 +31,9 @@
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
   },
+  "overrides": {
+    "cookie": "^0.7.0"
+  },
   "description": "",
   "main": "svelte.config.js",
   "keywords": [],
