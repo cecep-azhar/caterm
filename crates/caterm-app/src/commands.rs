@@ -3,7 +3,7 @@
 //! returns its result — no business logic here. See `tests/arch.rs` in
 //! `caterm-core` for the guard that enforces this.
 
-use caterm_core::{groups, keys, snippets, ssh, store, vault, CatermError};
+use caterm_core::{groups, keys, snippets, ssh, store, tunnels, vault, CatermError};
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
 where
@@ -15,6 +15,30 @@ where
         .map_err(|e| caterm_core::error::IoError::Generic(format!("Task join error: {e}")))?
 }
 
+#[tauri::command]
+pub async fn list_tunnels() -> Result<Vec<tunnels::TunnelRecord>, CatermError> {
+    run_blocking(tunnels::list_tunnels).await
+}
+
+#[tauri::command]
+pub async fn save_tunnel(input: tunnels::TunnelInput) -> Result<tunnels::TunnelRecord, CatermError> {
+    run_blocking(move || tunnels::save_tunnel(input)).await
+}
+
+#[tauri::command]
+pub async fn delete_tunnel(id: String) -> Result<(), CatermError> {
+    run_blocking(move || tunnels::delete_tunnel(&id)).await
+}
+
+#[tauri::command]
+pub async fn start_tunnel(id: String) -> Result<(), CatermError> {
+    run_blocking(move || tunnels::start_tunnel(&id)).await
+}
+
+#[tauri::command]
+pub async fn stop_tunnel(id: String) -> Result<(), CatermError> {
+    run_blocking(move || tunnels::stop_tunnel(&id)).await
+}
 #[tauri::command]
 pub async fn list_keys() -> Result<Vec<keys::KeyRecord>, CatermError> {
     run_blocking(keys::list_keys).await

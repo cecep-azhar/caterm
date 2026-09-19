@@ -30,6 +30,7 @@ pub mod snippets;
 pub mod ssh;
 pub mod store;
 pub mod keys;
+pub mod tunnels;
 pub mod vault;
 
 pub use error::CatermError;
