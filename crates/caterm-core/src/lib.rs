@@ -32,6 +32,7 @@ pub mod store;
 pub mod keys;
 pub mod tunnels;
 pub mod vault;
+pub mod monitor;
 
 pub use error::CatermError;
 

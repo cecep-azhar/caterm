@@ -25,13 +25,15 @@ pub struct SshSession {
     pub host_id: String,
 }
 
-struct SessionHandle {
-    tx: tokio::sync::mpsc::Sender<Vec<u8>>,
-    output_buffer: Arc<Mutex<Vec<u8>>>,
-    channel: Arc<Mutex<ssh2::Channel>>,
+pub(crate) struct SessionHandle {
+    pub(crate) tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    pub(crate) output_buffer: Arc<Mutex<Vec<u8>>>,
+    pub(crate) channel: Arc<Mutex<ssh2::Channel>>,
+    pub(crate) session: Arc<Mutex<ssh2::Session>>,
+    pub(crate) host_id: String,
 }
 
-static SESSIONS: Lazy<Arc<Mutex<HashMap<String, SessionHandle>>>> =
+pub(crate) static SESSIONS: Lazy<Arc<Mutex<HashMap<String, SessionHandle>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
 fn require_non_empty(field: &str, value: &str) -> Result<(), CatermError> {
@@ -229,6 +231,8 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         tx,
         output_buffer,
         channel: channel_arc,
+        session: Arc::new(Mutex::new(sess)),
+        host_id: host.id.clone(),
     };
 
     if let Ok(mut sessions) = SESSIONS.lock() {

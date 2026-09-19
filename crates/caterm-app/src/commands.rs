@@ -3,7 +3,7 @@
 //! returns its result — no business logic here. See `tests/arch.rs` in
 //! `caterm-core` for the guard that enforces this.
 
-use caterm_core::{groups, keys, snippets, ssh, store, tunnels, vault, CatermError};
+use caterm_core::{groups, keys, monitor, snippets, ssh, store, tunnels, vault, CatermError};
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
 where
@@ -42,6 +42,11 @@ pub async fn stop_tunnel(id: String) -> Result<(), CatermError> {
 #[tauri::command]
 pub async fn list_keys() -> Result<Vec<keys::KeyRecord>, CatermError> {
     run_blocking(keys::list_keys).await
+}
+
+#[tauri::command]
+pub async fn poll_active_metrics() -> Result<Vec<monitor::HostMetrics>, CatermError> {
+    run_blocking(monitor::poll_active_metrics).await
 }
 
 #[tauri::command]

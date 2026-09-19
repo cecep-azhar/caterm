@@ -1,4 +1,39 @@
 <script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { pollActiveMetrics, type HostMetrics } from '$lib/api/monitor';
+  import { listHosts, type HostRecord } from '$lib/api/hosts';
+
+  let metrics: HostMetrics[] = [];
+  let hosts: HostRecord[] = [];
+  let errorMsg = '';
+  let isLoading = true;
+  let timer: ReturnType<typeof setInterval>;
+
+  async function loadMetrics() {
+    try {
+      [metrics, hosts] = await Promise.all([pollActiveMetrics(), listHosts()]);
+      errorMsg = '';
+    } catch (e: any) {
+      errorMsg = String(e);
+    } finally {
+      isLoading = false;
+    }
+  }
+
+  onMount(() => {
+    loadMetrics();
+    // Poll every 5 seconds
+    timer = setInterval(loadMetrics, 5000);
+  });
+
+  onDestroy(() => {
+    if (timer) clearInterval(timer);
+  });
+
+  function getHostLabel(hostId: string): string {
+    const host = hosts.find(h => h.id === hostId);
+    return host ? host.label || host.address : hostId;
+  }
 </script>
 
 <div class="max-w-4xl mx-auto space-y-6">
@@ -8,63 +43,76 @@
     </div>
     <div>
       <h1 class="text-2xl font-bold text-white">System Monitoring</h1>
-      <p class="text-sm text-neutral-400">Real-time resource utilization (CPU, RAM, Disk, Network) across connected hosts.</p>
+      <p class="text-sm text-neutral-400">Real-time resource utilization (CPU, RAM, Disk, Net) across connected hosts.</p>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    <div class="p-6 border border-neutral-800 rounded-xl bg-neutral-900/40">
-      <div class="flex items-center justify-between mb-4">
-        <span class="font-medium text-white">YPC Server</span>
-        <span class="px-2 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-400">Online</span>
-      </div>
-      <div class="space-y-3 text-sm">
-        <div>
-          <div class="flex justify-between text-xs text-neutral-400 mb-1">
-            <span>CPU Usage</span>
-            <span>14%</span>
-          </div>
-          <div class="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
-            <div class="w-[14%] h-full bg-sky-500 rounded-full"></div>
-          </div>
-        </div>
-        <div>
-          <div class="flex justify-between text-xs text-neutral-400 mb-1">
-            <span>RAM Usage</span>
-            <span>4.2 GB / 16 GB</span>
-          </div>
-          <div class="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
-            <div class="w-[26%] h-full bg-indigo-500 rounded-full"></div>
-          </div>
-        </div>
-      </div>
+  {#if errorMsg}
+    <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+      {errorMsg}
     </div>
+  {/if}
 
-    <div class="p-6 border border-neutral-800 rounded-xl bg-neutral-900/40">
-      <div class="flex items-center justify-between mb-4">
-        <span class="font-medium text-white">XPC Server</span>
-        <span class="px-2 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-400">Online</span>
-      </div>
-      <div class="space-y-3 text-sm">
-        <div>
-          <div class="flex justify-between text-xs text-neutral-400 mb-1">
-            <span>CPU Usage</span>
-            <span>8%</span>
-          </div>
-          <div class="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
-            <div class="w-[8%] h-full bg-sky-500 rounded-full"></div>
-          </div>
-        </div>
-        <div>
-          <div class="flex justify-between text-xs text-neutral-400 mb-1">
-            <span>RAM Usage</span>
-            <span>6.1 GB / 32 GB</span>
-          </div>
-          <div class="w-full h-2 bg-neutral-800 rounded-full overflow-hidden">
-            <div class="w-[19%] h-full bg-indigo-500 rounded-full"></div>
-          </div>
-        </div>
-      </div>
+  {#if isLoading}
+    <div class="p-8 text-center text-neutral-500 text-sm">Loading monitoring data...</div>
+  {:else if metrics.length === 0}
+    <div class="p-8 border border-neutral-800 rounded-xl bg-neutral-900/30 text-center flex flex-col items-center justify-center">
+      <svg class="w-12 h-12 text-neutral-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+      <h3 class="text-lg font-medium text-white mb-2">No active sessions</h3>
+      <p class="text-sm text-neutral-400 max-w-md">Connect to one or more SSH hosts in the Hosts tab to view real-time metrics here.</p>
     </div>
-  </div>
+  {:else}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {#each metrics as m (m.host_id)}
+        {@const ramPct = (m.mem_used_mb / m.mem_total_mb) * 100}
+        {@const diskPct = (m.disk_used_gb / m.disk_total_gb) * 100}
+        <div class="p-6 border border-neutral-800 rounded-xl bg-neutral-900/40 hover:border-neutral-700 transition-colors">
+          <div class="flex items-center justify-between mb-4">
+            <span class="font-medium text-white text-sm">{getHostLabel(m.host_id)}</span>
+            <span class="px-2 py-0.5 rounded text-xs font-mono bg-emerald-500/20 text-emerald-400 flex items-center gap-1.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Online
+            </span>
+          </div>
+
+          <div class="text-xs text-neutral-500 mb-4 pb-4 border-b border-neutral-800/50">
+            <div><span class="text-neutral-400">OS:</span> {m.os_name}</div>
+            <div><span class="text-neutral-400">Uptime:</span> {m.uptime}</div>
+            <div><span class="text-neutral-400">Hostname:</span> {m.hostname}</div>
+          </div>
+
+          <div class="space-y-4 text-sm">
+            <div>
+              <div class="flex justify-between text-xs text-neutral-400 mb-1.5">
+                <span>CPU Usage</span>
+                <span>{m.cpu_usage.toFixed(1)}%</span>
+              </div>
+              <div class="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                <div class="h-full bg-sky-500 rounded-full transition-all duration-500" style="width: {m.cpu_usage}%"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs text-neutral-400 mb-1.5">
+                <span>RAM Usage</span>
+                <span>{(m.mem_used_mb / 1024).toFixed(1)} GB / {(m.mem_total_mb / 1024).toFixed(1)} GB</span>
+              </div>
+              <div class="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                <div class="h-full bg-indigo-500 rounded-full transition-all duration-500" style="width: {ramPct}%"></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs text-neutral-400 mb-1.5">
+                <span>Root Disk</span>
+                <span>{m.disk_used_gb.toFixed(1)} GB / {m.disk_total_gb.toFixed(1)} GB</span>
+              </div>
+              <div class="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+                <div class="h-full bg-amber-500 rounded-full transition-all duration-500" style="width: {diskPct}%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>

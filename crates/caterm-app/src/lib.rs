@@ -60,6 +60,7 @@ pub fn run(start: std::time::Instant) {
             commands::delete_tunnel,
             commands::start_tunnel,
             commands::stop_tunnel,
+            commands::poll_active_metrics,
             commands::list_keys,
             commands::generate_key,
             commands::import_key,

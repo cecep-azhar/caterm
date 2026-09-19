@@ -14,6 +14,7 @@
 - [x] **`T2-SSH-04` — TOFU Host Key Verification**: Menambahkan verifikasi `known_hosts` otomatis pada `ssh::connect`. Celah MITM berhasil ditutup.
 - [x] **`T2-TOOL-05` — SSH Keys Manager**: Implementasi backend Rust (`caterm-core/src/keys.rs`) & UI SvelteKit (`/ssh-keys`). Private key disimpan terenkripsi AES-256-GCM di SQLite database lokal.
 - [x] **`T2-TOOL-06` — Deploy public key**: Fitur `Deploy to Server` di UI SSH Keys. Deploy idempoten ke `~/.ssh/authorized_keys` menggunakan backend `ssh2` channel exec.
+- [x] **`T2-TOOL-02` — Port Forwarding**: Manajer tunneling dengan mode *Local*, *Remote*, dan *Dynamic*. Terikat ke ID host. Otomatis membersihkan socket *direct-tcpip* saat ditutup. Backend Rust `caterm-core/src/tunnels.rs` + UI `/port-forwarding`.
 
 ## Keputusan Desain (Membutuhkan Konfirmasi Pemilik)
 * **DX-1 (ssh2 -> russh)**: Default -> **DILEWATI SEMENTARA**. Karena Port Forwarding dan Monitoring akan ditulis, saya membuat interface backend `TunnelManager` dan `MonitorManager` yang terisolasi dari core `ssh2::Session` sehingga nanti migrasi ke `russh` dapat dilakukan pada level konektor inti.
