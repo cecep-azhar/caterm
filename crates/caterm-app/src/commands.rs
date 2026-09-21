@@ -272,6 +272,14 @@ pub async fn ai_generate_plan(
 }
 
 #[tauri::command]
+pub async fn ai_chat(
+    messages: Vec<ai::AiChatMessage>,
+    host_label: Option<String>,
+) -> Result<ai::AiChatReply, CatermError> {
+    run_blocking(move || ai::chat(messages, host_label.as_deref())).await
+}
+
+#[tauri::command]
 pub async fn ai_execute_step(
     host_id: String,
     command: String,

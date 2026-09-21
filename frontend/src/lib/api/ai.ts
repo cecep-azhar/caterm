@@ -68,3 +68,26 @@ export async function aiExecuteStep(
     command
   });
 }
+
+export interface AiChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+}
+
+export interface AiChatReply {
+  reply: string;
+  /** True only once the assistant has stopped asking questions and proposes commands. */
+  ready: boolean;
+  steps: AiPlanStep[];
+}
+
+/**
+ * One turn of conversation. Send the whole history each time — the backend is stateless and
+ * the model needs the earlier answers to know what it already asked.
+ */
+export async function aiChat(
+  messages: AiChatMessage[],
+  hostLabel?: string
+): Promise<AiChatReply> {
+  return invoke<AiChatReply>('ai_chat', { messages, hostLabel });
+}

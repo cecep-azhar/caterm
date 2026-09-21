@@ -4,6 +4,8 @@
   import NotificationCenter from '$lib/components/NotificationCenter.svelte';
   import Logo from '$lib/components/Logo.svelte';
   import WorkspaceMenu from '$lib/components/WorkspaceMenu.svelte';
+  import AiChatPanel from '$lib/components/AiChatPanel.svelte';
+  import { getAiChatState, toggleAiChat, closeAiChat } from '$lib/stores/aiChat.svelte';
   import { page } from '$app/state';
   import { getTabs, closeTab } from '$lib/stores/sessionTabs.svelte';
   import {
@@ -39,6 +41,7 @@
   });
 
   const theme = getTheme();
+  const aiChat = getAiChatState();
   const isDarkTheme = $derived(theme.name === 'dark');
 
   onMount(() => {
@@ -202,7 +205,19 @@
   ];
 </script>
 
-<svelte:window onkeydown={(e) => { if (e.key === 'Escape') mobileDrawerOpen = false; }} />
+<svelte:window
+  onkeydown={(e) => {
+    if (e.key !== 'Escape') return;
+    mobileDrawerOpen = false;
+    closeAiChat();
+  }}
+/>
+
+<!-- Gated on the vault being open: the assistant reads hosts and can run commands, so it must
+     not be reachable from the lock screen. -->
+{#if isUnlocked && aiChat.open}
+  <AiChatPanel onClose={closeAiChat} />
+{/if}
 
 <NotificationCenter />
 
@@ -543,6 +558,19 @@
           <span class="text-green-500 animate-pulse text-[10px]" class:opacity-50={monitorState.isPolling}>●</span>
           <span class="font-mono text-neutral-700 dark:text-neutral-300 hidden lg:inline">{timeAgo}</span>
         </div>
+
+        <!-- AI Assistant: mounted at layout level so the conversation survives navigation -->
+        <button
+          onclick={toggleAiChat}
+          class="p-1.5 rounded transition-colors {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400' : 'hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
+          title="AI Assistant — diskusi lalu jalankan"
+          aria-label="AI Assistant"
+          aria-pressed={aiChat.open}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+        </button>
 
         <!-- Theme Toggle -->
         <button onclick={toggleTheme} class="p-1.5 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors" title="Toggle Theme ({isDarkTheme ? 'Dark' : 'Light'})" aria-label="Toggle Theme">

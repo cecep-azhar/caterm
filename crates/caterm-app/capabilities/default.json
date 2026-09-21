@@ -49,6 +49,7 @@
     "allow-get-ai-settings",
     "allow-save-ai-settings",
     "allow-ai-generate-plan",
+    "allow-ai-chat",
     "allow-ai-execute-step"
   ]
 }

@@ -34,6 +34,9 @@ ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "encryption", "allo
 chrono = "0.4.45"
 regex = "1.13.1"
 uuid = { version = "1.26.1", features = ["v4"] }
+# Blocking HTTP for the LLM endpoint. Replaces shelling out to `curl`, which put the API key
+# in the process argv where any local user could read it off the process table.
+ureq = { version = "3.1", features = ["json"] }
 
 [dev-dependencies]
 serde_json.workspace = true

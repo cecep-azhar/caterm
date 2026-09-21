@@ -124,6 +124,7 @@ pub fn run(start: std::time::Instant) {
             commands::get_ai_settings,
             commands::save_ai_settings,
             commands::ai_generate_plan,
+            commands::ai_chat,
             commands::ai_execute_step,
         ])
         .run(tauri::generate_context!())

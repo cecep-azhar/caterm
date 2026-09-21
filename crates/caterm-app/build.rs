@@ -65,6 +65,7 @@ const COMMANDS: &[&str] = &[
     "get_ai_settings",
     "save_ai_settings",
     "ai_generate_plan",
+    "ai_chat",
     "ai_execute_step",
 ];
 

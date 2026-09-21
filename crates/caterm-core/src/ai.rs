@@ -168,19 +168,99 @@ fn resolve_host_label(target_host: Option<&str>) -> Option<String> {
         .or_else(|| Some(host_id.to_string()))
 }
 
+/// POSTs an OpenAI-compatible `/chat/completions` request and returns the assistant's message
+/// content.
+///
+/// This used to shell out to `curl`, passing the API key as `-H "Authorization: Bearer ..."`.
+/// Command-line arguments are world-readable on both Windows and Linux, so the key was visible
+/// to any local process listing. Sending it from inside our own process closes that, and drops
+/// the dependency on `curl.exe` being present.
+fn post_chat_completion(
+    settings: &AiSettings,
+    payload: serde_json::Value,
+    timeout: std::time::Duration,
+) -> Result<String, CatermError> {
+    let base_url = settings.base_url.trim();
+    if base_url.is_empty() {
+        return Err(CatermError::Ai(AiError::Generic(
+            "Base URL AI belum diisi — buka Settings > AI Assistant.".to_string(),
+        )));
+    }
+    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
+
+    let config = ureq::Agent::config_builder()
+        .timeout_global(Some(timeout))
+        .build();
+    let agent: ureq::Agent = config.into();
+
+    let mut request = agent.post(&url).header("Content-Type", "application/json");
+    let api_key = settings.api_key.trim();
+    if !api_key.is_empty() {
+        request = request.header("Authorization", &format!("Bearer {api_key}"));
+    }
+
+    let mut response = request
+        .send_json(&payload)
+        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Gagal menghubungi {url}: {e}"))))?;
+
+    let body = response
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Respons AI tidak terbaca: {e}"))))?;
+
+    extract_message_content(&body).ok_or_else(|| {
+        CatermError::Ai(AiError::Generic(format!(
+            "Respons AI tidak sesuai format OpenAI chat/completions: {}",
+            body.chars().take(300).collect::<String>()
+        )))
+    })
+}
+
+/// Pulls `choices[0].message.content` out of an OpenAI-compatible response.
+fn extract_message_content(raw_json: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(raw_json).ok()?;
+    Some(
+        v.get("choices")?
+            .get(0)?
+            .get("message")?
+            .get("content")?
+            .as_str()?
+            .to_string(),
+    )
+}
+
+/// Strips a ```json ... ``` fence if the model wrapped its answer in one.
+fn strip_code_fence(content: &str) -> &str {
+    let trimmed = content.trim();
+    if let Some(stripped) = trimmed.strip_prefix("```json") {
+        stripped.strip_suffix("```").unwrap_or(stripped).trim()
+    } else if let Some(stripped) = trimmed.strip_prefix("```") {
+        stripped.strip_suffix("```").unwrap_or(stripped).trim()
+    } else {
+        trimmed
+    }
+}
+
 fn call_llm_if_available(
     settings: &AiSettings,
     goal: &str,
     target_host: Option<&str>,
     host_label: Option<String>,
 ) -> Option<AiExecutionPlan> {
-    let base_url = settings.base_url.trim();
-    if base_url.is_empty() {
-        return None;
+    let system_prompt = "You are a Linux DevOps and Sysadmin AI assistant. Generate a structured execution plan for the requested goal. Respond ONLY with valid JSON matching this schema:
+{
+  \"summary\": \"Brief summary of the plan\",
+  \"requirements\": [\"Requirement 1\", \"Requirement 2\"],
+  \"steps\": [
+    {
+      \"step\": 1,
+      \"title\": \"Step title\",
+      \"command\": \"bash command\",
+      \"description\": \"Step description\",
+      \"is_dangerous\": false
     }
-    let url = format!("{}/chat/completions", base_url.trim_end_matches('/'));
-
-    let system_prompt = "You are a Linux DevOps and Sysadmin AI assistant. Generate a structured execution plan for the requested goal. Respond ONLY with valid JSON matching this schema:\n{\n  \"summary\": \"Brief summary of the plan\",\n  \"requirements\": [\"Requirement 1\", \"Requirement 2\"],\n  \"steps\": [\n    {\n      \"step\": 1,\n      \"title\": \"Step title\",\n      \"command\": \"bash command\",\n      \"description\": \"Step description\",\n      \"is_dangerous\": false\n    }\n  ]\n}";
+  ]
+}";
 
     let payload = serde_json::json!({
         "model": &settings.model,
@@ -191,74 +271,19 @@ fn call_llm_if_available(
         "temperature": 0.2
     });
 
-    let payload_str = payload.to_string();
-
-    let mut cmd = std::process::Command::new("curl");
-    cmd.arg("-s")
-        .arg("--max-time")
-        .arg("6")
-        .arg("-X")
-        .arg("POST")
-        .arg(&url)
-        .arg("-H")
-        .arg("Content-Type: application/json");
-
-    if !settings.api_key.trim().is_empty() {
-        cmd.arg("-H")
-            .arg(format!("Authorization: Bearer {}", settings.api_key.trim()));
-    }
-
-    cmd.arg("-d").arg(&payload_str);
-
-    let output = cmd.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    let response_str = String::from_utf8(output.stdout).ok()?;
-    parse_ai_llm_response(&response_str, goal, target_host, host_label)
+    // Falls back to the built-in heuristic planner when the endpoint is unreachable, so this
+    // deliberately swallows the error rather than surfacing it.
+    let content =
+        post_chat_completion(settings, payload, std::time::Duration::from_secs(60)).ok()?;
+    parse_ai_plan_content(&content, goal, target_host, host_label)
 }
 
-fn parse_ai_llm_response(
-    raw_json: &str,
-    goal: &str,
-    target_host: Option<&str>,
-    host_label: Option<String>,
-) -> Option<AiExecutionPlan> {
-    let v: serde_json::Value = serde_json::from_str(raw_json).ok()?;
-    let content = v
-        .get("choices")?
-        .get(0)?
-        .get("message")?
-        .get("content")?
-        .as_str()?;
-
-    let trimmed = content.trim();
-    let json_text = if let Some(stripped) = trimmed.strip_prefix("```json") {
-        stripped.strip_suffix("```").unwrap_or(stripped).trim()
-    } else if let Some(stripped) = trimmed.strip_prefix("```") {
-        stripped.strip_suffix("```").unwrap_or(stripped).trim()
-    } else {
-        trimmed
+/// Reads a `steps: [...]` array into `AiPlanStep`s, skipping entries with no command. Shared by
+/// the one-shot planner and the conversational path.
+fn parse_plan_steps(parsed: &serde_json::Value) -> Vec<AiPlanStep> {
+    let Some(steps_arr) = parsed.get("steps").and_then(|s| s.as_array()) else {
+        return Vec::new();
     };
-
-    let parsed: serde_json::Value = serde_json::from_str(json_text).ok()?;
-    let summary = parsed.get("summary")?.as_str()?.to_string();
-
-    let requirements = parsed
-        .get("requirements")
-        .and_then(|r| r.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|x| x.as_str().map(|s| s.to_string()))
-                .collect()
-        })
-        .unwrap_or_default();
-
-    let steps_arr = parsed.get("steps")?.as_array()?;
-    if steps_arr.is_empty() {
-        return None;
-    }
 
     let mut steps = Vec::new();
     for (idx, item) in steps_arr.iter().enumerate() {
@@ -297,6 +322,31 @@ fn parse_ai_llm_response(
             is_dangerous,
         ));
     }
+
+    steps
+}
+
+/// Parses the assistant's message content (already unwrapped from the HTTP envelope) into a plan.
+fn parse_ai_plan_content(
+    content: &str,
+    goal: &str,
+    target_host: Option<&str>,
+    host_label: Option<String>,
+) -> Option<AiExecutionPlan> {
+    let parsed: serde_json::Value = serde_json::from_str(strip_code_fence(content)).ok()?;
+    let summary = parsed.get("summary")?.as_str()?.to_string();
+
+    let requirements = parsed
+        .get("requirements")
+        .and_then(|r| r.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|x| x.as_str().map(|s| s.to_string()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let steps = parse_plan_steps(&parsed);
 
     if steps.is_empty() {
         return None;
@@ -732,6 +782,120 @@ pub fn generate_plan(
 }
 
 /// Execute a single plan step command over SSH on the target host, recording the audit log.
+/// One turn of a conversation with the assistant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiChatMessage {
+    /// `system`, `user`, or `assistant`.
+    pub role: String,
+    pub content: String,
+}
+
+/// The assistant's answer to a turn. `steps` is empty for as long as the assistant is still
+/// asking clarifying questions — it only proposes commands once `ready` is true.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiChatReply {
+    pub reply: String,
+    pub ready: bool,
+    pub steps: Vec<AiPlanStep>,
+}
+
+const CHAT_SYSTEM_PROMPT: &str = "You are CATerm's Linux DevOps assistant, embedded in an SSH client. The user will describe something they want done on a remote server.
+
+Your job has two phases.
+PHASE 1 - CLARIFY: Ask short, concrete questions until you know enough to act. Ask about distribution and version, target versions of the software, whether sudo is available, ports, data directories, and anything destructive. Ask only what you genuinely need; never ask more than three questions in one turn. While you are in this phase, `ready` MUST be false and `steps` MUST be an empty array.
+PHASE 2 - PROPOSE: Once the user has answered and explicitly agrees to proceed, set `ready` to true and fill `steps` with the exact shell commands, in order.
+
+Commands run non-interactively over SSH, so they must not prompt: use flags like -y, set DEBIAN_FRONTEND=noninteractive, and never launch an editor or pager. Mark anything that deletes data, overwrites config, or restarts a service as dangerous.
+
+Reply with ONLY a JSON object, no prose outside it, no markdown fence:
+{\"reply\": \"what you say to the user, in the user's language\", \"ready\": false, \"steps\": [{\"step\": 1, \"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"is_dangerous\": false}]}";
+
+/// Holds a conversation with the configured LLM.
+///
+/// Unlike [`generate_plan`], this has no heuristic fallback: a chat with no model behind it
+/// would be a fiction, so a missing or unreachable endpoint is reported as an error the UI can
+/// show instead of silently inventing an answer.
+pub fn chat(
+    messages: Vec<AiChatMessage>,
+    host_label: Option<&str>,
+) -> Result<AiChatReply, CatermError> {
+    if messages.is_empty() {
+        return Err(CatermError::Validation(ValidationError::Generic(
+            "Percakapan kosong".to_string(),
+        )));
+    }
+
+    let settings = get_ai_settings()?;
+
+    let mut system = CHAT_SYSTEM_PROMPT.to_string();
+    if let Some(label) = host_label.filter(|l| !l.trim().is_empty()) {
+        system.push_str(&format!(
+            "
+
+The commands will run on the host the user calls \"{label}\"."
+        ));
+    }
+
+    let mut payload_messages = vec![serde_json::json!({ "role": "system", "content": system })];
+    for message in &messages {
+        // Anything that is not a recognised role is treated as the user speaking: a malformed
+        // role would otherwise be rejected by the endpoint and lose the whole conversation.
+        let role = match message.role.as_str() {
+            "assistant" => "assistant",
+            "system" => "system",
+            _ => "user",
+        };
+        payload_messages
+            .push(serde_json::json!({ "role": role, "content": message.content.clone() }));
+    }
+
+    let payload = serde_json::json!({
+        "model": &settings.model,
+        "messages": payload_messages,
+        "temperature": 0.3
+    });
+
+    let content = post_chat_completion(&settings, payload, std::time::Duration::from_secs(120))?;
+    Ok(parse_chat_reply(&content))
+}
+
+/// Turns the model's answer into a reply. A model that ignores the JSON contract and answers in
+/// prose still produces a usable turn — its text becomes the reply and nothing is proposed —
+/// rather than an error the user cannot act on.
+fn parse_chat_reply(content: &str) -> AiChatReply {
+    let stripped = strip_code_fence(content);
+
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(stripped) else {
+        return AiChatReply {
+            reply: content.trim().to_string(),
+            ready: false,
+            steps: Vec::new(),
+        };
+    };
+
+    let reply = parsed
+        .get("reply")
+        .and_then(|r| r.as_str())
+        .unwrap_or_else(|| content.trim())
+        .to_string();
+
+    let steps = parse_plan_steps(&parsed);
+    // `ready` without steps is meaningless, and steps without `ready` would execute something
+    // the user never agreed to — both are treated as "still talking".
+    let ready = parsed
+        .get("ready")
+        .and_then(|r| r.as_bool())
+        .unwrap_or(false)
+        && !steps.is_empty();
+
+    AiChatReply {
+        reply,
+        ready,
+        steps: if ready { steps } else { Vec::new() },
+    }
+}
+
 pub fn execute_plan_step(host_id: &str, command: &str) -> Result<AiExecutionResult, CatermError> {
     if host_id.trim().is_empty() {
         return Err(CatermError::Validation(ValidationError::Generic(
