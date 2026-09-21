@@ -6,7 +6,6 @@
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import {
     getAiSettings,
-    saveAiSettings,
     aiGeneratePlan,
     aiExecuteStep,
     type AiPlanStep,
@@ -35,10 +34,7 @@
     model: 'deepseek-chat'
   };
 
-  let isSettingsOpen = $state(false);
-  let showApiKey = $state(false);
   let settings = $state<AiSettings>({ ...DEFAULT_SETTINGS });
-  let isSavingSettings = $state(false);
 
   // Prompt & Plan state
   let goal = $state('');
@@ -119,29 +115,6 @@
     } catch {
       // ignore
     }
-  }
-
-  async function handleSaveSettings(e: Event) {
-    e.preventDefault();
-    isSavingSettings = true;
-    try {
-      await saveAiSettings(settings);
-    } catch {
-      // if backend invoke fails, persist in localStorage
-    }
-    try {
-      localStorage.setItem('caterm_ai_settings', JSON.stringify(settings));
-    } catch {
-      // ignore
-    }
-    isSavingSettings = false;
-    isSettingsOpen = false;
-    showToast('Pengaturan AI berhasil disimpan', 'success');
-  }
-
-  function handleResetSettings() {
-    settings = { ...DEFAULT_SETTINGS };
-    showToast('Pengaturan dikembalikan ke default', 'info');
   }
 
   function selectQuickPrompt(promptGoal: string) {
@@ -632,19 +605,18 @@
         {/if}
       </div>
 
-      <!-- AI Settings Modal Button (Gear Icon) -->
-      <button
-        type="button"
-        onclick={() => (isSettingsOpen = true)}
-        title="AI Settings"
-        aria-label="AI Settings"
-        class="p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 shadow-sm transition-colors"
+      <!-- AI config now lives on the Settings page so there is exactly one place for it. -->
+      <a
+        href="/settings"
+        title="Pengaturan AI (halaman Settings)"
+        aria-label="Pengaturan AI"
+        class="p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 shadow-sm transition-colors inline-flex"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
-      </button>
+      </a>
     </div>
   </header>
 
@@ -1026,151 +998,5 @@
   {/if}
 
   <!-- AI Settings Modal -->
-  {#if isSettingsOpen}
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div
-        class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl space-y-4"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ai-settings-modal-title"
-      >
-        <!-- Modal Header -->
-        <div class="p-5 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between">
-          <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center text-violet-600 dark:text-violet-400">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div>
-              <h2 id="ai-settings-modal-title" class="font-bold text-base text-neutral-900 dark:text-white">AI Ops Assistant Settings</h2>
-              <p class="text-xs text-neutral-500 dark:text-neutral-400">Konfigurasi endpoint LLM & credential analitik</p>
-            </div>
-          </div>
 
-          <button
-            type="button"
-            onclick={() => (isSettingsOpen = false)}
-            class="p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
-            aria-label="Tutup modal"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Modal Form -->
-        <form onsubmit={handleSaveSettings} class="p-5 space-y-4">
-          <!-- Provider -->
-          <div>
-            <label for="ai-provider-select" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-              Provider
-            </label>
-            <select
-              id="ai-provider-select"
-              bind:value={settings.provider}
-              class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
-            >
-              <option value="custom">Custom / OpenAI Compatible (Self-hosted, vLLM, Ollama)</option>
-              <option value="openai">OpenAI Official</option>
-              <option value="ollama">Ollama Local</option>
-              <option value="anthropic">Anthropic Claude</option>
-            </select>
-          </div>
-
-          <!-- Base URL -->
-          <div>
-            <label for="ai-base-url-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-              Base URL (OpenAI-compatible)
-            </label>
-            <input
-              id="ai-base-url-input"
-              type="text"
-              bind:value={settings.base_url}
-              placeholder="http://100.76.150.46:3007/v1"
-              class="w-full font-mono bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs md:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
-            />
-            <p class="text-[11px] text-neutral-500 mt-1">Default local network gateway: http://100.76.150.46:3007/v1</p>
-          </div>
-
-          <!-- API Key -->
-          <div>
-            <label for="ai-api-key-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-              API Key
-            </label>
-            <div class="relative">
-              <input
-                id="ai-api-key-input"
-                type={showApiKey ? 'text' : 'password'}
-                bind:value={settings.api_key}
-                placeholder="sk-..."
-                class="w-full font-mono bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs md:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors pr-10"
-              />
-              <button
-                type="button"
-                onclick={() => (showApiKey = !showApiKey)}
-                class="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                aria-label={showApiKey ? 'Sembunyikan API key' : 'Tampilkan API key'}
-              >
-                {#if showApiKey}
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                  </svg>
-                {:else}
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                {/if}
-              </button>
-            </div>
-          </div>
-
-          <!-- Model -->
-          <div>
-            <label for="ai-model-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-              Model
-            </label>
-            <input
-              id="ai-model-input"
-              type="text"
-              bind:value={settings.model}
-              placeholder="deepseek-chat"
-              class="w-full font-mono bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs md:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
-            />
-          </div>
-
-          <!-- Modal Actions -->
-          <div class="flex items-center justify-between pt-3 border-t border-neutral-200 dark:border-neutral-800">
-            <button
-              type="button"
-              onclick={handleResetSettings}
-              class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
-            >
-              Reset ke Default
-            </button>
-
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                onclick={() => (isSettingsOpen = false)}
-                class="px-4 py-2 rounded-lg text-xs font-medium bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-              >
-                Batal
-              </button>
-              <button
-                type="submit"
-                disabled={isSavingSettings}
-                class="px-5 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white shadow transition-colors"
-              >
-                {isSavingSettings ? 'Menyimpan...' : 'Simpan Pengaturan'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
-  {/if}
 </div>

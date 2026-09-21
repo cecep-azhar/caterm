@@ -2,6 +2,8 @@
   import { onMount } from 'svelte';
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
+  import HostDetailPanel from '$lib/components/HostDetailPanel.svelte';
+  import { goto } from '$app/navigation';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
 
   let hosts = $state<HostRecord[]>([]);
@@ -12,6 +14,59 @@
   let errorMsg = $state('');
   let editingId = $state<string | null>(null);
   let editingHadSecret = $state(false);
+
+  // Bulk selection + detail slide-over. Both buttons on the host card were previously inert
+  // markup with no onclick; this is the state behind them.
+  let selectedIds = $state<string[]>([]);
+  let detailHost = $state<HostRecord | null>(null);
+
+  const isSelected = (id: string) => selectedIds.includes(id);
+
+  function toggleSelected(id: string) {
+    selectedIds = isSelected(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
+  }
+
+  function clearSelection() {
+    selectedIds = [];
+  }
+
+  /** Opens every selected host as tabs in one session, which is what a split view needs. */
+  function connectSelected() {
+    if (selectedIds.length === 0) return;
+    const ids = selectedIds.join(',');
+    clearSelection();
+    void goto(`/session?hosts=${ids}`);
+  }
+
+  async function deleteSelected() {
+    const count = selectedIds.length;
+    if (count === 0) return;
+    const ok = await confirmModal(
+      `Hapus ${count} host terpilih? Kredensial tersimpannya ikut terhapus dan tidak bisa dikembalikan.`,
+      'Hapus Host Terpilih',
+      true,
+      'Hapus',
+      'Batal'
+    );
+    if (!ok) return;
+
+    const failed: string[] = [];
+    for (const id of selectedIds) {
+      try {
+        await deleteHost(id);
+      } catch {
+        failed.push(hosts.find((h) => h.id === id)?.label ?? id);
+      }
+    }
+    clearSelection();
+    await refreshHosts();
+
+    if (failed.length > 0) {
+      showToast(`Gagal menghapus: ${failed.join(', ')}`, 'error');
+    } else {
+      showToast(`${count} host dihapus.`, 'success');
+    }
+  }
 
   // Form State
   let formLabel = $state('');
@@ -150,6 +205,36 @@
     </div>
   </div>
 
+  <!-- Bulk actions: only present once at least one host is ticked, so the page stays quiet
+       when you are not doing a multi-host operation. -->
+  {#if selectedIds.length > 0}
+    <div class="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900">
+      <span class="text-sm font-medium text-sky-800 dark:text-sky-300">
+        {selectedIds.length} host terpilih
+      </span>
+      <div class="flex items-center gap-2 ml-auto">
+        <button
+          onclick={connectSelected}
+          class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium transition-colors"
+        >
+          Connect semua
+        </button>
+        <button
+          onclick={deleteSelected}
+          class="px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-300 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+        >
+          Hapus
+        </button>
+        <button
+          onclick={clearSelection}
+          class="px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+        >
+          Batal
+        </button>
+      </div>
+    </div>
+  {/if}
+
   <!-- Hosts Table / Cards -->
   {#if filteredHosts.length === 0}
     <div class="p-12 border border-neutral-200 dark:border-neutral-800 rounded-xl bg-white/70 dark:bg-neutral-900/30 text-center flex flex-col items-center justify-center shadow-sm dark:shadow-none">
@@ -167,7 +252,7 @@
   {:else}
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {#each filteredHosts as host (host.id)}
-        <div class="p-5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl hover:border-neutral-300 dark:hover:border-neutral-700 shadow-sm dark:shadow-none transition-colors flex flex-col justify-between group">
+        <div class="p-5 bg-white dark:bg-neutral-900 border rounded-xl shadow-sm dark:shadow-none transition-colors flex flex-col justify-between group {isSelected(host.id) ? 'border-sky-500 dark:border-sky-500 ring-1 ring-sky-500/40' : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700'}">
           <div>
             <div class="flex items-center justify-between mb-2">
               <span class="font-bold text-neutral-900 dark:text-white text-base truncate">{host.label}</span>
@@ -202,7 +287,12 @@
           </div>
 
           <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-2">
-            <button class="px-2 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all" title="Select mode">
+            <button
+              onclick={() => toggleSelected(host.id)}
+              aria-pressed={isSelected(host.id)}
+              class="px-2 py-1.5 rounded-md text-xs font-medium border transition-all {isSelected(host.id) ? 'bg-sky-600 border-sky-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
+              title={isSelected(host.id) ? 'Batalkan pilihan' : 'Pilih untuk aksi massal'}
+            >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
             </button>
             <a
@@ -216,7 +306,11 @@
               class="px-2.5 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all flex items-center justify-center" title="Open SFTP File Manager">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
             </a>
-            <button class="px-2 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all" title="Details (open info panel)">
+            <button
+              onclick={() => (detailHost = host)}
+              class="px-2 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
+              title="Detail host & riwayat aktivitas"
+            >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </button>
           </div>
@@ -225,6 +319,10 @@
     </div>
   {/if}
 </div>
+
+{#if detailHost}
+  <HostDetailPanel host={detailHost} onClose={() => (detailHost = null)} />
+{/if}
 
 <!-- Add Host Modal -->
 {#if isAddModalOpen}

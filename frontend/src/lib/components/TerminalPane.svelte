@@ -15,6 +15,7 @@
   } from '$lib/api/ssh';
   import type { HostRecord } from '$lib/api/hosts';
   import { setActiveSession, clearActiveSession } from '$lib/stores/activeSession.svelte';
+  import { getTheme, terminalTheme } from '$lib/stores/theme.svelte';
 
   let {
     host,
@@ -38,6 +39,7 @@
     return String(err);
   }
 
+  const theme = getTheme();
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
   let terminalContainer: HTMLDivElement;
 
@@ -61,6 +63,13 @@
     }
   }
 
+  // xterm owns its own canvas and never sees Tailwind's `dark:` classes, so the palette has to
+  // be pushed in whenever the theme flips — otherwise the terminal stays black in light mode.
+  $effect(() => {
+    const palette = terminalTheme(theme.name);
+    if (term) term.options.theme = palette;
+  });
+
   // Panes are kept mounted while hidden so their SSH session and scrollback survive tab
   // switching. A hidden pane keeps its layout box (visibility, not display), so xterm stays
   // correctly sized — the re-fit here is belt and braces for a resize that happened while away.
@@ -76,11 +85,7 @@
 
   onMount(() => {
     const terminal = new Terminal({
-      theme: {
-        background: '#09090b',
-        foreground: '#e4e4e7',
-        cursor: '#38bdf8'
-      },
+      theme: terminalTheme(theme.name),
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 13,
       cursorBlink: true
@@ -229,8 +234,8 @@
   });
 </script>
 
-<div class="flex flex-col h-full bg-[#09090b] border border-neutral-800 rounded-md overflow-hidden">
-  <div class="h-7 sm:h-8 bg-neutral-900/90 border-b border-neutral-800 px-2.5 flex items-center justify-between text-xs font-mono text-neutral-400 shrink-0">
+<div class="flex flex-col h-full bg-white dark:bg-[#09090b] border border-neutral-200 dark:border-neutral-800 rounded-md overflow-hidden">
+  <div class="h-7 sm:h-8 bg-neutral-100 dark:bg-neutral-900/90 border-b border-neutral-200 dark:border-neutral-800 px-2.5 flex items-center justify-between text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0">
     <div class="flex items-center gap-2 min-w-0">
       <span
         class="w-2 h-2 rounded-full shrink-0 {status === 'connected'
@@ -239,10 +244,10 @@
             ? 'bg-amber-500'
             : 'bg-neutral-600'}"
       ></span>
-      <span class="text-white font-medium truncate">{host.label}</span>
-      <span class="text-neutral-500 hidden sm:inline truncate">({host.address})</span>
+      <span class="text-neutral-900 dark:text-white font-medium truncate">{host.label}</span>
+      <span class="text-neutral-500 dark:text-neutral-500 hidden sm:inline truncate">({host.address})</span>
     </div>
-    <div class="flex items-center gap-2 text-neutral-400 shrink-0">
+    <div class="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 shrink-0">
       {#if onSplitRight}
         <button onclick={onSplitRight} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Right (Vertical)" aria-label="Split Right">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>

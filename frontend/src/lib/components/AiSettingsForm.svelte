@@ -1,0 +1,154 @@
+<script lang="ts">
+  // The single AI configuration form. It used to live only inside a modal in Prompt Studio,
+  // which meant the AI credentials were the one setting you could not find on the Settings
+  // page. Extracted as a component so Settings owns it and everything else links there.
+  import { onMount } from 'svelte';
+  import { getAiSettings, saveAiSettings, type AiSettings } from '$lib/api/ai';
+  import { showToast } from '$lib/stores/uiNotifications.svelte';
+
+  let { onSaved }: { onSaved?: (settings: AiSettings) => void } = $props();
+
+  const DEFAULT_SETTINGS: AiSettings = {
+    provider: 'custom',
+    base_url: 'http://100.76.150.46:3007/v1',
+    api_key: '',
+    model: 'claude-3-5-sonnet'
+  };
+
+  let settings = $state<AiSettings>({ ...DEFAULT_SETTINGS });
+  let showApiKey = $state(false);
+  let isSaving = $state(false);
+  let isLoading = $state(true);
+
+  onMount(async () => {
+    try {
+      const saved = await getAiSettings();
+      settings = { ...DEFAULT_SETTINGS, ...saved };
+    } catch {
+      // Backend unavailable (e.g. browser preview): keep defaults, the save will report.
+    } finally {
+      isLoading = false;
+    }
+  });
+
+  async function handleSave(event: Event) {
+    event.preventDefault();
+    isSaving = true;
+    try {
+      await saveAiSettings(settings);
+      showToast('Pengaturan AI tersimpan.', 'success');
+      onSaved?.(settings);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Gagal menyimpan pengaturan AI.', 'error');
+    } finally {
+      isSaving = false;
+    }
+  }
+
+  function handleReset() {
+    settings = { ...DEFAULT_SETTINGS };
+  }
+</script>
+
+<form onsubmit={handleSave} class="space-y-4">
+  <div>
+    <label for="ai-provider-select" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+      Provider
+    </label>
+    <select
+      id="ai-provider-select"
+      bind:value={settings.provider}
+      disabled={isLoading}
+      class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
+    >
+      <option value="custom">Custom / OpenAI Compatible (Self-hosted, vLLM, Ollama)</option>
+      <option value="openai">OpenAI Official</option>
+      <option value="ollama">Ollama Local</option>
+      <option value="anthropic">Anthropic Claude</option>
+    </select>
+  </div>
+
+  <div>
+    <label for="ai-base-url-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+      Base URL (OpenAI-compatible)
+    </label>
+    <input
+      id="ai-base-url-input"
+      type="text"
+      bind:value={settings.base_url}
+      disabled={isLoading}
+      placeholder="http://100.76.150.46:3007/v1"
+      class="w-full font-mono bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs md:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
+    />
+    <p class="text-[11px] text-neutral-500 mt-1">
+      Endpoint harus menyediakan <span class="font-mono">/chat/completions</span>.
+    </p>
+  </div>
+
+  <div>
+    <label for="ai-api-key-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+      API Key
+    </label>
+    <div class="relative">
+      <input
+        id="ai-api-key-input"
+        type={showApiKey ? 'text' : 'password'}
+        bind:value={settings.api_key}
+        disabled={isLoading}
+        placeholder="sk-..."
+        class="w-full font-mono bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs md:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors pr-10"
+      />
+      <button
+        type="button"
+        onclick={() => (showApiKey = !showApiKey)}
+        class="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+        aria-label={showApiKey ? 'Sembunyikan API key' : 'Tampilkan API key'}
+      >
+        {#if showApiKey}
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          </svg>
+        {:else}
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        {/if}
+      </button>
+    </div>
+    <p class="text-[11px] text-neutral-500 mt-1">
+      Disimpan di vault SQLite terenkripsi lokal dan dikirim langsung dari proses aplikasi.
+    </p>
+  </div>
+
+  <div>
+    <label for="ai-model-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+      Model
+    </label>
+    <input
+      id="ai-model-input"
+      type="text"
+      bind:value={settings.model}
+      disabled={isLoading}
+      placeholder="claude-3-5-sonnet"
+      class="w-full font-mono bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs md:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
+    />
+  </div>
+
+  <div class="flex items-center justify-between pt-3 border-t border-neutral-200 dark:border-neutral-800">
+    <button
+      type="button"
+      onclick={handleReset}
+      class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+    >
+      Reset ke Default
+    </button>
+    <button
+      type="submit"
+      disabled={isSaving || isLoading}
+      class="px-5 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white shadow transition-colors"
+    >
+      {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}
+    </button>
+  </div>
+</form>

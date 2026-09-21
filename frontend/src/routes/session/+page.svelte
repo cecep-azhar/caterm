@@ -111,7 +111,7 @@
   }
 </script>
 
-<div class="h-full w-full flex flex-col bg-neutral-950 overflow-hidden">
+<div class="h-full w-full flex flex-col bg-neutral-100 dark:bg-neutral-950 overflow-hidden">
   <!-- Terminal & Content Viewport Area. No header bar here on purpose: host, Files toggle and
        split controls all live in the app's single top header, and each pane carries its own
        host/address strip. -->

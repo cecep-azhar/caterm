@@ -19,7 +19,8 @@ export function isPaneLayout(value: unknown): value is PaneLayout {
 
 const view = $state({
   layout: 1 as PaneLayout,
-  showFiles: true,
+  /** Off until the user asks for it: the file panel costs a third of the terminal's width. */
+  showFiles: false,
   /** Host id the header controls and the SFTP panel follow; '' means "first open tab". */
   selectedHostId: ''
 });

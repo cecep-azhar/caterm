@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import {
     getWorkspaces,
     saveWorkspace,
@@ -171,8 +172,11 @@
       if (onLoad) onLoad(ws);
       if (onLoadWorkspace) onLoadWorkspace(ws);
 
+      // Client-side navigation only. `window.location.href` reloaded the whole app, which
+      // reset the layout's `isUnlocked` state and dumped the user back on the lock screen —
+      // loading a workspace looked exactly like being logged out.
       if (typeof window !== 'undefined' && window.location.pathname !== '/session') {
-        window.location.href = '/session';
+        await goto('/session');
       }
     } catch (err: any) {
       showToast(err?.message || 'Failed to load workspace', 'error');

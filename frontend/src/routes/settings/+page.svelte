@@ -1,9 +1,10 @@
 <script lang="ts">
   import { validateVaultPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
   import { exportEncryptedBackup, importEncryptedBackup } from '$lib/api/backup';
+  import AiSettingsForm from '$lib/components/AiSettingsForm.svelte';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
 
-  let activeTab = $state('updates'); // 'updates' | 'subscription' | 'sync' | 'security' | 'backup'
+  let activeTab = $state('updates'); // 'updates' | 'ai' | 'subscription' | 'sync' | 'security' | 'backup' | 'shortcuts'
   let vaultPassword = $state('');
   let vaultMessage = $state('');
   let vaultMessageKind = $state<'success' | 'error'>('success');
@@ -106,6 +107,11 @@
       Updates
     </button>
     <button
+      onclick={() => activeTab = 'ai'}
+      class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'ai' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
+      AI Assistant
+    </button>
+    <button
       onclick={() => activeTab = 'subscription'}
       class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'subscription' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
       Subscription
@@ -143,6 +149,16 @@
           Check for Updates
         </button>
       </div>
+    </div>
+  {:else if activeTab === 'ai'}
+    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-4">
+      <div>
+        <h2 class="text-lg font-semibold text-white">AI Ops Assistant</h2>
+        <p class="text-neutral-400 text-sm">
+          Endpoint LLM, credential, dan model yang dipakai AI Chat dan Prompt Studio.
+        </p>
+      </div>
+      <AiSettingsForm />
     </div>
   {:else if activeTab === 'subscription'}
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-6">

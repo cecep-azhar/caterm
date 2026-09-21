@@ -13,6 +13,11 @@
     toggleFiles,
     type PaneLayout
   } from '$lib/stores/sessionView.svelte';
+  import {
+    getTheme,
+    initTheme,
+    toggleTheme
+  } from '$lib/stores/theme.svelte';
   import { getToasts, showToast } from '$lib/stores/uiNotifications.svelte';
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
   import { onMount, onDestroy } from 'svelte';
@@ -33,21 +38,12 @@
     return () => clearInterval(t);
   });
 
-  let isDarkTheme = $state(true);
+  const theme = getTheme();
+  const isDarkTheme = $derived(theme.name === 'dark');
 
   onMount(() => {
     startMonitoring();
-    try {
-      const savedTheme = localStorage.getItem('caterm-theme');
-      if (savedTheme !== null) {
-        isDarkTheme = savedTheme === 'dark';
-      } else {
-        isDarkTheme = true;
-      }
-      document.documentElement.classList.toggle('dark', isDarkTheme);
-    } catch (e) {
-      // ignore
-    }
+    initTheme();
   });
 
   onDestroy(() => {
@@ -64,18 +60,6 @@
   }
   async function closeWindow() {
     if (appWindow) await appWindow.close();
-  }
-
-  function toggleTheme() {
-    isDarkTheme = !isDarkTheme;
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', isDarkTheme);
-    }
-    try {
-      localStorage.setItem('caterm-theme', isDarkTheme ? 'dark' : 'light');
-    } catch (e) {
-      // ignore
-    }
   }
 
   let toastsList = $derived(getToasts());
