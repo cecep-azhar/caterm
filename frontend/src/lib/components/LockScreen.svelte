@@ -3,14 +3,68 @@
   import { isVaultInitialized, validateVaultPassword, resetVault } from '$lib/api/vault';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import Logo from './Logo.svelte';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { invoke } from '@tauri-apps/api/core';
 
   export let onUnlocked: () => void;
 
   let password = '';
+  let showPassword = false;
   let errorMsg = '';
   let successMsg = '';
   let isLoading = false;
   let isSetup = false;
+
+  const isTauri = typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__);
+  const appWindow = isTauri ? getCurrentWindow() : null;
+
+  async function minimizeWindow() {
+    try {
+      await invoke('window_minimize');
+    } catch {
+      try {
+        if (appWindow) {
+          await appWindow.minimize();
+        } else if (typeof window !== 'undefined') {
+          await getCurrentWindow().minimize();
+        }
+      } catch (err) {
+        console.warn('Failed to minimize window:', err);
+      }
+    }
+  }
+
+  async function maximizeWindow() {
+    try {
+      await invoke('window_maximize');
+    } catch {
+      try {
+        if (appWindow) {
+          await appWindow.toggleMaximize();
+        } else if (typeof window !== 'undefined') {
+          await getCurrentWindow().toggleMaximize();
+        }
+      } catch (err) {
+        console.warn('Failed to toggle maximize window:', err);
+      }
+    }
+  }
+
+  async function closeWindow() {
+    try {
+      await invoke('window_close');
+    } catch {
+      try {
+        if (appWindow) {
+          await appWindow.close();
+        } else if (typeof window !== 'undefined') {
+          await getCurrentWindow().close();
+        }
+      } catch (err) {
+        console.warn('Failed to close window:', err);
+      }
+    }
+  }
 
   const QUOTES = [
     { text: "Talk is cheap. Show me the code.", author: "Linus Torvalds" },
@@ -88,6 +142,40 @@
 </script>
 
 <div class="fixed inset-0 z-50 flex bg-[#0a0a0a] text-white select-none">
+  <!-- Top Drag Region Bar with Custom Window Controls -->
+  <div data-tauri-drag-region class="absolute top-0 left-0 right-0 h-9 z-50 flex items-center justify-between px-3">
+    <div class="flex items-center gap-2 pointer-events-none opacity-80">
+      <span class="text-[11px] font-mono text-neutral-400 font-semibold tracking-wider">CATERM</span>
+      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono">v2.1.3</span>
+    </div>
+    <div class="flex items-center no-drag">
+      <button
+        onclick={() => minimizeWindow()}
+        class="p-1.5 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer rounded"
+        title="Minimize"
+        aria-label="Minimize"
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+      </button>
+      <button
+        onclick={() => maximizeWindow()}
+        class="p-1.5 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer rounded"
+        title="Maximize"
+        aria-label="Maximize"
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"></rect></svg>
+      </button>
+      <button
+        onclick={() => closeWindow()}
+        class="p-1.5 hover:bg-rose-600 hover:text-white text-neutral-400 transition-colors cursor-pointer rounded"
+        title="Close"
+        aria-label="Close"
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+  </div>
+
   <!-- Left Panel: Brand & Quote -->
   <div class="hidden lg:flex flex-1 flex-col justify-between p-12 bg-neutral-950 border-r border-neutral-800/60 relative overflow-hidden">
     <!-- Ambient Grid Effect -->
@@ -96,7 +184,7 @@
     <div class="relative z-10 flex items-center gap-3">
       <Logo size={40} mode="brand" />
       <div>
-        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.1.2</span></h1>
+        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.1.3</span></h1>
         <p class="text-xs text-neutral-400">Enterprise SSH Manager & Prompt Studio</p>
       </div>
     </div>
@@ -152,14 +240,34 @@
       <div class="space-y-4">
         <div>
           <label for="master-password" class="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">{isSetup ? 'Create Master Password' : 'Master Password'}</label>
-          <input
-            id="master-password"
-            type="password"
-            bind:value={password}
-            onkeydown={handleKeydown}
-            placeholder="••••••••••••"
-            class="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
-          />
+          <div class="relative">
+            <input
+              id="master-password"
+              type={showPassword ? 'text' : 'password'}
+              bind:value={password}
+              onkeydown={handleKeydown}
+              placeholder="••••••••••••"
+              class="w-full pl-4 pr-11 py-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
+            />
+            <button
+              type="button"
+              onclick={() => (showPassword = !showPassword)}
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors p-1"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              title={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {#if showPassword}
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              {:else}
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              {/if}
+            </button>
+          </div>
         </div>
 
         <button

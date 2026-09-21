@@ -77,6 +77,7 @@
   let formKeyPath = $state('');
   let formKeyId = $state('');
   let formSecret = $state('');
+  let showFormSecret = $state(false);
   let formTags = $state('');
 
   onMount(async () => {
@@ -304,42 +305,58 @@
             {/if}
           </div>
 
-          <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-2">
-            <button
-              onclick={() => toggleSelected(host.id)}
-              aria-pressed={isSelected(host.id)}
-              class="px-2 py-1.5 rounded-md text-xs font-medium border transition-all {isSelected(host.id) ? 'bg-sky-600 border-sky-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
-              title={isSelected(host.id) ? 'Deselect' : 'Select for batch action'}
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            </button>
+          <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-1.5">
+            <!-- 1. Connect: Lightning SVG, primary button -->
             <button
               onclick={() => openSession(host.id)}
-              class="flex-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5"
-              title="Open new session (can open multiple for the same host)">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-              <span>Connect</span>
+              class="w-8 h-8 flex items-center justify-center bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all shrink-0"
+              title="Connect"
+              aria-label="Connect"
+            >
+              <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M13 2L3 14h7v8l11-12h-8l1-8z" />
+              </svg>
             </button>
+
+            <!-- 2. Clone: Duplicate/Copy SVG -->
             <button
               onclick={() => handleClone(host)}
-              class="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded-md text-xs font-semibold border border-neutral-300 dark:border-neutral-700 transition-all flex items-center justify-center gap-1 shadow-sm"
-              title="Clone / Duplicate Host"
+              class="w-8 h-8 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-300 dark:border-neutral-700 transition-all shrink-0 shadow-sm"
+              title="Clone Host"
               aria-label="Clone Host"
             >
               <svg class="w-4 h-4 text-sky-600 dark:text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              <span class="hidden sm:inline">Clone</span>
             </button>
+
+            <!-- 3. Check: Select checkbox SVG -->
+            <button
+              onclick={() => toggleSelected(host.id)}
+              aria-pressed={isSelected(host.id)}
+              class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium border transition-all shrink-0 {isSelected(host.id) ? 'bg-sky-600 border-sky-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
+              title="Select for batch action"
+              aria-label="Select for batch action"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </button>
+
+            <!-- 4. Folder: SFTP File Manager SVG -->
             <a
               href="/sftp?host={host.id}"
-              class="px-2.5 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all flex items-center justify-center" title="Open SFTP File Manager">
+              class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
+              title="Files (SFTP)"
+              aria-label="Files (SFTP)"
+            >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
             </a>
+
+            <!-- 5. Info: Host Details SVG -->
             <button
               onclick={() => (detailHost = host)}
-              class="px-2 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
-              title="Host details & activity history"
+              class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
+              title="Host Details"
+              aria-label="Host Details"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </button>
@@ -449,12 +466,32 @@
           <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">
             {formAuthType === 'key' ? 'Key Passphrase (optional)' : 'Password'}
           </label>
-          <input
-            type="password"
-            bind:value={formSecret}
-            placeholder={editingId && editingHadSecret ? 'Leave blank to keep unchanged' : (formAuthType === 'key' ? 'Leave blank if key has no passphrase' : 'Required to connect')}
-            class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
-          />
+          <div class="relative">
+            <input
+              type={showFormSecret ? 'text' : 'password'}
+              bind:value={formSecret}
+              placeholder={editingId && editingHadSecret ? 'Leave blank to keep unchanged' : (formAuthType === 'key' ? 'Leave blank if key has no passphrase' : 'Required to connect')}
+              class="w-full pl-3 pr-10 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
+            />
+            <button
+              type="button"
+              onclick={() => (showFormSecret = !showFormSecret)}
+              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 p-1"
+              aria-label={showFormSecret ? 'Hide secret' : 'Show secret'}
+              title={showFormSecret ? 'Hide secret' : 'Show secret'}
+            >
+              {#if showFormSecret}
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              {:else}
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              {/if}
+            </button>
+          </div>
           {/if}
           <p class="text-neutral-500 text-xs mt-1">Stored encrypted (AES-256-GCM) in local database — never returned to the UI.</p>
         </div>

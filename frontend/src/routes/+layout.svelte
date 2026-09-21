@@ -288,7 +288,7 @@
         <div class="flex items-center gap-2">
           <Logo size={22} mode="brand" />
           <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide">CATerm</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.2</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.3</span>
         </div>
         <button
           onclick={() => mobileDrawerOpen = false}
@@ -367,7 +367,7 @@
   >
     <div>
       <!-- Sidebar Header -->
-      <div class="h-11 border-b border-neutral-200 dark:border-neutral-800 flex items-center {isCollapsed ? 'justify-center px-2' : 'justify-between px-3'} transition-all">
+      <div class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center {isCollapsed ? 'justify-center px-2' : 'justify-between px-3'} transition-all">
         {#if isCollapsed}
           <button
             type="button"
@@ -382,7 +382,7 @@
           <div class="flex items-center gap-2 overflow-hidden min-w-0">
             <Logo size={22} mode="brand" />
             <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate">CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.2</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.3</span>
           </div>
           <button
             type="button"
@@ -489,7 +489,7 @@
          (host chip, Files toggle, split controls, a duplicate Workspaces menu) is folded in
          here: two stacked 40-44px bars cost ~84px of vertical space to show one row of
          information. Per-pane host/address now lives on each TerminalPane's own strip. -->
-    <header class="h-9 border-b border-neutral-200 dark:border-neutral-800 flex items-center pl-1 pr-1 md:pl-2 bg-white dark:bg-neutral-900 shrink-0 select-none transition-colors duration-150 gap-1 md:gap-2" data-tauri-drag-region>
+    <header class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center pl-1 pr-1 md:pl-2 bg-white dark:bg-neutral-900 shrink-0 select-none transition-colors duration-150 gap-1 md:gap-2" data-tauri-drag-region>
       <!-- Left: navigation + session tabs -->
       <div class="flex items-center gap-1 min-w-0 flex-1">
         <!-- Mobile Menu Hamburger Button -->
