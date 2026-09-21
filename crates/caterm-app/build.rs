@@ -18,6 +18,10 @@ const COMMANDS: &[&str] = &[
     "ssh_write",
     "ssh_resize",
     "ssh_disconnect",
+    "get_ai_settings",
+    "save_ai_settings",
+    "ai_generate_plan",
+    "ai_execute_step",
 ];
 
 fn main() {

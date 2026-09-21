@@ -4,8 +4,8 @@
 //! `caterm-core` for the guard that enforces this.
 
 use caterm_core::{
-    CatermError, audit, backup, groups, investigations, keys, monitor, sftp, snippets, ssh, store,
-    teams, tunnels, vault,
+    CatermError, ai, audit, backup, groups, investigations, keys, monitor, sftp, snippets, ssh,
+    store, teams, tunnels, vault,
 };
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
@@ -245,4 +245,36 @@ pub async fn save_investigation(
 #[tauri::command]
 pub async fn delete_investigation(id: String) -> Result<(), CatermError> {
     run_blocking(move || investigations::delete_investigation(&id)).await
+}
+
+#[tauri::command]
+pub async fn get_ai_settings() -> Result<ai::AiSettings, CatermError> {
+    run_blocking(ai::get_ai_settings).await
+}
+
+#[tauri::command]
+pub async fn save_ai_settings(
+    settings: Option<ai::AiSettings>,
+    input: Option<ai::AiSettings>,
+) -> Result<ai::AiSettings, CatermError> {
+    let s = settings
+        .or(input)
+        .unwrap_or_else(|| ai::AiSettings::default());
+    run_blocking(move || ai::save_ai_settings(s)).await
+}
+
+#[tauri::command]
+pub async fn ai_generate_plan(
+    goal: String,
+    host_id: Option<String>,
+) -> Result<ai::AiExecutionPlan, CatermError> {
+    run_blocking(move || ai::generate_plan(&goal, host_id.as_deref())).await
+}
+
+#[tauri::command]
+pub async fn ai_execute_step(
+    host_id: String,
+    command: String,
+) -> Result<ai::AiExecutionResult, CatermError> {
+    run_blocking(move || ai::execute_plan_step(&host_id, &command)).await
 }

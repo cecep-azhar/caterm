@@ -20,6 +20,10 @@
     "allow-ssh-connect",
     "allow-ssh-write",
     "allow-ssh-resize",
-    "allow-ssh-disconnect"
+    "allow-ssh-disconnect",
+    "allow-get-ai-settings",
+    "allow-save-ai-settings",
+    "allow-ai-generate-plan",
+    "allow-ai-execute-step"
   ]
 }
