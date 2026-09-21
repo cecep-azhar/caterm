@@ -238,3 +238,99 @@ fn tauri_commands_in_caterm_app_are_thin_bindings() {
         "PELANGGARAN K2-1: command Tauri melebihi batas 15 baris (logika bisnis bocor ke binding): {violations:?}"
     );
 }
+
+/// Test 4: the three places that have to agree about the Tauri command surface actually do.
+///
+/// Tauri v2 derives its ACL from `build.rs`'s `COMMANDS` list, not from `invoke_handler!`. A
+/// command registered in the handler but absent from that list compiles fine and fails only at
+/// runtime, on the one code path that calls it, as `Command <name> not allowed by ACL` — which
+/// is how `ssh_read` (blank terminal) and `list_remote_dir` (dead SFTP panel) shipped broken in
+/// 2.0.10 along with 23 others. Same for a command present in `build.rs` but never referenced by
+/// `capabilities/default.json`: the permission exists and is simply not granted.
+///
+/// This guard compares all three lists directly, so the failure is a red test at build time
+/// instead of a dead feature at runtime.
+#[test]
+fn tauri_command_registry_build_script_and_acl_agree() {
+    let app_dir = workspace_root().join("crates").join("caterm-app");
+
+    let lib_rs = std::fs::read_to_string(app_dir.join("src").join("lib.rs"))
+        .expect("gagal membaca caterm-app/src/lib.rs");
+    let build_rs = std::fs::read_to_string(app_dir.join("build.rs"))
+        .expect("gagal membaca caterm-app/build.rs");
+    let capabilities =
+        std::fs::read_to_string(app_dir.join("capabilities").join("default.json"))
+            .expect("gagal membaca caterm-app/capabilities/default.json");
+
+    // `commands::<name>,` inside generate_handler![...]
+    let handler_block = lib_rs
+        .split_once("generate_handler![")
+        .and_then(|(_, rest)| rest.split_once("])"))
+        .map(|(inner, _)| inner)
+        .expect("blok generate_handler![...] tidak ditemukan di lib.rs");
+    let registered: HashSet<String> = handler_block
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("commands::"))
+        .filter_map(|rest| rest.strip_suffix(','))
+        .map(|name| name.trim().to_string())
+        .collect();
+
+    // String literals inside build.rs's `const COMMANDS: &[&str] = &[...]`
+    let commands_block = build_rs
+        .split_once("const COMMANDS: &[&str] = &[")
+        .and_then(|(_, rest)| rest.split_once("];"))
+        .map(|(inner, _)| inner)
+        .expect("blok const COMMANDS tidak ditemukan di build.rs");
+    let declared: HashSet<String> = commands_block
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with('"'))
+        .filter_map(|line| line.trim_start_matches('"').split('"').next())
+        .map(str::to_string)
+        .collect();
+
+    // "allow-<command-with-dashes>" entries in the capability file
+    let granted: HashSet<String> = capabilities
+        .lines()
+        .map(str::trim)
+        .filter_map(|line| line.strip_prefix("\"allow-"))
+        .filter_map(|rest| rest.split('"').next())
+        .map(|name| name.replace('-', "_"))
+        .collect();
+
+    let sorted = |set: &HashSet<String>, other: &HashSet<String>| {
+        let mut diff: Vec<String> = set.difference(other).cloned().collect();
+        diff.sort();
+        diff
+    };
+
+    assert!(!registered.is_empty(), "tidak ada command yang terbaca dari generate_handler!");
+
+    let missing_from_build = sorted(&registered, &declared);
+    assert!(
+        missing_from_build.is_empty(),
+        "command terdaftar di invoke_handler! tapi tidak ada di COMMANDS build.rs \
+         (akan gagal runtime: `Command <name> not allowed by ACL`): {missing_from_build:?}"
+    );
+
+    let missing_from_handler = sorted(&declared, &registered);
+    assert!(
+        missing_from_handler.is_empty(),
+        "command ada di COMMANDS build.rs tapi tidak terdaftar di invoke_handler!: \
+         {missing_from_handler:?}"
+    );
+
+    let missing_from_capabilities = sorted(&declared, &granted);
+    assert!(
+        missing_from_capabilities.is_empty(),
+        "permission `allow-<command>` tidak di-grant di capabilities/default.json \
+         (akan gagal runtime: `Command <name> not allowed by ACL`): {missing_from_capabilities:?}"
+    );
+
+    let granted_without_command = sorted(&granted, &declared);
+    assert!(
+        granted_without_command.is_empty(),
+        "capabilities/default.json men-grant permission untuk command yang tidak ada: \
+         {granted_without_command:?}"
+    );
+}

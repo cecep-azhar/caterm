@@ -3,7 +3,16 @@
   import { Terminal } from 'xterm';
   import { FitAddon } from '@xterm/addon-fit';
   import 'xterm/css/xterm.css';
-  import { sshConnect, sshWrite, sshResize, sshDisconnect, sshRead, type SshSession } from '$lib/api/ssh';
+  import type { UnlistenFn } from '@tauri-apps/api/event';
+  import {
+    sshConnect,
+    sshWrite,
+    sshResize,
+    sshDisconnect,
+    onSshOutput,
+    onSshClosed,
+    type SshSession
+  } from '$lib/api/ssh';
   import type { HostRecord } from '$lib/api/hosts';
   import { setActiveSession, clearActiveSession } from '$lib/stores/activeSession.svelte';
 
@@ -48,12 +57,34 @@
 
     let disposed = false;
     let session: SshSession | null = null;
+    const unlisteners: UnlistenFn[] = [];
+
+    // Output that arrived while `sshConnect` was still in flight — we subscribe *before*
+    // connecting (so the shell banner can't be missed) but only learn our own session id
+    // afterwards, so anything that lands in between is parked here and flushed on arrival.
+    const early = new Map<string, string[]>();
+
+    function keepUnlisten(unlisten: UnlistenFn) {
+      if (disposed) unlisten();
+      else unlisteners.push(unlisten);
+    }
+
+    // A backend call that fails silently is how the blank-terminal bug stayed invisible for a
+    // whole release: `ssh_read` was rejected by the Tauri ACL on every poll and every rejection
+    // was swallowed by an empty `.catch()`. Failures now show up in the terminal itself, once
+    // per pane so a flapping link can't spam the scrollback.
+    let reportedFailure = false;
+    function reportFailure(what: string, err: unknown) {
+      if (disposed || reportedFailure) return;
+      reportedFailure = true;
+      term.write(`\r\n\x1b[31m${what}: ${errorMessage(err)}\x1b[0m\r\n`);
+    }
 
     // Injects a snippet command as if it were typed + Enter (T7). Reuses the same
     // echo/sshWrite path as real keystrokes below so the terminal output stays consistent.
     function injectCommand(cmd: string) {
       if (!session) return;
-      void sshWrite(session.sessionId, cmd + '\r').catch(() => {});
+      void sshWrite(session.sessionId, cmd + '\r').catch((err) => reportFailure('Send failed', err));
     }
 
     function markActive() {
@@ -66,41 +97,69 @@
       `\x1b[1;32mWelcome to CATerm v2\x1b[0m — connecting to \x1b[1;36m${host.label}\x1b[0m (${host.address})...`
     );
 
-    let pollTimer: ReturnType<typeof setInterval>;
+    void (async () => {
+      try {
+        keepUnlisten(
+          await onSshOutput(({ sessionId, data }) => {
+            if (disposed) return;
+            if (session) {
+              if (sessionId === session.sessionId) term.write(data);
+              return;
+            }
+            const buffered = early.get(sessionId) ?? [];
+            buffered.push(data);
+            early.set(sessionId, buffered);
+          })
+        );
 
-    sshConnect(host.id)
-      .then((opened) => {
-        if (disposed) return;
+        keepUnlisten(
+          await onSshClosed(({ sessionId }) => {
+            if (disposed || !session || sessionId !== session.sessionId) return;
+            status = 'offline';
+            term.write('\r\n\x1b[33mconnection closed by remote host\x1b[0m\r\n');
+          })
+        );
+      } catch (err) {
+        if (!disposed) {
+          status = 'offline';
+          term.write(
+            `\r\n\x1b[31mTidak bisa berlangganan output terminal: ${errorMessage(err)}\x1b[0m\r\n`
+          );
+        }
+        return;
+      }
+
+      try {
+        const opened = await sshConnect(host.id);
+        if (disposed) {
+          void sshDisconnect(opened.sessionId).catch(() => {});
+          return;
+        }
+
         session = opened;
         status = 'connected';
         fitAddon.fit();
-        void sshResize(opened.sessionId, term.cols, term.rows).catch(() => {});
+        void sshResize(opened.sessionId, term.cols, term.rows).catch((err) =>
+          reportFailure('Resize failed', err)
+        );
         term.write(`\r\n\x1b[32mconnected\x1b[0m (session ${opened.sessionId})\r\n`);
+
+        for (const chunk of early.get(opened.sessionId) ?? []) term.write(chunk);
+        early.clear();
+
         markActive();
         term.focus();
-
-        // Start polling for PTY output
-        pollTimer = setInterval(() => {
-          if (!session) return;
-          sshRead(session.sessionId)
-            .then((output) => {
-              if (output && output.length > 0) {
-                term.write(output);
-              }
-            })
-            .catch(() => {});
-        }, 40);
-      })
-      .catch((err) => {
+      } catch (err) {
         if (disposed) return;
         status = 'offline';
         term.write(`\r\n\x1b[31mSSH connection failed: ${errorMessage(err)}\x1b[0m\r\n`);
-      });
+      }
+    })();
 
     term.onData((data) => {
       // Send keystroke to the real Rust SSH PTY backend
       if (session) {
-        void sshWrite(session.sessionId, data).catch(() => {});
+        void sshWrite(session.sessionId, data).catch((err) => reportFailure('Send failed', err));
       }
     });
 
@@ -118,7 +177,8 @@
 
     return () => {
       disposed = true;
-      if (pollTimer) clearInterval(pollTimer);
+      for (const unlisten of unlisteners) unlisten();
+      unlisteners.length = 0;
       window.removeEventListener('resize', handleResize);
       terminalContainer.removeEventListener('click', markActive);
       if (session) {
@@ -145,17 +205,17 @@
     </div>
     <div class="flex items-center gap-2 text-neutral-400 shrink-0">
       {#if onSplitRight}
-        <button onclick={onSplitRight} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Right (Vertical)">
+        <button onclick={onSplitRight} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Right (Vertical)" aria-label="Split Right">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
         </button>
       {/if}
       {#if onSplitDown}
-        <button onclick={onSplitDown} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Down (Horizontal)">
+        <button onclick={onSplitDown} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Down (Horizontal)" aria-label="Split Down">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3 12h18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
         </button>
       {/if}
       {#if onClose}
-        <button onclick={onClose} class="hover:text-rose-400 p-0.5 rounded transition-colors" title="Close Pane">
+        <button onclick={onClose} class="hover:text-rose-400 p-0.5 rounded transition-colors" title="Close Pane" aria-label="Close Pane">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       {/if}

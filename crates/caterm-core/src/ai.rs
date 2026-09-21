@@ -744,67 +744,27 @@ pub fn execute_plan_step(host_id: &str, command: &str) -> Result<AiExecutionResu
         )));
     }
 
-    let sess_arc = {
-        let sessions = crate::ssh::SESSIONS.lock().map_err(|_| {
-            CatermError::Ssh(SshError::Generic("SSH session lock failure".to_string()))
+    // Runs on the host's pooled non-interactive session, never on a terminal pane's session:
+    // an automation step must not be able to stall (or steal output from) an open terminal.
+    let (exit_code, stdout_buf, stderr_buf) = crate::ssh::with_exec_session(host_id, |sess| {
+        let mut channel = sess.channel_session().map_err(|e| {
+            CatermError::Ssh(SshError::Generic(format!("Failed to open SSH channel: {e}")))
         })?;
-        sessions
-            .values()
-            .find(|h| h.host_id == host_id)
-            .map(|h| std::sync::Arc::clone(&h.session))
-    };
 
-    let sess_arc = match sess_arc {
-        Some(s) => s,
-        None => {
-            let session = crate::ssh::connect(host_id)?;
-            let sessions = crate::ssh::SESSIONS.lock().map_err(|_| {
-                CatermError::Ssh(SshError::Generic("SSH session lock failure".to_string()))
-            })?;
-            sessions
-                .get(&session.session_id)
-                .map(|h| std::sync::Arc::clone(&h.session))
-                .ok_or_else(|| {
-                    CatermError::Ssh(SshError::Generic(
-                        "Connected SSH session not found in registry".to_string(),
-                    ))
-                })?
-        }
-    };
+        channel.exec(command).map_err(|e| {
+            CatermError::Ssh(SshError::Generic(format!("Failed to execute command: {e}")))
+        })?;
 
-    let sess = sess_arc
-        .lock()
-        .map_err(|_| CatermError::Ssh(SshError::Generic("Session mutex poisoned".to_string())))?;
+        use std::io::Read;
+        let mut stdout_buf = Vec::new();
+        let mut stderr_buf = Vec::new();
 
-    sess.set_blocking(true);
+        let _ = channel.read_to_end(&mut stdout_buf);
+        let _ = channel.stderr().read_to_end(&mut stderr_buf);
+        let _ = channel.wait_close();
 
-    let mut channel = match sess.channel_session() {
-        Ok(ch) => ch,
-        Err(e) => {
-            sess.set_blocking(false);
-            return Err(CatermError::Ssh(SshError::Generic(format!(
-                "Failed to open SSH channel: {e}"
-            ))));
-        }
-    };
-
-    if let Err(e) = channel.exec(command) {
-        sess.set_blocking(false);
-        return Err(CatermError::Ssh(SshError::Generic(format!(
-            "Failed to execute command: {e}"
-        ))));
-    }
-
-    use std::io::Read;
-    let mut stdout_buf = Vec::new();
-    let mut stderr_buf = Vec::new();
-
-    let _ = channel.read_to_end(&mut stdout_buf);
-    let _ = channel.stderr().read_to_end(&mut stderr_buf);
-    let _ = channel.wait_close();
-
-    let exit_code = channel.exit_status().unwrap_or(0);
-    sess.set_blocking(false);
+        Ok((channel.exit_status().unwrap_or(0), stdout_buf, stderr_buf))
+    })?;
 
     let stdout = String::from_utf8_lossy(&stdout_buf).to_string();
     let stderr = String::from_utf8_lossy(&stderr_buf).to_string();

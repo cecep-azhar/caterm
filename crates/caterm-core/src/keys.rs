@@ -5,8 +5,6 @@
 use crate::error::{CatermError, ValidationError};
 use serde::{Deserialize, Serialize};
 use ssh_key::{Algorithm, HashAlg, LineEnding, PrivateKey};
-use std::path::Path;
-use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,7 +65,8 @@ pub fn init_table(conn: &rusqlite::Connection) -> Result<(), CatermError> {
 /// List all stored public keys.
 pub fn list_keys() -> Result<Vec<KeyRecord>, CatermError> {
     let data_info = crate::paths::resolve_data_dir()?;
-    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
+    // Listing never decrypts anything, but the local key must exist before the DB is opened.
+    let _key = crate::vault::load_or_create_local_key(&data_info.path)?;
     let conn = crate::db::open()?;
     init_table(&conn)?;
 
@@ -317,86 +316,9 @@ pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError>
         )))
     })?;
 
-    // Connect to target host
-    let (host, secret) = crate::store::load_host_for_connect(host_id)?;
-    let port = if host.port == 0 { 22 } else { host.port };
-    let addr = format!("{}:{port}", host.address);
-
-    let tcp = std::net::TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| {
-            CatermError::Validation(ValidationError::Generic(format!(
-                "Invalid address {addr}: {e}"
-            )))
-        })?,
-        Duration::from_secs(10),
-    )
-    .map_err(|e| {
-        CatermError::Validation(ValidationError::Generic(format!(
-            "Connection failed to {addr}: {e}"
-        )))
-    })?;
-
-    let mut sess = ssh2::Session::new().map_err(|e| {
-        CatermError::Validation(ValidationError::Generic(format!(
-            "SSH session creation failed: {e}"
-        )))
-    })?;
-
-    sess.set_tcp_stream(tcp);
-    sess.handshake().map_err(|e| {
-        CatermError::Validation(ValidationError::Generic(format!(
-            "SSH handshake failed: {e}"
-        )))
-    })?;
-
-    match &host.auth_method {
-        crate::store::AuthMethod::Password => {
-            let password = secret.ok_or_else(|| {
-                CatermError::Validation(ValidationError::Generic(format!(
-                    "Password host '{}' belum diset.",
-                    host.label
-                )))
-            })?;
-            sess.userauth_password(&host.username, &password)
-                .map_err(|e| {
-                    CatermError::Validation(ValidationError::Generic(format!("Auth failed: {e}")))
-                })?;
-        }
-        crate::store::AuthMethod::Key { path } => {
-            let expanded = crate::paths::expand_tilde(path);
-            sess.userauth_pubkey_file(
-                &host.username,
-                None,
-                Path::new(&expanded),
-                secret.as_deref(),
-            )
-            .map_err(|e| {
-                CatermError::Validation(ValidationError::Generic(format!(
-                    "Auth via key failed: {e}"
-                )))
-            })?;
-        }
-        crate::store::AuthMethod::KeyId { id } => {
-            
-            let priv_pem = get_private_key(id)?;
-            let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
-            std::fs::write(&temp_path, priv_pem.as_bytes()).unwrap();
-            let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
-            std::fs::remove_file(&temp_path).ok();
-            auth_res.map_err(|e| {
-                CatermError::Validation(ValidationError::Generic(format!(
-                    "Auth via key id failed: {e}"
-                )))
-            })?;
-
-        }
-    }
-
-    if !sess.authenticated() {
-        return Err(CatermError::Validation(ValidationError::Generic(
-            "Authentication failed".into(),
-        )));
-    }
+    // Connect to target host. Shared path = same TOFU host key verification as everything
+    // else; this used to be a hand-rolled copy of the connect logic that skipped it entirely.
+    let (sess, host) = crate::ssh::open_authenticated_session(host_id)?;
 
     // Deploy public key idempotently & fix permissions
     let mut channel = sess.channel_session().map_err(|e| {

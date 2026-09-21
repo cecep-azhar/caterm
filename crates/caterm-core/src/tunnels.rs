@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -194,87 +193,11 @@ pub fn delete_tunnel(id: &str) -> Result<(), CatermError> {
     Ok(())
 }
 
+/// A dedicated blocking session for a tunnel listener. Delegates to
+/// [`crate::ssh::open_authenticated_session`] so a tunnel goes through the same TOFU host key
+/// verification as every other connection — this used to be a hand-rolled copy that skipped it.
 fn connect_host_session(host_id: &str) -> Result<ssh2::Session, CatermError> {
-    let (host, secret) = crate::store::load_host_for_connect(host_id)?;
-    let port = if host.port == 0 { 22 } else { host.port };
-    let addr = format!("{}:{port}", host.address);
-
-    let tcp = TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| {
-            CatermError::Validation(ValidationError::Generic(format!(
-                "Invalid address {addr}: {e}"
-            )))
-        })?,
-        Duration::from_secs(10),
-    )
-    .map_err(|e| {
-        CatermError::Validation(ValidationError::Generic(format!(
-            "Connection failed to {addr}: {e}"
-        )))
-    })?;
-
-    let mut sess = ssh2::Session::new().map_err(|e| {
-        CatermError::Validation(ValidationError::Generic(format!(
-            "SSH session creation failed: {e}"
-        )))
-    })?;
-
-    sess.set_tcp_stream(tcp);
-    sess.handshake().map_err(|e| {
-        CatermError::Validation(ValidationError::Generic(format!(
-            "SSH handshake failed: {e}"
-        )))
-    })?;
-
-    match &host.auth_method {
-        crate::store::AuthMethod::Password => {
-            let password = secret.ok_or_else(|| {
-                CatermError::Validation(ValidationError::Generic(format!(
-                    "Password host '{}' belum diset.",
-                    host.label
-                )))
-            })?;
-            sess.userauth_password(&host.username, &password)
-                .map_err(|e| {
-                    CatermError::Validation(ValidationError::Generic(format!("Auth failed: {e}")))
-                })?;
-        }
-        crate::store::AuthMethod::Key { path } => {
-            let expanded = crate::paths::expand_tilde(path);
-            sess.userauth_pubkey_file(
-                &host.username,
-                None,
-                Path::new(&expanded),
-                secret.as_deref(),
-            )
-            .map_err(|e| {
-                CatermError::Validation(ValidationError::Generic(format!(
-                    "Auth via key failed: {e}"
-                )))
-            })?;
-        }
-        crate::store::AuthMethod::KeyId { id } => {
-            
-            let priv_pem = crate::keys::get_private_key(id)?;
-            let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
-            std::fs::write(&temp_path, priv_pem.as_bytes()).unwrap();
-            let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
-            std::fs::remove_file(&temp_path).ok();
-            auth_res.map_err(|e| {
-                CatermError::Validation(ValidationError::Generic(format!(
-                    "Auth via key id failed: {e}"
-                )))
-            })?;
-
-        }
-    }
-
-    if !sess.authenticated() {
-        return Err(CatermError::Validation(ValidationError::Generic(
-            "Authentication failed".into(),
-        )));
-    }
-
+    let (sess, _host) = crate::ssh::open_authenticated_session(host_id)?;
     Ok(sess)
 }
 
@@ -493,7 +416,7 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                     return;
                                 }
                                 let atyp = buf[3];
-                                let mut target_host = String::new();
+                                let target_host;
                                 if atyp == 1 {
                                     if local_stream.read_exact(&mut buf[0..4]).is_err() {
                                         return;

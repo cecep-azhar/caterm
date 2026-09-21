@@ -24,6 +24,39 @@
 
 mod commands;
 
+use serde::Serialize;
+use tauri::Emitter;
+
+/// Payload for the `ssh://output` event. One event per chunk the PTY reader thread produces.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SshOutputEvent {
+    session_id: String,
+    data: String,
+}
+
+/// Payload for `ssh://closed`, emitted once when a PTY channel reaches EOF.
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SshClosedEvent {
+    session_id: String,
+}
+
+/// Bridges `caterm_core`'s GUI-free event sink to Tauri's event bus. Registering this is what
+/// switches PTY delivery from "frontend polls `ssh_read` 25x/second" to push — the core buffers
+/// nothing once a sink exists, so bytes are delivered exactly once.
+fn install_ssh_event_bridge(app: &tauri::AppHandle) {
+    let handle = app.clone();
+    caterm_core::ssh::set_event_sink(move |event| match event {
+        caterm_core::ssh::SshEvent::Output { session_id, data } => {
+            let _ = handle.emit("ssh://output", SshOutputEvent { session_id, data });
+        }
+        caterm_core::ssh::SshEvent::Closed { session_id } => {
+            let _ = handle.emit("ssh://closed", SshClosedEvent { session_id });
+        }
+    });
+}
+
 /// `start` should be captured as close to `main()`'s first line as possible by the
 /// caller, so the printed duration approximates true cold start (REQ-02). Prints
 /// `CATERM_COLD_START_MS=<n>` once the backend considers itself ready (main window
@@ -41,7 +74,8 @@ pub fn run(start: std::time::Instant) {
     // the lint attributes that call to this statement's span.
     #[allow(clippy::expect_used, clippy::disallowed_methods)]
     tauri::Builder::default()
-        .setup(move |_app| {
+        .setup(move |app| {
+            install_ssh_event_bridge(app.handle());
             println!("CATERM_COLD_START_MS={}", start.elapsed().as_millis());
             Ok(())
         })

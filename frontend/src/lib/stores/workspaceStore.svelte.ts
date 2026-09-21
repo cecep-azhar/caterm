@@ -3,6 +3,12 @@
 
 import { listHosts, type HostRecord } from '$lib/api/hosts';
 import { openTab, closeAllTabs } from '$lib/stores/sessionTabs.svelte';
+import {
+  getSessionView,
+  setLayout,
+  setShowFiles,
+  isPaneLayout
+} from '$lib/stores/sessionView.svelte';
 
 export interface Workspace {
   id: string;
@@ -53,8 +59,9 @@ function persistWorkspaces(items: Workspace[]): void {
 }
 
 let workspaces = $state<Workspace[]>(loadInitialWorkspaces());
-let currentLayout = $state<number>(1);
-let currentShowFiles = $state<boolean>(true);
+// Layout / file-panel state is NOT owned here: `sessionView` is the single source of truth
+// shared by the app header and the Session route. Keeping a second copy in this store meant a
+// workspace restore and the header could disagree about the current layout.
 
 export function getWorkspaces(): Workspace[] {
   return workspaces;
@@ -131,19 +138,19 @@ export function deleteWorkspace(id: string): void {
 }
 
 export function getCurrentLayout(): number {
-  return currentLayout;
+  return getSessionView().layout;
 }
 
 export function setCurrentLayout(val: number): void {
-  currentLayout = val;
+  if (isPaneLayout(val)) setLayout(val);
 }
 
 export function getCurrentShowFiles(): boolean {
-  return currentShowFiles;
+  return getSessionView().showFiles;
 }
 
 export function setCurrentShowFiles(val: boolean): void {
-  currentShowFiles = val;
+  setShowFiles(val);
 }
 
 /**
@@ -168,8 +175,8 @@ export async function restoreWorkspace(workspace: Workspace): Promise<{ openedCo
     }
   }
 
-  currentLayout = workspace.layout || 1;
-  currentShowFiles = workspace.showFiles ?? true;
+  setCurrentLayout(workspace.layout || 1);
+  setShowFiles(workspace.showFiles ?? true);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('caterm:workspace-loaded', { detail: workspace }));
