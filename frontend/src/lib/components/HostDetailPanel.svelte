@@ -3,6 +3,8 @@
   // with no onclick at all; this is what it now opens.
   import { invoke } from '@tauri-apps/api/core';
   import type { HostRecord } from '$lib/api/hosts';
+  import { openSession } from '$lib/nav';
+  import { errorText } from '$lib/errors';
 
   let { host, onClose }: { host: HostRecord; onClose: () => void } = $props();
 
@@ -28,7 +30,7 @@
         logs = rows.slice(0, 50);
       })
       .catch((err) => {
-        logError = err instanceof Error ? err.message : String(err);
+        logError = errorText(err);
         logs = [];
       })
       .finally(() => {
@@ -161,12 +163,12 @@
     </div>
 
     <footer class="p-4 border-t border-neutral-200 dark:border-neutral-800 flex items-center gap-2 shrink-0">
-      <a
-        href="/session?host={host.id}"
+      <button
+        onclick={() => openSession(host.id)}
         class="flex-1 px-3 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium text-center transition-colors"
       >
         Connect
-      </a>
+      </button>
       <a
         href="/sftp?host={host.id}"
         class="px-3 py-2 rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"

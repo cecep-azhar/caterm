@@ -16,6 +16,8 @@ export interface AiExecutionPlan {
   requirements: string[];
   steps: AiPlanStep[];
   estimated_time?: string;
+  /** 'llm' when the model produced it, 'builtin' when the offline template planner did. */
+  source?: 'llm' | 'builtin' | string;
 }
 
 export interface AiExecutionResult {

@@ -421,8 +421,9 @@
       try {
         resultPlan = await aiGeneratePlan(goal, selectedHostId || undefined);
       } catch {
-        // Backend invoke fallback
-        resultPlan = generateLocalPlan(goal);
+        // Backend unreachable entirely — fall back to the in-page template planner. Marked as
+        // `builtin` so the badge on the plan says so instead of implying the model wrote it.
+        resultPlan = { ...generateLocalPlan(goal), source: 'builtin' };
       }
 
       plan = resultPlan;
@@ -692,6 +693,18 @@
               <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
                 {approvedCount} dari {steps.length} Langkah Terpilih
               </span>
+              <!-- Says which planner actually produced this. The LLM path silently falls back
+                   to the offline template planner when the endpoint is unreachable, and without
+                   this badge a broken connection still looked like a working assistant. -->
+              {#if plan?.source === 'llm'}
+                <span class="text-xs px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold border border-violet-500/20" title="Dihasilkan oleh model AI yang dikonfigurasi">
+                  Model AI
+                </span>
+              {:else}
+                <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold border border-amber-500/20" title="Endpoint AI tidak terjangkau atau balasannya tidak terbaca, jadi rencana ini dari template bawaan. Uji koneksi di Settings > AI Assistant.">
+                  Template bawaan
+                </span>
+              {/if}
             </div>
             <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1 leading-relaxed">{plan.summary}</p>
           </div>

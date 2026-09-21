@@ -3,11 +3,11 @@
   import { page } from '$app/state';
   import TerminalPane from '$lib/components/TerminalPane.svelte';
   import SessionFileManager from '$lib/components/SessionFileManager.svelte';
-  import { listHosts, type HostRecord } from '$lib/api/hosts';
-  import { getTabs, openTab, closeTab } from '$lib/stores/sessionTabs.svelte';
+  import { listHosts } from '$lib/api/hosts';
+  import { getTabs, openTab, closeTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
-    setSelectedHostId,
+    setSelectedTabId,
     setShowFiles,
     setLayout,
     resetLayout
@@ -35,24 +35,38 @@
   // Opens a tab for every host named in `?host=<id>` or `?hosts=<id1>,<id2>,...` — this is
   // the ONLY way a session tab gets created. No fallback/demo hosts: with no matching query
   // param, or before the id resolves, nothing opens (see the empty state below).
+  //
+  // Each distinct URL is honoured exactly once. `openSession()` stamps a nonce onto every
+  // Connect so asking for a host that is already open is a new URL, and therefore opens a
+  // second session rather than being swallowed as a duplicate.
+  let handledUrl = '';
+
   $effect(() => {
+    const url = page.url.href;
     const params = page.url.searchParams;
-    const ids = new Set<string>();
+    if (url === handledUrl) return;
+
+    const ids: string[] = [];
     const single = params.get('host');
-    if (single) ids.add(single);
+    if (single) ids.push(single);
     const multi = params.get('hosts');
     if (multi) {
-      for (const id of multi.split(',').map((s) => s.trim()).filter(Boolean)) ids.add(id);
+      for (const id of multi.split(',').map((s) => s.trim()).filter(Boolean)) ids.push(id);
     }
-    if (ids.size === 0) return;
+    if (ids.length === 0) return;
+
+    handledUrl = url;
 
     listHosts()
       .then((hosts) => {
         loadError = '';
+        let lastOpened = '';
         for (const id of ids) {
           const host = hosts.find((h) => h.id === id);
-          if (host) openTab(host);
+          if (host) lastOpened = openTab(host);
         }
+        // Focus what was just opened, so a second session to the same host is visible at once.
+        if (lastOpened) setSelectedTabId(lastOpened);
       })
       .catch(() => {
         loadError = 'Tauri backend tidak terdeteksi — tidak bisa memuat daftar host.';
@@ -62,19 +76,17 @@
   const tabs = $derived(getTabs());
 
   $effect(() => {
-    if (tabs.length > 0 && (!view.selectedHostId || !tabs.some((t) => t.host.id === view.selectedHostId))) {
-      setSelectedHostId(tabs[0].host.id);
+    if (tabs.length > 0 && (!view.selectedTabId || !tabs.some((t) => t.id === view.selectedTabId))) {
+      setSelectedTabId(tabs[0].id);
     }
   });
 
-  const activeHost = $derived.by(() => {
+  const activeTab = $derived.by(() => {
     if (tabs.length === 0) return undefined;
-    if (view.selectedHostId) {
-      const found = tabs.find((t) => t.host.id === view.selectedHostId);
-      if (found) return found.host;
-    }
-    return tabs[0]?.host;
+    return tabs.find((t) => t.id === view.selectedTabId) ?? tabs[0];
   });
+
+  const activeHost = $derived(activeTab?.host);
 
   /** A single pane is the only sensible arrangement on a phone, or with one host open. */
   const effectiveLayout = $derived(!isWideViewport || tabs.length === 1 ? 1 : view.layout);
@@ -95,18 +107,18 @@
    * done with `invisible` rather than `hidden`: `display:none` collapses the box to 0x0 and
    * xterm would re-measure itself to nothing.
    */
-  function paneClass(hostId: string): string {
+  function paneClass(tabId: string): string {
     if (effectiveLayout !== 1) return 'min-h-0 min-w-0 flex-1';
-    return hostId === activeHost?.id
+    return tabId === activeTab?.id
       ? 'absolute inset-0 z-10'
       : 'absolute inset-0 invisible pointer-events-none';
   }
 
-  function close(host: HostRecord) {
-    closeTab(host.id);
+  function close(tabId: string) {
+    closeTab(tabId);
     if (getTabs().length === 0) resetLayout();
-    if (view.selectedHostId === host.id) {
-      setSelectedHostId(getTabs()[0]?.host.id || '');
+    if (view.selectedTabId === tabId) {
+      setSelectedTabId(getTabs()[0]?.id || '');
     }
   }
 </script>
@@ -133,11 +145,11 @@
             <div class="flex items-center gap-1 overflow-x-auto pb-1.5 mb-1 scrollbar-none shrink-0">
               {#each tabs as tab (tab.id)}
                 <button
-                  onclick={() => setSelectedHostId(tab.host.id)}
-                  class="px-2.5 py-1 rounded text-xs font-mono transition-colors shrink-0 flex items-center gap-1.5 {view.selectedHostId === tab.host.id ? 'bg-sky-600 text-white font-semibold shadow-xs' : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 border border-neutral-800'}"
+                  onclick={() => setSelectedTabId(tab.id)}
+                  class="px-2.5 py-1 rounded text-xs font-mono transition-colors shrink-0 flex items-center gap-1.5 {view.selectedTabId === tab.id ? 'bg-sky-600 text-white font-semibold shadow-xs' : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 border border-neutral-800'}"
                 >
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  <span class="truncate max-w-[120px]">{tab.host.label}</span>
+                  <span class="truncate max-w-[120px]">{tabLabel(tab)}</span>
                 </button>
               {/each}
             </div>
@@ -150,13 +162,14 @@
           <div class="flex-1 min-h-0">
             <div class={containerClass}>
               {#each tabs as tab (tab.id)}
-                <div class={paneClass(tab.host.id)}>
+                <div class={paneClass(tab.id)}>
                   <TerminalPane
                     host={tab.host}
-                    isActive={effectiveLayout === 1 ? tab.host.id === activeHost?.id : true}
+                    label={tabLabel(tab)}
+                    isActive={effectiveLayout === 1 ? tab.id === activeTab?.id : true}
                     onSplitRight={effectiveLayout === 1 && tabs.length > 1 ? () => setLayout(3) : undefined}
                     onSplitDown={effectiveLayout === 1 && tabs.length > 1 ? () => setLayout(2) : undefined}
-                    onClose={() => close(tab.host)}
+                    onClose={() => close(tab.id)}
                   />
                 </div>
               {/each}
@@ -171,7 +184,7 @@
             <SessionFileManager
               host={activeHost}
               availableHosts={tabs.map((t) => t.host)}
-              onSelectHost={(h) => setSelectedHostId(h.id)}
+              onSelectHost={(h) => setSelectedTabId(tabs.find((t) => t.host.id === h.id)?.id ?? '')}
               onClose={() => setShowFiles(false)}
             />
           </div>
@@ -182,7 +195,7 @@
               <SessionFileManager
                 host={activeHost}
                 availableHosts={tabs.map((t) => t.host)}
-                onSelectHost={(h) => setSelectedHostId(h.id)}
+                onSelectHost={(h) => setSelectedTabId(tabs.find((t) => t.host.id === h.id)?.id ?? '')}
                 onClose={() => setShowFiles(false)}
               />
             </div>

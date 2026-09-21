@@ -3,8 +3,9 @@
   // which meant the AI credentials were the one setting you could not find on the Settings
   // page. Extracted as a component so Settings owns it and everything else links there.
   import { onMount } from 'svelte';
-  import { getAiSettings, saveAiSettings, type AiSettings } from '$lib/api/ai';
+  import { aiChat, getAiSettings, saveAiSettings, type AiSettings } from '$lib/api/ai';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
+  import { errorText } from '$lib/errors';
 
   let { onSaved }: { onSaved?: (settings: AiSettings) => void } = $props();
 
@@ -19,6 +20,11 @@
   let showApiKey = $state(false);
   let isSaving = $state(false);
   let isLoading = $state(true);
+
+  // A connection that fails silently is what made the assistant look broken for no visible
+  // reason, so the settings page can prove the endpoint works before you rely on it.
+  let isTesting = $state(false);
+  let testResult = $state<{ ok: boolean; text: string } | null>(null);
 
   onMount(async () => {
     try {
@@ -39,7 +45,7 @@
       showToast('Pengaturan AI tersimpan.', 'success');
       onSaved?.(settings);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Gagal menyimpan pengaturan AI.', 'error');
+      showToast(errorText(err), 'error');
     } finally {
       isSaving = false;
     }
@@ -47,6 +53,23 @@
 
   function handleReset() {
     settings = { ...DEFAULT_SETTINGS };
+    testResult = null;
+  }
+
+  /** Saves first: the backend reads the stored settings, not whatever is typed in the form. */
+  async function handleTest() {
+    isTesting = true;
+    testResult = null;
+    try {
+      await saveAiSettings(settings);
+      const reply = await aiChat([{ role: 'user', content: 'ping' }]);
+      const preview = reply.reply.trim().slice(0, 120) || '(balasan kosong)';
+      testResult = { ok: true, text: `Terhubung. Model menjawab: ${preview}` };
+    } catch (err) {
+      testResult = { ok: false, text: errorText(err) };
+    } finally {
+      isTesting = false;
+    }
   }
 </script>
 
@@ -135,20 +158,41 @@
     />
   </div>
 
-  <div class="flex items-center justify-between pt-3 border-t border-neutral-200 dark:border-neutral-800">
+  {#if testResult}
+    <div
+      class="p-3 rounded-lg text-xs border {testResult.ok
+        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300'
+        : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'}"
+    >
+      <p class="font-semibold mb-0.5">{testResult.ok ? 'Koneksi berhasil' : 'Koneksi gagal'}</p>
+      <p class="break-words">{testResult.text}</p>
+    </div>
+  {/if}
+
+  <div class="flex items-center justify-between pt-3 border-t border-neutral-200 dark:border-neutral-800 gap-2">
     <button
       type="button"
       onclick={handleReset}
-      class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+      class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors shrink-0"
     >
       Reset ke Default
     </button>
-    <button
-      type="submit"
-      disabled={isSaving || isLoading}
-      class="px-5 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white shadow transition-colors"
-    >
-      {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}
-    </button>
+    <div class="flex items-center gap-2">
+      <button
+        type="button"
+        onclick={handleTest}
+        disabled={isTesting || isLoading}
+        class="px-4 py-2 rounded-lg text-xs font-semibold border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+      >
+        {isTesting ? 'Menguji...' : 'Uji Koneksi'}
+      </button>
+      <button
+        type="submit"
+        disabled={isSaving || isLoading}
+        class="px-5 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white shadow transition-colors"
+      >
+        {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}
+      </button>
+    </div>
   </div>
 </form>

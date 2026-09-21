@@ -13,6 +13,7 @@
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { getActiveSession, injectIntoActiveSession } from '$lib/stores/activeSession.svelte';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
+  import { errorText } from '$lib/errors';
 
   let { onClose }: { onClose: () => void } = $props();
 
@@ -82,7 +83,7 @@
         runs = reply.steps.map(() => ({ status: 'pending', output: '' }));
       }
     } catch (err) {
-      errorMsg = err instanceof Error ? err.message : String(err);
+      errorMsg = errorText(err);
     } finally {
       isSending = false;
       scrollToBottom();
@@ -146,7 +147,7 @@
         } catch (err) {
           runs[i] = {
             status: 'failed',
-            output: err instanceof Error ? err.message : String(err)
+            output: errorText(err)
           };
           break;
         }
@@ -160,8 +161,10 @@
   const acceptedCount = $derived(acceptedSteps.filter(Boolean).length);
 </script>
 
+<!-- A docked column on desktop, a full-screen sheet on phones where 26rem would leave the page
+     with nothing. Sits in the same slot as the SFTP panel; only one of the two is ever open. -->
 <aside
-  class="fixed right-0 top-0 z-50 h-full w-full sm:w-[26rem] bg-white dark:bg-neutral-950 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col"
+  class="fixed inset-0 z-50 sm:static sm:z-auto sm:w-[26rem] sm:shrink-0 h-full bg-white dark:bg-neutral-950 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl sm:shadow-none flex flex-col"
   aria-label="AI Assistant"
 >
   <header class="p-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-2 shrink-0">

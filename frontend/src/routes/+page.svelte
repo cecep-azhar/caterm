@@ -3,7 +3,7 @@
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
   import HostDetailPanel from '$lib/components/HostDetailPanel.svelte';
-  import { goto } from '$app/navigation';
+  import { openSession } from '$lib/nav';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
 
   let hosts = $state<HostRecord[]>([]);
@@ -33,9 +33,9 @@
   /** Opens every selected host as tabs in one session, which is what a split view needs. */
   function connectSelected() {
     if (selectedIds.length === 0) return;
-    const ids = selectedIds.join(',');
+    const ids = [...selectedIds];
     clearSelection();
-    void goto(`/session?hosts=${ids}`);
+    void openSession(ids);
   }
 
   async function deleteSelected() {
@@ -295,12 +295,13 @@
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
             </button>
-            <a
-              href="/session?host={host.id}"
-              class="flex-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-medium shadow-lg shadow-sky-600/20 transition-all flex items-center justify-center gap-1.5" title="Click to connect">
+            <button
+              onclick={() => openSession(host.id)}
+              class="flex-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-medium shadow-lg shadow-sky-600/20 transition-all flex items-center justify-center gap-1.5"
+              title="Buka sesi baru (bisa lebih dari satu untuk host yang sama)">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
               Connect
-            </a>
+            </button>
             <a
               href="/sftp?host={host.id}"
               class="px-2.5 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all flex items-center justify-center" title="Open SFTP File Manager">

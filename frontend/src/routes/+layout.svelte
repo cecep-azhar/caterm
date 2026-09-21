@@ -7,12 +7,12 @@
   import AiChatPanel from '$lib/components/AiChatPanel.svelte';
   import { getAiChatState, toggleAiChat, closeAiChat } from '$lib/stores/aiChat.svelte';
   import { page } from '$app/state';
-  import { getTabs, closeTab } from '$lib/stores/sessionTabs.svelte';
+  import { getTabs, closeTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
     setLayout,
-    setSelectedHostId,
-    toggleFiles,
+    setSelectedTabId,
+    setShowFiles,
     type PaneLayout
   } from '$lib/stores/sessionView.svelte';
   import {
@@ -100,10 +100,29 @@
   ];
 
   /** A session tab is "current" only while the Session route is showing it. */
-  function isSessionTabActive(hostId: string): boolean {
+  function isSessionTabActive(tabId: string): boolean {
     if (!page.url.pathname.startsWith('/session')) return false;
-    const selected = view.selectedHostId || sessionTabs[0]?.host.id;
-    return selected === hostId;
+    const selected = view.selectedTabId || sessionTabs[0]?.id;
+    return selected === tabId;
+  }
+
+  // Files and AI share the right-hand column, so opening one closes the other.
+  function handleFilesToggle() {
+    if (view.showFiles) {
+      setShowFiles(false);
+      return;
+    }
+    closeAiChat();
+    setShowFiles(true);
+  }
+
+  function handleAiToggle() {
+    if (aiChat.open) {
+      closeAiChat();
+      return;
+    }
+    setShowFiles(false);
+    toggleAiChat();
   }
 
   // Sidebar collapse & responsive mobile drawer state
@@ -212,12 +231,6 @@
     closeAiChat();
   }}
 />
-
-<!-- Gated on the vault being open: the assistant reads hosts and can run commands, so it must
-     not be reachable from the lock screen. -->
-{#if isUnlocked && aiChat.open}
-  <AiChatPanel onClose={closeAiChat} />
-{/if}
 
 <NotificationCenter />
 
@@ -474,22 +487,22 @@
             <!-- Hidden on phones: the Session route renders its own full-width tab switcher
                  there, and two competing strips in a 375px row leaves both unusable. -->
             <div
-              class="hidden sm:flex items-center rounded shrink-0 transition-colors {isSessionTabActive(tab.host.id) ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
+              class="hidden sm:flex items-center rounded shrink-0 transition-colors {isSessionTabActive(tab.id) ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
             >
               <a
                 href="/session"
-                onclick={() => setSelectedHostId(tab.host.id)}
+                onclick={() => setSelectedTabId(tab.id)}
                 class="py-1 pl-2 pr-1 flex items-center gap-1.5 truncate max-w-[110px] md:max-w-[160px]"
-                title="{tab.host.label} ({tab.host.address})"
+                title="{tabLabel(tab)} ({tab.host.address})"
               >
                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                <span class="truncate">{tab.host.label}</span>
+                <span class="truncate">{tabLabel(tab)}</span>
               </a>
               <button
                 onclick={() => closeTab(tab.id)}
                 class="p-0.5 mr-1 rounded hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-rose-600 dark:hover:text-rose-400"
-                title="Tutup sesi {tab.host.label}"
-                aria-label="Tutup sesi {tab.host.label}"
+                title="Tutup sesi {tabLabel(tab)}"
+                aria-label="Tutup sesi {tabLabel(tab)}"
               >
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
@@ -514,7 +527,7 @@
         <!-- Session view controls: only meaningful while terminals are open -->
         {#if sessionTabs.length > 0}
           <button
-            onclick={toggleFiles}
+            onclick={handleFilesToggle}
             class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {view.showFiles ? 'bg-sky-600/20 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
             title={view.showFiles ? 'Sembunyikan Remote Files (SFTP)' : 'Tampilkan Remote Files (SFTP)'}
           >
@@ -524,6 +537,19 @@
             <span class="hidden lg:inline">Files</span>
           </button>
         {/if}
+
+        <!-- Right next to Files because they share the same column: opening one closes the other -->
+        <button
+          onclick={handleAiToggle}
+          class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
+          title={aiChat.open ? 'Tutup AI Assistant' : 'AI Assistant — diskusi lalu jalankan'}
+          aria-pressed={aiChat.open}
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+          </svg>
+          <span class="hidden lg:inline">AI</span>
+        </button>
 
         <!-- Split Controls: ONLY shown when more than one host is open -->
         {#if sessionTabs.length > 1}
@@ -559,19 +585,6 @@
           <span class="font-mono text-neutral-700 dark:text-neutral-300 hidden lg:inline">{timeAgo}</span>
         </div>
 
-        <!-- AI Assistant: mounted at layout level so the conversation survives navigation -->
-        <button
-          onclick={toggleAiChat}
-          class="p-1.5 rounded transition-colors {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400' : 'hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
-          title="AI Assistant — diskusi lalu jalankan"
-          aria-label="AI Assistant"
-          aria-pressed={aiChat.open}
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-        </button>
-
         <!-- Theme Toggle -->
         <button onclick={toggleTheme} class="p-1.5 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors" title="Toggle Theme ({isDarkTheme ? 'Dark' : 'Light'})" aria-label="Toggle Theme">
           {#if isDarkTheme}
@@ -604,9 +617,17 @@
       </div>
     </header>
     
-    <!-- Content Area (Screen Real Estate Optimized) -->
-    <div class="flex-1 overflow-auto bg-neutral-100 dark:bg-[#0a0a0a] text-neutral-900 dark:text-neutral-100 relative transition-colors duration-150 {isSessionActive ? 'p-0 md:p-1' : 'p-3 md:p-6'}">
-      {@render children()}
+    <!-- Content Area (Screen Real Estate Optimized). The AI panel is a docked column beside
+         the page rather than an overlay, so it behaves like the Files panel: the content
+         narrows instead of being covered. Both never show at once — see handleAiToggle. -->
+    <div class="flex-1 flex min-h-0 overflow-hidden">
+      <div class="flex-1 min-w-0 overflow-auto bg-neutral-100 dark:bg-[#0a0a0a] text-neutral-900 dark:text-neutral-100 relative transition-colors duration-150 {isSessionActive ? 'p-0 md:p-1' : 'p-3 md:p-6'}">
+        {@render children()}
+      </div>
+
+      {#if aiChat.open}
+        <AiChatPanel onClose={closeAiChat} />
+      {/if}
     </div>
   </main>
 </div>

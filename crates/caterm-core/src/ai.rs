@@ -67,6 +67,18 @@ pub struct AiExecutionPlan {
         skip_serializing_if = "Option::is_none"
     )]
     pub estimated_time: Option<String>,
+    /// Where the plan actually came from: `"llm"` or `"builtin"`.
+    ///
+    /// The LLM path falls back to the built-in template planner whenever the endpoint cannot be
+    /// reached or its answer cannot be parsed. That fallback is useful, but it was invisible:
+    /// a broken endpoint still produced a polished plan, so the assistant looked connected when
+    /// it was not. The UI reads this to say which one you are looking at.
+    #[serde(default = "default_plan_source")]
+    pub source: String,
+}
+
+fn default_plan_source() -> String {
+    "builtin".to_string()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -216,17 +228,57 @@ fn post_chat_completion(
     })
 }
 
-/// Pulls `choices[0].message.content` out of an OpenAI-compatible response.
-fn extract_message_content(raw_json: &str) -> Option<String> {
-    let v: serde_json::Value = serde_json::from_str(raw_json).ok()?;
-    Some(
-        v.get("choices")?
+/// Pulls the assistant's text out of an OpenAI-compatible response.
+///
+/// Handles both shapes a gateway may answer with: a single JSON object holding
+/// `choices[0].message.content`, and a `text/event-stream` of `data:` chunks carrying
+/// `choices[0].delta.content` to be concatenated. We request `stream: false`, but a server that
+/// streams regardless would otherwise look like a total failure — which is exactly how this
+/// surfaced: every request "succeeded" with HTTP 200 and then failed to parse.
+fn extract_message_content(body: &str) -> Option<String> {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(body) {
+        return value
+            .get("choices")?
             .get(0)?
             .get("message")?
             .get("content")?
-            .as_str()?
-            .to_string(),
-    )
+            .as_str()
+            .map(str::to_string);
+    }
+    extract_streamed_content(body)
+}
+
+/// Reassembles an SSE body. Returns `None` when no chunk carried any text, so a malformed or
+/// empty stream is reported as an error rather than as a silent empty answer.
+fn extract_streamed_content(body: &str) -> Option<String> {
+    let mut out = String::new();
+
+    for line in body.lines() {
+        let Some(payload) = line.trim_start().strip_prefix("data:") else {
+            continue;
+        };
+        let payload = payload.trim();
+        if payload.is_empty() || payload == "[DONE]" {
+            continue;
+        }
+        let Ok(chunk) = serde_json::from_str::<serde_json::Value>(payload) else {
+            continue;
+        };
+        let Some(choice) = chunk.get("choices").and_then(|c| c.get(0)) else {
+            continue;
+        };
+        // `delta.content` while streaming; `message.content` if the server mixes shapes.
+        let text = choice
+            .get("delta")
+            .and_then(|d| d.get("content"))
+            .or_else(|| choice.get("message").and_then(|m| m.get("content")))
+            .and_then(|c| c.as_str());
+        if let Some(text) = text {
+            out.push_str(text);
+        }
+    }
+
+    if out.is_empty() { None } else { Some(out) }
 }
 
 /// Strips a ```json ... ``` fence if the model wrapped its answer in one.
@@ -268,7 +320,8 @@ fn call_llm_if_available(
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": goal }
         ],
-        "temperature": 0.2
+        "temperature": 0.2,
+        "stream": false
     });
 
     // Falls back to the built-in heuristic planner when the endpoint is unreachable, so this
@@ -363,6 +416,8 @@ fn parse_ai_plan_content(
         host_label,
         requirements,
         steps,
+        // The only place a plan is genuinely the model's work.
+        source: "llm".to_string(),
         created_at: now,
         estimated_time: Some(est),
     })
@@ -451,7 +506,8 @@ fn build_template_plan(
             host_label,
             requirements,
             steps,
-            created_at: now,
+            source: default_plan_source(),
+        created_at: now,
             estimated_time: Some("~12 mins".to_string()),
         }
     } else if goal_lower.contains("docker") || goal_lower.contains("container") {
@@ -523,7 +579,8 @@ fn build_template_plan(
             host_label,
             requirements,
             steps,
-            created_at: now,
+            source: default_plan_source(),
+        created_at: now,
             estimated_time: Some("~6 mins".to_string()),
         }
     } else if goal_lower.contains("node")
@@ -595,7 +652,8 @@ fn build_template_plan(
             host_label,
             requirements,
             steps,
-            created_at: now,
+            source: default_plan_source(),
+        created_at: now,
             estimated_time: Some("~8 mins".to_string()),
         }
     } else if goal_lower.contains("python")
@@ -650,7 +708,8 @@ fn build_template_plan(
             host_label,
             requirements,
             steps,
-            created_at: now,
+            source: default_plan_source(),
+        created_at: now,
             estimated_time: Some("~6 mins".to_string()),
         }
     } else if goal_lower.contains("hardening")
@@ -710,7 +769,8 @@ fn build_template_plan(
             host_label,
             requirements,
             steps,
-            created_at: now,
+            source: default_plan_source(),
+        created_at: now,
             estimated_time: Some("~4 mins".to_string()),
         }
     } else {
@@ -752,7 +812,8 @@ fn build_template_plan(
             host_label,
             requirements,
             steps,
-            created_at: now,
+            source: default_plan_source(),
+        created_at: now,
             estimated_time: Some("~3 mins".to_string()),
         }
     }
@@ -853,7 +914,10 @@ The commands will run on the host the user calls \"{label}\"."
     let payload = serde_json::json!({
         "model": &settings.model,
         "messages": payload_messages,
-        "temperature": 0.3
+        "temperature": 0.3,
+        // Some OpenAI-compatible gateways (9Router among them) stream by default and answer
+        // with `text/event-stream` unless told otherwise, which no plain JSON parse can read.
+        "stream": false
     });
 
     let content = post_chat_completion(&settings, payload, std::time::Duration::from_secs(120))?;
@@ -977,6 +1041,69 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.1);
         }
+    }
+
+    #[test]
+    fn extract_message_content_reads_a_plain_completion() {
+        let body = r#"{"choices":[{"index":0,"message":{"role":"assistant","content":"pong"}}]}"#;
+        assert_eq!(extract_message_content(body).as_deref(), Some("pong"));
+    }
+
+    #[test]
+    fn extract_message_content_reassembles_a_streamed_completion() {
+        // Shape a 9Router-style gateway returns when it streams regardless of `stream: false`.
+        // Parsing this as one JSON object fails, which made every request look like a hard
+        // failure while the HTTP status was 200.
+        let body = concat!(
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\"}}]}
+
+",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"pong. \"}}]}
+
+",
+            "data: {\"choices\":[{\"index\":0,\"delta\":{\"content\":\"Send task.\"}}]}
+
+",
+            "data: [DONE]
+
+"
+        );
+        assert_eq!(
+            extract_message_content(body).as_deref(),
+            Some("pong. Send task.")
+        );
+    }
+
+    #[test]
+    fn extract_message_content_rejects_a_body_with_no_text() {
+        assert!(extract_message_content("data: [DONE]
+
+").is_none());
+        assert!(extract_message_content("not json at all").is_none());
+        assert!(extract_message_content(r#"{"error":"API key required"}"#).is_none());
+    }
+
+    #[test]
+    fn parse_chat_reply_withholds_steps_until_the_model_says_ready() {
+        let asking = parse_chat_reply(
+            r#"{"reply":"Ubuntu versi berapa?","ready":false,"steps":[{"step":1,"title":"x","command":"echo hi","description":"","is_dangerous":false}]}"#,
+        );
+        assert!(!asking.ready, "steps without ready must not be executable");
+        assert!(asking.steps.is_empty());
+
+        let ready = parse_chat_reply(
+            r#"{"reply":"Siap.","ready":true,"steps":[{"step":1,"title":"x","command":"echo hi","description":"","is_dangerous":false}]}"#,
+        );
+        assert!(ready.ready);
+        assert_eq!(ready.steps.len(), 1);
+    }
+
+    #[test]
+    fn parse_chat_reply_falls_back_to_prose() {
+        let reply = parse_chat_reply("Halo, mau setup apa?");
+        assert_eq!(reply.reply, "Halo, mau setup apa?");
+        assert!(!reply.ready);
+        assert!(reply.steps.is_empty());
     }
 
     #[test]

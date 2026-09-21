@@ -21,8 +21,9 @@ const view = $state({
   layout: 1 as PaneLayout,
   /** Off until the user asks for it: the file panel costs a third of the terminal's width. */
   showFiles: false,
-  /** Host id the header controls and the SFTP panel follow; '' means "first open tab". */
-  selectedHostId: ''
+  /** Tab id the header controls and the side panel follow; '' means "first open tab".
+      Keyed by tab, not host, because the same host can be open in several tabs. */
+  selectedTabId: ''
 });
 
 export function getSessionView() {
@@ -37,12 +38,8 @@ export function setShowFiles(show: boolean) {
   view.showFiles = show;
 }
 
-export function toggleFiles() {
-  view.showFiles = !view.showFiles;
-}
-
-export function setSelectedHostId(hostId: string) {
-  view.selectedHostId = hostId;
+export function setSelectedTabId(tabId: string) {
+  view.selectedTabId = tabId;
 }
 
 /** Called when the last tab closes so the next session doesn't inherit a stale split. */

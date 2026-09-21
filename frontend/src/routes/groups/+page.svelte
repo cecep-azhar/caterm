@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { openSession } from '$lib/nav';
   import { listGroups, saveGroup, deleteGroup, type GroupRecord } from '$lib/api/groups';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
 
@@ -121,7 +122,7 @@
           <button onclick={() => openEditModal(group)} class="px-3 py-1 bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Edit</button>
           <button onclick={() => removeGroup(group.id)} class="px-3 py-1 bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Delete</button>
           {#if group.hostIds.length > 0}
-            <a href="/session?hosts={group.hostIds.join(',')}" class="px-3 py-1 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">Launch All</a>
+            <button onclick={() => openSession(group.hostIds)} class="px-3 py-1 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">Launch All</button>
           {/if}
         </div>
       </div>

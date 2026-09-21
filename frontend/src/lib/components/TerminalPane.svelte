@@ -19,12 +19,15 @@
 
   let {
     host,
+    label,
     isActive = true,
     onSplitRight,
     onSplitDown,
     onClose
   }: {
     host: HostRecord;
+    /** Disambiguated tab name, e.g. "YPC (2)" when the host is open more than once. */
+    label?: string;
     /** Whether this pane is the one the user is looking at (drives focus + snippet target). */
     isActive?: boolean;
     onSplitRight?: () => void;
@@ -39,6 +42,7 @@
     return String(err);
   }
 
+  const paneLabel = $derived(label ?? host.label);
   const theme = getTheme();
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
   let terminalContainer: HTMLDivElement;
@@ -59,7 +63,7 @@
 
   function markActive() {
     if (session) {
-      setActiveSession({ sessionId: session.sessionId, label: host.label, inject: injectCommand });
+      setActiveSession({ sessionId: session.sessionId, label: paneLabel, inject: injectCommand });
     }
   }
 
@@ -244,7 +248,7 @@
             ? 'bg-amber-500'
             : 'bg-neutral-600'}"
       ></span>
-      <span class="text-neutral-900 dark:text-white font-medium truncate">{host.label}</span>
+      <span class="text-neutral-900 dark:text-white font-medium truncate">{paneLabel}</span>
       <span class="text-neutral-500 dark:text-neutral-500 hidden sm:inline truncate">({host.address})</span>
     </div>
     <div class="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 shrink-0">
