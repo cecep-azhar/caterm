@@ -6,7 +6,7 @@
 | A-1 | Vault Argon2id sungguhan? | `[SELESAI]` Modul KEK menggunakan Argon2id dan Zeroize diterapkan. |
 | A-2 | `ssh.rs` memakai `russh` atau `ssh2`? | `[SELESAI]` Tetap memakai `ssh2` untuk rilis 2.x demi stabilitas modul lain (tunnels/monitor/SFTP) yang bergantung padanya. Interface asinkron disimulasikan lewat tokio mpsc & thread worker. |
 | A-3 | TOFU host-key verification? | `[SELESAI]` Diimplementasikan di `caterm-core/src/ssh.rs` dengan pencatatan & verifikasi `known_hosts` otomatis! |
-| A-4 | `catermctl` CLI commands? | `[REGRESI]` Belum ada subcommands untuk host/vault/connect/tunnel/monitor/key/audit. |
+| A-4 | `catermctl` CLI commands? | `[SELESAI]` Tersedia subcommands untuk host, vault, connect, tunnel, monitor, key, dan audit. Semua memanggil langsung fungsi `caterm-core`. |
 | A-5 | SFTP (Fase 4)? | `[SELESAI]` Ditambahkan via `crates/caterm-core/src/sftp.rs` beserta antarmuka UI. |
 
 ## Utang Teknis & Task Selesai (19 Sep 2026)
@@ -26,3 +26,4 @@
 - [x] **Teams Feature (21 Sep 2026)**: Added Teams model to SQLite (T6/Teams) mapping to multiple local members, hostIds, and groupIds. Included Tauri commands and SvelteKit route with the Hosts/Groups UI style.
 
 - [x] **`T2-CORE-02` — Command Logs (Audit)**: Implemented full-stack audit logs for PTY terminal commands, tunnel start/stop, vault lock/unlock, and SSH key deploy. Logs are saved in `caterm.db` and masked for secrets using regex. SvelteKit UI in `/command-logs` with filtering, search, and CSV export.
+- [x] **Investigations Feature (21 Sep 2026)**: Added full-stack Investigations feature (Model in `caterm-core/src/investigations.rs` with `id, title, host_id, status, notes, evidence`). Persisted to `caterm.db`. Built UI timeline in `frontend/src/routes/investigations/+page.svelte` aligned with Agent 4's Audit log design.

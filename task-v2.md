@@ -56,3 +56,11 @@
   - Track: PTY hook (commands), tunnels, vault, ssh keys.
   - Privacy: Mask passwords and secrets automatically.
   - Route: frontend/src/routes/command-logs/+page.svelte (scrollable, filter, search, export).
+
+## 12. Investigations
+- [x] Create Investigations model in `caterm-core` with SQLite storage (fields: id, title, host_id, status, notes, evidence).
+- [x] Implement Tauri commands `list_investigations`, `save_investigation`, `delete_investigation`.
+- [x] Create `frontend/src/routes/investigations/+page.svelte` featuring a list of incidents, timeline detail view, and "New Investigation" tied to hosts/time range.
+
+## 12. CLI (catermctl)
+- [x] Implement CLI parity (host, vault, connect, tunnel, monitor, key, audit) in caterm-cli/src/main.rs calling caterm-core.

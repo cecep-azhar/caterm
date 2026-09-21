@@ -26,6 +26,100 @@ enum Commands {
         #[command(subcommand)]
         action: BenchAction,
     },
+    Host {
+        #[command(subcommand)]
+        action: HostAction,
+    },
+    Vault {
+        #[command(subcommand)]
+        action: VaultAction,
+    },
+    Connect {
+        host_id: String,
+    },
+    Tunnel {
+        #[command(subcommand)]
+        action: TunnelAction,
+    },
+    Monitor {
+        host_id: String,
+    },
+    Key {
+        #[command(subcommand)]
+        action: KeyAction,
+    },
+    Audit {
+        #[command(subcommand)]
+        action: AuditAction,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum HostAction {
+    List,
+    Add {
+        #[arg(long)]
+        label: String,
+        #[arg(long)]
+        address: String,
+        #[arg(long)]
+        port: u16,
+        #[arg(long)]
+        username: String,
+        #[arg(long, help = "password, key-path=..., or key-id=...")]
+        auth_method: String,
+        #[arg(long, default_value = "")]
+        secret: String,
+        #[arg(long, value_delimiter = ',')]
+        tags: Vec<String>,
+    },
+    Rm {
+        id: String,
+    },
+    Connect {
+        id: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum VaultAction {
+    Unlock { password: String },
+    Lock,
+    Status,
+}
+
+#[derive(Subcommand, Debug)]
+enum TunnelAction {
+    Start { id: String },
+    Stop { id: String },
+    List,
+}
+
+#[derive(Subcommand, Debug)]
+enum KeyAction {
+    List,
+    Add {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        algorithm: String,
+    },
+    Deploy {
+        #[arg(long)]
+        host_id: String,
+        #[arg(long)]
+        key_id: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum AuditAction {
+    Tail {
+        #[arg(long)]
+        host_id: Option<String>,
+        #[arg(long)]
+        search: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -73,6 +167,20 @@ struct EnvInfo {
     db_size_bytes: u64,
 }
 
+fn parse_auth_method(val: &str) -> Result<caterm_core::store::AuthMethod, String> {
+    if val == "password" {
+        Ok(caterm_core::store::AuthMethod::Password)
+    } else if let Some(path) = val.strip_prefix("key-path=") {
+        Ok(caterm_core::store::AuthMethod::Key {
+            path: path.to_string(),
+        })
+    } else if let Some(id) = val.strip_prefix("key-id=") {
+        Ok(caterm_core::store::AuthMethod::KeyId { id: id.to_string() })
+    } else {
+        Err(format!("invalid auth method: {val}"))
+    }
+}
+
 fn main() {
     let cli = Cli::parse();
     let exit_code = match cli.command {
@@ -95,14 +203,16 @@ fn main() {
                     json,
                 },
         }) => run_bench(exe, settle_secs, timeout_secs, json),
+        Some(Commands::Host { action }) => handle_host(action),
+        Some(Commands::Vault { action }) => handle_vault(action),
+        Some(Commands::Connect { host_id }) => handle_connect(&host_id),
+        Some(Commands::Tunnel { action }) => handle_tunnel(action),
+        Some(Commands::Monitor { host_id }) => handle_monitor(&host_id),
+        Some(Commands::Key { action }) => handle_key(action),
+        Some(Commands::Audit { action }) => handle_audit(action),
         None => 0,
     };
 
-    // Only main()'s own outermost statement exits the process - every helper above
-    // returns a code instead of exiting itself. clippy::disallowed_methods bans
-    // std::process::exit crate-wide with no way to express a location-based exception
-    // (it fires here too, in main(), the one place the policy's own reason text sanctions
-    // it) - this is that single, intentional, narrowly-scoped exemption.
     #[allow(clippy::disallowed_methods)]
     if exit_code != 0 {
         std::process::exit(exit_code);
@@ -202,5 +312,266 @@ fn print_env(as_json: bool) {
 fn print_errors_list() {
     for err in caterm_core::CatermError::all_known_for_registry() {
         println!("{}\t{}\t{}", err.code(), err.domain(), err.user_message());
+    }
+}
+
+fn handle_host(action: HostAction) -> i32 {
+    match action {
+        HostAction::List => match caterm_core::store::list_hosts() {
+            Ok(hosts) => {
+                for h in hosts {
+                    println!("{} | {} | {}@{}", h.id, h.label, h.username, h.address);
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+        HostAction::Add {
+            label,
+            address,
+            port,
+            username,
+            auth_method,
+            secret,
+            tags,
+        } => {
+            let auth = match parse_auth_method(&auth_method) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("Error: {}", e);
+                    return 1;
+                }
+            };
+            let input = caterm_core::store::HostInput {
+                id: None,
+                label,
+                address,
+                port,
+                username,
+                auth_method: auth,
+                tags,
+                secret: if secret.is_empty() {
+                    None
+                } else {
+                    Some(secret)
+                },
+            };
+            match caterm_core::store::save_host(input) {
+                Ok(h) => {
+                    println!("Host saved: {}", h.id);
+                    0
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e.user_message());
+                    1
+                }
+            }
+        }
+        HostAction::Rm { id } => match caterm_core::store::delete_host(&id) {
+            Ok(_) => {
+                println!("Host deleted");
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+        HostAction::Connect { id } => handle_connect(&id),
+    }
+}
+
+fn handle_vault(action: VaultAction) -> i32 {
+    match action {
+        VaultAction::Unlock { password } => match caterm_core::vault::unlock_vault(&password) {
+            Ok(_) => {
+                println!("Vault unlocked");
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+        VaultAction::Lock => match caterm_core::vault::lock_vault() {
+            Ok(_) => {
+                println!("Vault locked");
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+        VaultAction::Status => match caterm_core::vault::is_unlocked() {
+            Ok(true) => {
+                println!("Vault is UNLOCKED");
+                0
+            }
+            Ok(false) => {
+                println!("Vault is LOCKED");
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+    }
+}
+
+fn handle_connect(host_id: &str) -> i32 {
+    match caterm_core::ssh::connect(host_id) {
+        Ok(session) => {
+            println!(
+                "Connected to {}, session id: {}",
+                host_id, session.session_id
+            );
+            let _ = caterm_core::ssh::disconnect(&session.session_id);
+            0
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e.user_message());
+            1
+        }
+    }
+}
+
+fn handle_tunnel(action: TunnelAction) -> i32 {
+    match action {
+        TunnelAction::Start { id } => match caterm_core::tunnels::start_tunnel(&id) {
+            Ok(_) => {
+                println!("Tunnel {} started", id);
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+        TunnelAction::Stop { id } => match caterm_core::tunnels::stop_tunnel(&id) {
+            Ok(_) => {
+                println!("Tunnel {} stopped", id);
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+        TunnelAction::List => match caterm_core::tunnels::list_tunnels() {
+            Ok(tunnels) => {
+                for t in tunnels {
+                    println!(
+                        "{} | {} | {:?} | bind:{}:{} | target:{}:{} | active:{}",
+                        t.id,
+                        t.host_id,
+                        t.forward_type,
+                        t.bind_addr,
+                        t.bind_port,
+                        t.target_addr,
+                        t.target_port,
+                        t.is_active
+                    );
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+    }
+}
+
+fn handle_monitor(host_id: &str) -> i32 {
+    match caterm_core::monitor::fetch_metrics_for_host(host_id) {
+        Ok(metrics) => {
+            println!("CPU: {:.2}%", metrics.cpu_usage);
+            println!(
+                "Memory: {:.2} MB / {:.2} MB",
+                metrics.mem_used_mb, metrics.mem_total_mb
+            );
+            println!(
+                "Disk: {:.2} GB / {:.2} GB",
+                metrics.disk_used_gb, metrics.disk_total_gb
+            );
+            println!("Uptime: {}", metrics.uptime);
+            0
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e.user_message());
+            1
+        }
+    }
+}
+
+fn handle_key(action: KeyAction) -> i32 {
+    match action {
+        KeyAction::List => match caterm_core::keys::list_keys() {
+            Ok(keys) => {
+                for k in keys {
+                    println!("{} | {} | {}", k.id, k.name, k.algorithm);
+                }
+                0
+            }
+            Err(e) => {
+                eprintln!("Error: {}", e.user_message());
+                1
+            }
+        },
+        KeyAction::Add { name, algorithm } => {
+            let input = caterm_core::keys::KeyInput { name, algorithm };
+            match caterm_core::keys::generate_key(input) {
+                Ok(k) => {
+                    println!("Key generated: {}", k.id);
+                    0
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e.user_message());
+                    1
+                }
+            }
+        }
+        KeyAction::Deploy { host_id, key_id } => {
+            match caterm_core::keys::deploy_public_key(&host_id, &key_id) {
+                Ok(_) => {
+                    println!("Key deployed to host {}", host_id);
+                    0
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e.user_message());
+                    1
+                }
+            }
+        }
+    }
+}
+
+fn handle_audit(action: AuditAction) -> i32 {
+    match action {
+        AuditAction::Tail { host_id, search } => {
+            match caterm_core::audit::get_logs(host_id.as_deref(), search.as_deref()) {
+                Ok(logs) => {
+                    for l in logs {
+                        println!(
+                            "[{}] {} - {}: {}",
+                            l.timestamp,
+                            l.host_id.unwrap_or_default(),
+                            l.event_type,
+                            l.details
+                        );
+                    }
+                    0
+                }
+                Err(e) => {
+                    eprintln!("Error: {}", e.user_message());
+                    1
+                }
+            }
+        }
     }
 }

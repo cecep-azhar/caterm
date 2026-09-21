@@ -83,6 +83,16 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             timestamp INTEGER NOT NULL,
             host_id TEXT,
             details TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS investigations (
+            id TEXT PRIMARY KEY,
+            title TEXT NOT NULL,
+            host_id TEXT,
+            status TEXT NOT NULL,
+            notes TEXT NOT NULL,
+            evidence TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
          );",
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal inisialisasi skema: {e}"))))

@@ -260,7 +260,13 @@ fn private_bytes_for(pid: u32) -> Option<u64> {
     }
 
     extern "C" {
-        fn proc_pidinfo(pid: i32, flavor: i32, arg: u64, buffer: *mut c_void, buffersize: i32) -> i32;
+        fn proc_pidinfo(
+            pid: i32,
+            flavor: i32,
+            arg: u64,
+            buffer: *mut c_void,
+            buffersize: i32,
+        ) -> i32;
     }
 
     let mut info: proc_taskinfo = unsafe { std::mem::zeroed() };

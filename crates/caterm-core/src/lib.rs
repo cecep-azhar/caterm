@@ -26,6 +26,7 @@ pub mod backup;
 pub mod db;
 pub mod error;
 pub mod groups;
+pub mod investigations;
 pub mod keys;
 pub mod monitor;
 pub mod paths;
