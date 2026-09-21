@@ -35,6 +35,10 @@
       errorMsg = 'Master password tidak boleh kosong.';
       return;
     }
+    if (password.length < 8) {
+      errorMsg = 'Master password minimal 8 karakter.';
+      return;
+    }
     isLoading = true;
     errorMsg = '';
     try {

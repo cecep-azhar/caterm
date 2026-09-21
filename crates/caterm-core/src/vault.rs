@@ -134,12 +134,9 @@ pub fn get_active_dek() -> Result<[u8; 32], CatermError> {
     if let Some(key) = *guard {
         Ok(key)
     } else {
-        let local_hex = load_or_create_local_key(&crate::paths::resolve_data_dir()?.path)?;
-        let mut key = [0u8; 32];
-        let bytes = hex::decode(local_hex).unwrap_or_default();
-        let len = std::cmp::min(bytes.len(), 32);
-        key[..len].copy_from_slice(&bytes[..len]);
-        Ok(key)
+        Err(CatermError::Vault(VaultError::Generic(
+            "Vault is locked".into(),
+        )))
     }
 }
 

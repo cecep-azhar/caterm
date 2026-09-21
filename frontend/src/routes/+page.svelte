@@ -201,14 +201,19 @@
             {/if}
           </div>
 
-          <div class="pt-4 mt-4 border-t border-neutral-800/80 flex items-center justify-between">
-            <span class="text-[10px] text-neutral-500">ID: {host.id.slice(0, 8)}</span>
+          <div class="pt-4 mt-4 border-t border-neutral-800/80 flex items-center justify-between gap-2">
+            <button class="px-2 py-1.5 text-neutral-400 hover:text-white rounded-md text-xs font-medium border border-neutral-700 hover:bg-neutral-800 transition-all" title="Select mode">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </button>
             <a
               href="/session?host={host.id}"
-              class="px-3 py-1.5 bg-sky-600/20 hover:bg-sky-600 text-sky-400 hover:text-white rounded-md text-xs font-medium border border-sky-500/30 transition-all flex items-center gap-1.5">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+              class="flex-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-medium shadow-lg shadow-sky-600/20 transition-all flex items-center justify-center gap-1.5" title="Click to connect">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
               Connect
             </a>
+            <button class="px-2 py-1.5 text-neutral-400 hover:text-white rounded-md text-xs font-medium border border-neutral-700 hover:bg-neutral-800 transition-all" title="Details (open info panel)">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
           </div>
         </div>
       {/each}

@@ -44,3 +44,5 @@
 ## 9. Security & DB (Zero-Knowledge)
 - [x] Ensure SQLite database uses strong encryption (e.g., `sqlcipher` or similar Rust crates).
 - [x] Implement minimum 8-character password requirement for vault unlock.
+## 10. Audit & Completion
+- [x] Audited and completed Hosts, Groups, Snippets, and SSH Keys persistence to SQLite. Updated Hosts toolbar to match screenshot requirements.

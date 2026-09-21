@@ -121,3 +121,53 @@ pub fn import_encrypted_backup(encrypted_b64: &str, passphrase: &str) -> Result<
 
     Ok(imported_count)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_backup_roundtrip() {
+        // We can test this by mocking the store, but here we can at least test that 
+        // encryption/decryption works and doesn't leak plaintext.
+        let passphrase = "correct-horse-battery";
+        let payload = VaultBackupPayload {
+            version: "2.0.9".to_string(),
+            timestamp: 1234567890,
+            hosts: vec![HostRecord {
+                id: "h1".into(),
+                label: "Test".into(),
+                address: "127.0.0.1".into(),
+                port: 22,
+                username: "root".into(),
+                auth_method: "password".into(),
+                tags: vec![],
+                created_at: 1,
+                updated_at: 1,
+            }],
+            groups: vec![],
+            snippets: vec![],
+            keys: vec![],
+        };
+        let json_bytes = serde_json::to_vec(&payload).unwrap();
+        
+        // Encrypt with passphrase derived key using Argon2id + AES-256-GCM
+        let mut derived_key = [0u8; 32];
+        let params = argon2::Params::new(64 * 1024, 3, 4, Some(32)).unwrap();
+        let argon2 = argon2::Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+        let salt = b"caterm.vault.backup.salt.2026";
+        argon2.hash_password_into(passphrase.as_bytes(), salt, &mut derived_key).unwrap();
+
+        let encrypted_b64 = crate::secret::encrypt_bytes(&derived_key, &json_bytes).unwrap();
+        
+        // Ensure no plaintext leakage
+        assert!(!encrypted_b64.contains("Test"));
+        assert!(!encrypted_b64.contains("127.0.0.1"));
+
+        // Decrypt
+        let decrypted_bytes = crate::secret::decrypt_bytes(&derived_key, &encrypted_b64).unwrap();
+        let decrypted_payload: VaultBackupPayload = serde_json::from_slice(&decrypted_bytes).unwrap();
+
+        assert_eq!(decrypted_payload.hosts[0].label, "Test");
+    }
+}

@@ -92,8 +92,9 @@ fn migrate_hosts_secret_column(conn: &Connection) -> Result<(), CatermError> {
 /// Opens the encrypted database at the resolved data dir, keyed with the local vault key.
 pub fn open() -> Result<Connection, CatermError> {
     let data_dir = crate::paths::resolve_data_dir()?.path;
-    let key = crate::vault::load_or_create_local_key(&data_dir)?;
-    open_encrypted(&data_dir, &key)
+    let key = crate::vault::get_active_dek()?;
+    let key_hex = hex::encode(key);
+    open_encrypted(&data_dir, &key_hex)
 }
 
 #[cfg(test)]
