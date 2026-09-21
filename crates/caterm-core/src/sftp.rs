@@ -121,13 +121,27 @@ pub fn write_remote_file(host_id: &str, remote_path: &str, data: &[u8]) -> Resul
     })
 }
 
+pub fn mkdir_remote_dir(host_id: &str, remote_path: &str) -> Result<(), CatermError> {
+    let path = remote_path.to_string();
+
+    crate::ssh::with_exec_session(host_id, move |sess| {
+        let sftp = open_sftp(sess)?;
+        sftp.mkdir(Path::new(&path), 0o755)
+            .map_err(|e| sftp_err(format!("Failed to create remote directory {path}: {e}")))
+    })
+}
+
 pub fn delete_remote_file(host_id: &str, remote_path: &str) -> Result<(), CatermError> {
     let path = remote_path.to_string();
 
     crate::ssh::with_exec_session(host_id, move |sess| {
         let sftp = open_sftp(sess)?;
-        sftp.unlink(Path::new(&path))
-            .map_err(|e| sftp_err(format!("Failed to delete remote file {path}: {e}")))
+        // Try unlink first, if failed try rmdir for directory
+        if let Err(e) = sftp.unlink(Path::new(&path)) {
+            sftp.rmdir(Path::new(&path))
+                .map_err(|_| sftp_err(format!("Failed to delete remote file or directory {path}: {e}")))?;
+        }
+        Ok(())
     })
 }
 

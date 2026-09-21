@@ -39,7 +39,14 @@ const COMMANDS: &[&str] = &[
     "list_remote_dir",
     "read_remote_file",
     "write_remote_file",
+    "mkdir_remote_dir",
     "delete_remote_file",
+    "sftp_rename",
+    "sftp_copy",
+    // Window control
+    "window_minimize",
+    "window_maximize",
+    "window_close",
     // Backup & restore
     "export_encrypted_backup",
     "import_encrypted_backup",

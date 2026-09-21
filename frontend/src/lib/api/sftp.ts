@@ -20,6 +20,10 @@ export function writeRemoteFile(hostId: string, remotePath: string, data: number
   return invoke('write_remote_file', { hostId, remotePath, data });
 }
 
+export function mkdirRemoteDir(hostId: string, remotePath: string): Promise<void> {
+  return invoke('mkdir_remote_dir', { hostId, remotePath });
+}
+
 export function deleteRemoteFile(hostId: string, remotePath: string): Promise<void> {
   return invoke('delete_remote_file', { hostId, remotePath });
 }

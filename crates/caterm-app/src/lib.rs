@@ -104,6 +104,7 @@ pub fn run(start: std::time::Instant) {
             commands::list_remote_dir,
             commands::read_remote_file,
             commands::write_remote_file,
+            commands::mkdir_remote_dir,
             commands::delete_remote_file,
             commands::sftp_rename,
             commands::sftp_copy,
@@ -128,6 +129,9 @@ pub fn run(start: std::time::Instant) {
             commands::ai_generate_plan,
             commands::ai_chat,
             commands::ai_execute_step,
+            commands::window_minimize,
+            commands::window_maximize,
+            commands::window_close,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

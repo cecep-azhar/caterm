@@ -24,6 +24,7 @@
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
   import { onMount, onDestroy } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
+  import { invoke } from '@tauri-apps/api/core';
 
   let timeAgo = $state('never');
   
@@ -58,38 +59,50 @@
 
   async function minimizeWindow() {
     try {
-      if (appWindow) {
-        await appWindow.minimize();
-      } else if (typeof window !== 'undefined') {
-        const win = getCurrentWindow();
-        await win.minimize();
-      }
+      await invoke('window_minimize');
     } catch (e) {
-      console.warn('Failed to minimize window:', e);
+      try {
+        if (appWindow) {
+          await appWindow.minimize();
+        } else if (typeof window !== 'undefined') {
+          const win = getCurrentWindow();
+          await win.minimize();
+        }
+      } catch (err) {
+        console.warn('Failed to minimize window:', err);
+      }
     }
   }
   async function maximizeWindow() {
     try {
-      if (appWindow) {
-        await appWindow.toggleMaximize();
-      } else if (typeof window !== 'undefined') {
-        const win = getCurrentWindow();
-        await win.toggleMaximize();
-      }
+      await invoke('window_maximize');
     } catch (e) {
-      console.warn('Failed to toggle maximize window:', e);
+      try {
+        if (appWindow) {
+          await appWindow.toggleMaximize();
+        } else if (typeof window !== 'undefined') {
+          const win = getCurrentWindow();
+          await win.toggleMaximize();
+        }
+      } catch (err) {
+        console.warn('Failed to toggle maximize window:', err);
+      }
     }
   }
   async function closeWindow() {
     try {
-      if (appWindow) {
-        await appWindow.close();
-      } else if (typeof window !== 'undefined') {
-        const win = getCurrentWindow();
-        await win.close();
-      }
+      await invoke('window_close');
     } catch (e) {
-      console.warn('Failed to close window:', e);
+      try {
+        if (appWindow) {
+          await appWindow.close();
+        } else if (typeof window !== 'undefined') {
+          const win = getCurrentWindow();
+          await win.close();
+        }
+      } catch (err) {
+        console.warn('Failed to close window:', err);
+      }
     }
   }
 

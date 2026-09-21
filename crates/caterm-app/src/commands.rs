@@ -19,6 +19,29 @@ where
 }
 
 #[tauri::command]
+pub async fn window_minimize(window: tauri::Window) {
+    let _ = window.minimize();
+}
+
+#[tauri::command]
+pub async fn window_maximize(window: tauri::Window) {
+    if let Ok(max) = window.is_maximized() {
+        if max {
+            let _ = window.unmaximize();
+        } else {
+            let _ = window.maximize();
+        }
+    } else {
+        let _ = window.maximize();
+    }
+}
+
+#[tauri::command]
+pub async fn window_close(window: tauri::Window) {
+    let _ = window.close();
+}
+
+#[tauri::command]
 pub async fn list_tunnels() -> Result<Vec<tunnels::TunnelRecord>, CatermError> {
     run_blocking(tunnels::list_tunnels).await
 }
@@ -65,8 +88,13 @@ pub async fn write_remote_file(
     host_id: String,
     remote_path: String,
     data: Vec<u8>,
-) -> Result<(), CatermError> {
+)| -> Result<(), CatermError> {
     run_blocking(move || sftp::write_remote_file(&host_id, &remote_path, &data)).await
+}
+
+#[tauri::command]
+pub async fn mkdir_remote_dir(host_id: String, remote_path: String) -> Result<(), CatermError> {
+    run_blocking(move || sftp::mkdir_remote_dir(&host_id, &remote_path)).await
 }
 
 #[tauri::command]
