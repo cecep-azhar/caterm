@@ -241,9 +241,17 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     let buffer_read = Arc::clone(&output_buffer);
     thread::spawn(move || {
         let mut buf = [0u8; 4096];
+        let mut err_buf = [0u8; 4096];
         loop {
             let (read_res, is_eof) = {
                 if let Ok(mut ch) = channel_read.lock() {
+                    if let Ok(n_err) = ch.stderr().read(&mut err_buf) {
+                        if n_err > 0 {
+                            if let Ok(mut out) = buffer_read.lock() {
+                                out.extend_from_slice(&err_buf[..n_err]);
+                            }
+                        }
+                    }
                     let res = ch.read(&mut buf);
                     let eof = ch.eof();
                     (res, eof)

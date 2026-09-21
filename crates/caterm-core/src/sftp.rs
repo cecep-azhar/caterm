@@ -37,7 +37,9 @@ pub fn list_remote_dir(
     let sess_inner = sess_arc.lock().map_err(|_| {
         CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string()))
     })?;
+    sess_inner.set_blocking(true);
     let sftp = sess_inner.sftp().map_err(|e| {
+        sess_inner.set_blocking(false);
         CatermError::Sftp(crate::error::SftpError::Generic(format!(
             "Failed to initialize SFTP subsystem: {}",
             e
@@ -92,6 +94,7 @@ pub fn list_remote_dir(
         }
     });
 
+    sess_inner.set_blocking(false);
     Ok(entries)
 }
 
@@ -113,7 +116,9 @@ pub fn read_remote_file(host_id: &str, remote_path: &str) -> Result<Vec<u8>, Cat
     let sess_inner = sess_arc.lock().map_err(|_| {
         CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string()))
     })?;
+    sess_inner.set_blocking(true);
     let sftp = sess_inner.sftp().map_err(|e| {
+        sess_inner.set_blocking(false);
         CatermError::Sftp(crate::error::SftpError::Generic(format!(
             "Failed to initialize SFTP subsystem: {}",
             e
@@ -135,6 +140,7 @@ pub fn read_remote_file(host_id: &str, remote_path: &str) -> Result<Vec<u8>, Cat
         )))
     })?;
 
+    sess_inner.set_blocking(false);
     Ok(buf)
 }
 
@@ -156,7 +162,9 @@ pub fn write_remote_file(host_id: &str, remote_path: &str, data: &[u8]) -> Resul
     let sess_inner = sess_arc.lock().map_err(|_| {
         CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string()))
     })?;
+    sess_inner.set_blocking(true);
     let sftp = sess_inner.sftp().map_err(|e| {
+        sess_inner.set_blocking(false);
         CatermError::Sftp(crate::error::SftpError::Generic(format!(
             "Failed to initialize SFTP subsystem: {}",
             e
@@ -177,6 +185,7 @@ pub fn write_remote_file(host_id: &str, remote_path: &str, data: &[u8]) -> Resul
         )))
     })?;
 
+    sess_inner.set_blocking(false);
     Ok(())
 }
 
@@ -198,7 +207,9 @@ pub fn delete_remote_file(host_id: &str, remote_path: &str) -> Result<(), Caterm
     let sess_inner = sess_arc.lock().map_err(|_| {
         CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string()))
     })?;
+    sess_inner.set_blocking(true);
     let sftp = sess_inner.sftp().map_err(|e| {
+        sess_inner.set_blocking(false);
         CatermError::Sftp(crate::error::SftpError::Generic(format!(
             "Failed to initialize SFTP subsystem: {}",
             e
@@ -212,5 +223,6 @@ pub fn delete_remote_file(host_id: &str, remote_path: &str) -> Result<(), Caterm
         )))
     })?;
 
+    sess_inner.set_blocking(false);
     Ok(())
 }

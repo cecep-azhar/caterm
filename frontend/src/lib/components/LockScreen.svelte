@@ -8,6 +8,7 @@
 
   let password = '';
   let errorMsg = '';
+  let successMsg = '';
   let isLoading = false;
   let isSetup = false;
 
@@ -68,9 +69,11 @@
     if (confirmed) {
       try {
         await resetVault();
-        showToast('Vault berhasil direset. Silakan buat password baru.', 'success');
+        successMsg = 'Reset vault berhasil! Seluruh database dan kunci lokal telah dibersihkan.';
+        showToast('Reset vault berhasil! Seluruh database telah dibersihkan.', 'success');
         isSetup = true;
         password = '';
+        errorMsg = '';
       } catch (err: any) {
         showToast('Gagal mereset vault: ' + String(err), 'error');
       }
@@ -133,6 +136,12 @@
         <h2 class="text-2xl font-bold text-white">{isSetup ? 'Setup CATerm Vault' : 'Unlock CATerm Vault'}</h2>
         <p class="text-sm text-neutral-400 mt-1">Local Identity <span class="text-emerald-400 font-mono">(Encrypted)</span></p>
       </div>
+
+      {#if successMsg}
+        <div class="p-3 text-xs rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-center">
+          {successMsg}
+        </div>
+      {/if}
 
       {#if errorMsg}
         <div class="p-3 text-xs rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-center">

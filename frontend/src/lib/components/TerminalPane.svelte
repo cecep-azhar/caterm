@@ -73,8 +73,11 @@
         if (disposed) return;
         session = opened;
         status = 'connected';
+        fitAddon.fit();
+        void sshResize(opened.sessionId, term.cols, term.rows).catch(() => {});
         term.write(`\r\n\x1b[32mconnected\x1b[0m (session ${opened.sessionId})\r\n`);
         markActive();
+        term.focus();
 
         // Start polling for PTY output
         pollTimer = setInterval(() => {
@@ -86,7 +89,7 @@
               }
             })
             .catch(() => {});
-        }, 50);
+        }, 40);
       })
       .catch((err) => {
         if (disposed) return;
@@ -108,7 +111,10 @@
       }
     };
     window.addEventListener('resize', handleResize);
-    terminalContainer.addEventListener('click', markActive);
+    terminalContainer.addEventListener('click', () => {
+      markActive();
+      term.focus();
+    });
 
     return () => {
       disposed = true;

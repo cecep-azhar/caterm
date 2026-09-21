@@ -31,10 +31,43 @@ pub fn is_vault_initialized() -> Result<bool, CatermError> {
 
 pub fn reset_vault() -> Result<(), CatermError> {
     let data_dir = crate::paths::resolve_data_dir()?.path;
-    let _ = std::fs::remove_file(data_dir.join("vault_canary.bin"));
-    let _ = std::fs::remove_file(data_dir.join("vault.key"));
-    let _ = std::fs::remove_file(data_dir.join("caterm.db"));
-    lock_vault()?;
+
+    // 1. Disconnect all active tunnels and SSH sessions
+    let _ = crate::tunnels::stop_all_tunnels();
+    if let Ok(mut sessions) = crate::ssh::SESSIONS.lock() {
+        for (_id, handle) in sessions.drain() {
+            if let Ok(mut ch) = handle.channel.lock() {
+                let _ = ch.close();
+            }
+        }
+    }
+
+    // 2. Zeroize active vault key directly without logging to DB
+    {
+        let mut guard = ACTIVE_VAULT_KEY.write();
+        if let Some(mut key) = guard.take() {
+            key.zeroize();
+        }
+    }
+
+    // 3. Remove all vault security and database files
+    let files = [
+        "vault_canary.bin",
+        "vault.key",
+        "local.key",
+        "caterm.db",
+        "caterm.db-wal",
+        "caterm.db-shm",
+        "caterm.db-journal",
+        "known_hosts",
+    ];
+    for f in &files {
+        let p = data_dir.join(f);
+        if p.exists() {
+            let _ = std::fs::remove_file(&p);
+        }
+    }
+
     Ok(())
 }
 
