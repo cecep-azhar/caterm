@@ -38,7 +38,7 @@ pub fn export_encrypted_backup(passphrase: &str) -> Result<String, CatermError> 
         .unwrap_or(0);
 
     let payload = VaultBackupPayload {
-        version: "2.0.9".to_string(),
+        version: "2.0.10".to_string(),
         timestamp: now,
         hosts,
         groups,
@@ -136,7 +136,7 @@ mod tests {
         // encryption/decryption works and doesn't leak plaintext.
         let passphrase = "correct-horse-battery";
         let payload = VaultBackupPayload {
-            version: "2.0.9".to_string(),
+            version: "2.0.10".to_string(),
             timestamp: 1234567890,
             hosts: vec![HostRecord {
                 id: "h1".into(),
