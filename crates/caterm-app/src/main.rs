@@ -20,7 +20,18 @@
     )
 )]
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 fn main() {
-    let start = std::time::Instant::now();
-    caterm_app_lib::run(start)
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .expect("failed to build tokio runtime");
+
+    runtime.block_on(async {
+        let start = std::time::Instant::now();
+        caterm_app_lib::run(start);
+    });
 }

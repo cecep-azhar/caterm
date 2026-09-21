@@ -30,6 +30,7 @@
   
   $effect(() => {
     const updateTime = () => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       if (!monitorState.lastUpdated) { timeAgo = 'never'; return; }
       const diff = Math.floor((Date.now() - monitorState.lastUpdated.getTime()) / 1000);
       if (diff < 2) timeAgo = 'just now';
@@ -37,7 +38,7 @@
       else timeAgo = `${Math.floor(diff/60)}m ago`;
     };
     updateTime();
-    const t = setInterval(updateTime, 1000);
+    const t = setInterval(updateTime, 5000);
     return () => clearInterval(t);
   });
 

@@ -76,6 +76,24 @@ pub fn run(start: std::time::Instant) {
     tauri::Builder::default()
         .setup(move |app| {
             install_ssh_event_bridge(app.handle());
+
+            #[cfg(target_os = "linux")]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    window.with_webview(|webview| {
+                        use webkit2gtk::{WebContextExt, WebViewExt, SettingsExt};
+                        let inner = webview.inner();
+                        if let Some(context) = inner.context() {
+                            context.set_cache_model(webkit2gtk::CacheModel::DocumentViewer);
+                        }
+                        if let Some(settings) = inner.settings() {
+                            settings.set_enable_webgl(false);
+                        }
+                    }).ok();
+                }
+            }
+
             println!("CATERM_COLD_START_MS={}", start.elapsed().as_millis());
             Ok(())
         })
@@ -106,8 +124,20 @@ pub fn run(start: std::time::Instant) {
             commands::write_remote_file,
             commands::mkdir_remote_dir,
             commands::delete_remote_file,
+            commands::sftp_stat,
+            commands::sftp_chmod,
+            commands::sftp_upload,
+            commands::sftp_download,
+            commands::sftp_cancel,
             commands::sftp_rename,
             commands::sftp_copy,
+            commands::local_list_dir,
+            commands::local_stat,
+            commands::local_mkdir,
+            commands::local_delete,
+            commands::local_rename,
+            commands::local_read_file,
+            commands::local_write_file,
             commands::export_encrypted_backup,
             commands::import_encrypted_backup,
             commands::list_keys,

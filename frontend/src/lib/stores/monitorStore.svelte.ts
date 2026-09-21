@@ -9,6 +9,7 @@ export const monitorState = $state({
 let timer: ReturnType<typeof setInterval> | null = null;
 
 export async function fetchMetrics() {
+    if (typeof document !== 'undefined' && document.hidden) return;
     try {
         monitorState.isPolling = true;
         const res = await pollActiveMetrics();

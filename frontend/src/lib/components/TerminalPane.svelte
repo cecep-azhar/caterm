@@ -92,7 +92,8 @@
       theme: terminalTheme(theme.name),
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       fontSize: 13,
-      cursorBlink: true
+      cursorBlink: true,
+      scrollback: 1000
     });
     term = terminal;
 
