@@ -251,6 +251,11 @@
       href: '/ssh-keys',
       label: 'SSH keys',
       path: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z'
+    },
+    {
+      href: '/contribution',
+      label: 'Contribution',
+      path: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
     }
   ];
 </script>
@@ -289,7 +294,7 @@
         <div class="flex items-center gap-2">
           <Logo size={22} mode="brand" />
           <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide">CATerm</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.3</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.4</span>
         </div>
         <button
           onclick={() => mobileDrawerOpen = false}
@@ -383,7 +388,7 @@
           <div class="flex items-center gap-2 overflow-hidden min-w-0">
             <Logo size={22} mode="brand" />
             <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate">CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.3</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.4</span>
           </div>
           <button
             type="button"

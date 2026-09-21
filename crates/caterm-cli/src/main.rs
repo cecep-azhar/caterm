@@ -353,6 +353,7 @@ fn handle_host(action: HostAction) -> i32 {
                 username,
                 auth_method: auth,
                 tags,
+                os: None,
                 secret: if secret.is_empty() {
                     None
                 } else {

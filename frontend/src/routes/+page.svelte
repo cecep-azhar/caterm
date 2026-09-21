@@ -3,6 +3,7 @@
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
   import HostDetailPanel from '$lib/components/HostDetailPanel.svelte';
+  import OsIcon from '$lib/components/OsIcon.svelte';
   import { openSession } from '$lib/nav';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
 
@@ -79,6 +80,7 @@
   let formSecret = $state('');
   let showFormSecret = $state(false);
   let formTags = $state('');
+  let formOs = $state('');
 
   onMount(async () => {
     await refreshHosts();
@@ -104,6 +106,7 @@
     formKeyPath = '';
     formSecret = '';
     formTags = '';
+    formOs = '';
     errorMsg = '';
     isAddModalOpen = true;
   }
@@ -120,6 +123,7 @@
     formKeyId = host.authMethod.type === 'keyId' ? host.authMethod.id : '';
     formSecret = '';
     formTags = host.tags.join(', ');
+    formOs = host.os || '';
     errorMsg = '';
     isAddModalOpen = true;
   }
@@ -141,6 +145,7 @@
         username: formUsername,
         authMethod: formAuthType === 'password' ? { type: 'password' } : (formAuthType === 'keyId' ? { type: 'keyId', id: formKeyId } : { type: 'key', path: formKeyPath }),
         tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
+        os: formOs ? formOs : undefined,
         // Blank = leave whatever's stored untouched (edit) or no secret at all (create).
         secret: formSecret ? formSecret : undefined
       };
@@ -177,7 +182,8 @@
         port: host.port,
         username: host.username,
         authMethod: host.authMethod,
-        tags: [...host.tags]
+        tags: [...host.tags],
+        os: host.os
       };
       await saveHost(input);
       showToast(`Host "${host.label}" cloned successfully`, 'success');
@@ -274,7 +280,10 @@
         <div class="p-5 bg-white dark:bg-neutral-900 border rounded-xl shadow-sm dark:shadow-none transition-colors flex flex-col justify-between group {isSelected(host.id) ? 'border-sky-500 dark:border-sky-500 ring-1 ring-sky-500/40' : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700'}">
           <div>
             <div class="flex items-center justify-between mb-2">
-              <span class="font-bold text-neutral-900 dark:text-white text-base truncate">{host.label}</span>
+              <div class="flex items-center gap-2 min-w-0">
+                <OsIcon os={host.os} name={host.label} tags={host.tags} address={host.address} size={18} />
+                <span class="font-bold text-neutral-900 dark:text-white text-base truncate">{host.label}</span>
+              </div>
               <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                   onclick={() => openEditModal(host)}
@@ -305,7 +314,7 @@
             {/if}
           </div>
 
-          <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-1.5">
+          <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-start gap-2">
             <!-- 1. Connect: Lightning SVG, primary button -->
             <button
               onclick={() => openSession(host.id)}
@@ -494,6 +503,70 @@
           </div>
           {/if}
           <p class="text-neutral-500 text-xs mt-1">Stored encrypted (AES-256-GCM) in local database — never returned to the UI.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Operating System / Distro (Optional)</label>
+          <div class="flex items-center gap-2">
+            <OsIcon os={formOs} name={formLabel} tags={formTags.split(',')} address={formAddress} size={20} />
+            <select
+              bind:value={formOs}
+              class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none text-xs"
+            >
+              <option value="">Auto Detect (from Name, Tags, or Address)</option>
+              <optgroup label="Popular Linux Distros">
+                <option value="ubuntu">Ubuntu</option>
+                <option value="debian">Debian</option>
+                <option value="fedora">Fedora</option>
+                <option value="redhat">Red Hat / RHEL</option>
+                <option value="centos">CentOS</option>
+                <option value="rocky">Rocky Linux</option>
+                <option value="almalinux">AlmaLinux</option>
+                <option value="arch">Arch Linux</option>
+                <option value="manjaro">Manjaro</option>
+                <option value="alpine">Alpine Linux</option>
+                <option value="opensuse">openSUSE / SUSE</option>
+                <option value="mint">Linux Mint</option>
+                <option value="kali">Kali Linux</option>
+                <option value="popos">Pop!_OS</option>
+                <option value="gentoo">Gentoo</option>
+                <option value="void">Void Linux</option>
+                <option value="nixos">NixOS</option>
+                <option value="endeavour">EndeavourOS</option>
+                <option value="elementary">Elementary OS</option>
+                <option value="zorin">Zorin OS</option>
+                <option value="raspberry">Raspberry Pi OS / Raspbian</option>
+                <option value="amazon">Amazon Linux</option>
+                <option value="oracle">Oracle Linux</option>
+                <option value="slackware">Slackware</option>
+                <option value="mageia">Mageia</option>
+                <option value="solus">Solus</option>
+                <option value="tails">Tails</option>
+                <option value="deepin">Deepin</option>
+                <option value="clear">Clear Linux</option>
+                <option value="garuda">Garuda Linux</option>
+                <option value="steam">SteamOS</option>
+                <option value="coreos">CoreOS / Flatcar</option>
+                <option value="devuan">Devuan</option>
+                <option value="parrot">Parrot OS</option>
+                <option value="mx">MX Linux</option>
+                <option value="lubuntu">Lubuntu / Xubuntu / Kubuntu</option>
+                <option value="linux">Generic Linux (Tux)</option>
+              </optgroup>
+              <optgroup label="Other Operating Systems &amp; Devices">
+                <option value="windows">Windows</option>
+                <option value="macos">macOS / Apple</option>
+                <option value="android">Android</option>
+                <option value="ios">iOS</option>
+                <option value="freebsd">FreeBSD</option>
+                <option value="openbsd">OpenBSD</option>
+                <option value="netbsd">NetBSD</option>
+                <option value="mikrotik">MikroTik / RouterOS</option>
+                <option value="cisco">Cisco IOS</option>
+                <option value="server">Generic Server</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
 
         <div>

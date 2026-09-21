@@ -92,6 +92,7 @@ pub fn import_encrypted_backup(
             username: host.username,
             auth_method: host.auth_method,
             tags: host.tags,
+            os: host.os,
             secret: None,
         })?;
         imported_count += 1;
@@ -146,6 +147,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: crate::store::AuthMethod::Password,
                 tags: vec![],
+                os: None,
                 created_at: 1,
                 updated_at: 1,
                 has_secret: false,

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+button, [role="button"], a, input[type="submit"], input[type="button"], select {
+  cursor: pointer !important;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {

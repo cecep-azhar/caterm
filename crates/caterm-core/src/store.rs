@@ -34,6 +34,8 @@ pub struct HostRecord {
     pub username: String,
     pub auth_method: AuthMethod,
     pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub os: Option<String>,
     pub created_at: u64,
     pub updated_at: u64,
     /// Whether a password/passphrase is already stored for this host. Never the secret
@@ -54,6 +56,8 @@ pub struct HostInput {
     pub username: String,
     pub auth_method: AuthMethod,
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub os: Option<String>,
     /// Write-only. `None` (field omitted) = leave the stored secret untouched. `Some("")` =
     /// clear it. `Some(s)` = encrypt `s` and store it, replacing whatever was there.
     #[serde(default)]
@@ -85,6 +89,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
     let tags: Vec<String> = serde_json::from_str(&tags_json).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
     })?;
+    let os: Option<String> = row.get("os").unwrap_or(None);
     Ok(HostRecord {
         id: row.get("id")?,
         label: row.get("label")?,
@@ -93,6 +98,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
         username: row.get("username")?,
         auth_method,
         tags,
+        os,
         created_at: row.get::<_, i64>("created_at")? as u64,
         updated_at: row.get::<_, i64>("updated_at")? as u64,
         has_secret: secret_enc.map(|s| !s.is_empty()).unwrap_or(false),
@@ -104,7 +110,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
 pub(crate) fn list_hosts_in(conn: &Connection) -> Result<Vec<HostRecord>, CatermError> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, label, address, port, username, auth_method, tags, created_at, updated_at, secret_enc \
+            "SELECT id, label, address, port, username, auth_method, tags, os, created_at, updated_at, secret_enc \
              FROM hosts ORDER BY created_at ASC",
         )
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal query hosts: {e}"))))?;
@@ -154,9 +160,10 @@ pub(crate) fn save_host_in(
     let tags_json = serde_json::to_string(&input.tags)
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal serialisasi tags: {e}"))))?;
 
+    let os = input.os.filter(|s| !s.is_empty());
     conn.execute(
-        "INSERT INTO hosts (id, label, address, port, username, auth_method, tags, created_at, updated_at, secret_enc)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        "INSERT INTO hosts (id, label, address, port, username, auth_method, tags, os, created_at, updated_at, secret_enc)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
          ON CONFLICT(id) DO UPDATE SET
             label = excluded.label,
             address = excluded.address,
@@ -164,6 +171,7 @@ pub(crate) fn save_host_in(
             username = excluded.username,
             auth_method = excluded.auth_method,
             tags = excluded.tags,
+            os = excluded.os,
             updated_at = excluded.updated_at,
             secret_enc = excluded.secret_enc",
         params![
@@ -174,6 +182,7 @@ pub(crate) fn save_host_in(
             input.username,
             auth_json,
             tags_json,
+            os,
             created_at as i64,
             now as i64,
             secret_enc
@@ -189,6 +198,7 @@ pub(crate) fn save_host_in(
         username: input.username,
         auth_method: input.auth_method,
         tags: input.tags,
+        os,
         created_at,
         updated_at: now,
         has_secret: secret_enc.map(|s| !s.is_empty()).unwrap_or(false),
@@ -228,14 +238,14 @@ pub fn delete_host(id: &str) -> Result<(), CatermError> {
     delete_host_in(&db::open()?, id)
 }
 
-fn load_host_for_connect_in(
+pub(crate) fn load_host_for_connect_in(
     conn: &Connection,
     id: &str,
     local_key: &str,
 ) -> Result<(HostRecord, Option<String>), CatermError> {
     let (host, secret_enc): (HostRecord, Option<String>) = conn
         .query_row(
-            "SELECT id, label, address, port, username, auth_method, tags, created_at, updated_at, secret_enc \
+            "SELECT id, label, address, port, username, auth_method, tags, os, created_at, updated_at, secret_enc \
              FROM hosts WHERE id = ?1",
             params![id],
             |row| Ok((row_to_host(row)?, row.get::<_, Option<String>>("secret_enc")?)),
@@ -298,6 +308,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec!["test".into()],
+                os: None,
                 secret: None,
             },
             TEST_KEY,
@@ -323,6 +334,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                os: None,
                 secret: Some("hunter2".into()),
             },
             TEST_KEY,
@@ -342,6 +354,7 @@ mod tests {
                     path: "/home/user/.ssh/id_ed25519".into(),
                 },
                 tags: vec!["prod".into()],
+                os: Some("fedora".into()),
                 secret: None,
             },
             TEST_KEY,
@@ -350,12 +363,14 @@ mod tests {
 
         assert_eq!(updated.id, first.id);
         assert_eq!(updated.created_at, first.created_at);
+        assert_eq!(updated.os.as_deref(), Some("fedora"));
         // `secret: None` on the update must not wipe the password saved above.
         assert!(updated.has_secret);
 
         let all = list_hosts_in(&db.0).expect("list_hosts gagal");
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].label, "Updated");
+        assert_eq!(all[0].os.as_deref(), Some("fedora"));
 
         let (_, decrypted) =
             load_host_for_connect_in(&db.0, &first.id, TEST_KEY).expect("load gagal");
@@ -375,6 +390,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                os: None,
                 secret: Some("hunter2".into()),
             },
             TEST_KEY,
@@ -392,6 +408,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                os: None,
                 secret: Some("".into()),
             },
             TEST_KEY,
@@ -413,6 +430,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                os: None,
                 secret: None,
             },
             TEST_KEY,
@@ -437,6 +455,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                os: None,
                 secret: None,
             },
             TEST_KEY,

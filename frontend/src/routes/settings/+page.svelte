@@ -146,7 +146,7 @@
       <div class="flex justify-between items-center">
         <div>
           <h2 class="text-lg font-semibold text-white">Application Updates</h2>
-          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v2.1.3</span></p>
+          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v2.1.4</span></p>
         </div>
         <button class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">
           Check for Updates
@@ -176,7 +176,7 @@
             <span class="font-semibold text-white">Free Plan</span>
             <span class="text-xs bg-neutral-800 text-neutral-300 border border-neutral-700 px-2 py-0.5 rounded">Current</span>
           </div>
-          <p class="text-neutral-400 text-xs mt-2">Limited to <span class="text-neutral-200 font-medium">3 hosts</span> and <span class="text-neutral-200 font-medium">10 snippets</span>.</p>
+          <p class="text-neutral-400 text-xs mt-2">Unlimited hosts &amp; snippets, 100% local-first, zero-knowledge encryption.</p>
         </div>
       </div>
 
@@ -187,7 +187,7 @@
               <span class="font-semibold text-white">Pro Plan</span>
               <span class="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded">Next Feature / Disabled</span>
             </div>
-            <p class="text-neutral-400 text-xs mt-2">Unlimited hosts &amp; snippets, priority support, and team collaboration.</p>
+            <p class="text-neutral-400 text-xs mt-2">Unlimited hosts &amp; snippets, AI Agent CATerm, priority support, and team collaboration.</p>
           </div>
           <div class="text-right shrink-0">
             <div class="text-2xl font-bold text-white">$1 <span class="text-sm font-normal text-neutral-500">/ mo</span></div>
@@ -197,6 +197,21 @@
         <button disabled class="w-full py-2.5 bg-sky-600/30 text-sky-200/60 text-sm font-semibold rounded-md cursor-not-allowed border border-sky-500/20">
           Upgrade to Pro ($1/mo, $3 next, +$1/team)
         </button>
+      </div>
+
+      <div class="pt-4 border-t border-neutral-800/80 flex items-center justify-between">
+        <div>
+          <p class="text-xs text-neutral-300 font-medium">Support Independent Open Development</p>
+          <p class="text-[11px] text-neutral-500">CATerm is free and local-first. Donations help maintain active development.</p>
+        </div>
+        <a
+          href="https://paypal.me/cecepazhar"
+          target="_blank"
+          rel="noopener"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-[#0070ba] hover:bg-[#005ea6] text-white text-xs font-semibold rounded-lg transition-colors"
+        >
+          <span>Donate via PayPal</span>
+        </a>
       </div>
     </div>
   {:else if activeTab === 'sync'}

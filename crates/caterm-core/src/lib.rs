@@ -29,6 +29,7 @@ pub mod error;
 pub mod groups;
 pub mod investigations;
 pub mod keys;
+pub mod local_fs;
 pub mod monitor;
 pub mod paths;
 pub mod secret;

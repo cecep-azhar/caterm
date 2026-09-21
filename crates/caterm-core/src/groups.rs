@@ -228,6 +228,7 @@ mod tests {
                 username: "root".into(),
                 auth_method: AuthMethod::Password,
                 tags: vec![],
+                os: None,
                 secret: None,
             },
             "test-local-key",

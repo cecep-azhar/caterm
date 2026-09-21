@@ -98,8 +98,125 @@ pub async fn mkdir_remote_dir(host_id: String, remote_path: String) -> Result<()
 }
 
 #[tauri::command]
-pub async fn delete_remote_file(host_id: String, remote_path: String) -> Result<(), CatermError> {
-    run_blocking(move || sftp::delete_remote_file(&host_id, &remote_path)).await
+pub async fn delete_remote_file(
+    host_id: String,
+    remote_path: String,
+    is_dir: Option<bool>,
+    recursive: Option<bool>,
+) -> Result<(), CatermError> {
+    run_blocking(move || {
+        sftp::delete_remote_file(
+            &host_id,
+            &remote_path,
+            is_dir.unwrap_or(false),
+            recursive.unwrap_or(false),
+        )
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn sftp_stat(
+    host_id: String,
+    remote_path: String,
+) -> Result<sftp::SftpFileEntry, CatermError> {
+    run_blocking(move || sftp::stat_remote(&host_id, &remote_path)).await
+}
+
+#[tauri::command]
+pub async fn sftp_chmod(
+    host_id: String,
+    remote_path: String,
+    mode: u32,
+) -> Result<(), CatermError> {
+    run_blocking(move || sftp::chmod_remote_file(&host_id, &remote_path, mode)).await
+}
+
+fn emit_progress_fn(app: &tauri::AppHandle) -> std::sync::Arc<parking_lot::Mutex<impl FnMut(sftp::SftpProgressPayload) + Send + 'static>> {
+    use tauri::Emitter;
+    let app_clone = app.clone();
+    std::sync::Arc::new(parking_lot::Mutex::new(move |p: sftp::SftpProgressPayload| {
+        let _ = app_clone.emit("sftp-progress", p);
+    }))
+}
+
+#[tauri::command]
+pub async fn sftp_upload(
+    app: tauri::AppHandle,
+    host_id: String,
+    local_path: String,
+    remote_path: String,
+    transfer_id: String,
+) -> Result<(), CatermError> {
+    let cb = emit_progress_fn(&app);
+    run_blocking(move || sftp::upload_file_with_progress(&host_id, &local_path, &remote_path, &transfer_id, cb)).await
+}
+
+#[tauri::command]
+pub async fn sftp_download(
+    app: tauri::AppHandle,
+    host_id: String,
+    remote_path: String,
+    local_path: String,
+    transfer_id: String,
+) -> Result<(), CatermError> {
+    let cb = emit_progress_fn(&app);
+    run_blocking(move || sftp::download_file_with_progress(&host_id, &remote_path, &local_path, &transfer_id, cb)).await
+}
+
+#[tauri::command]
+pub async fn sftp_cancel(transfer_id: String) -> Result<(), CatermError> {
+    sftp::cancel_transfer(&transfer_id)
+}
+
+#[tauri::command]
+pub async fn local_list_dir(
+    path: String,
+) -> Result<Vec<caterm_core::local_fs::LocalFileEntry>, CatermError> {
+    run_blocking(move || caterm_core::local_fs::local_list_dir(&path)).await
+}
+
+#[tauri::command]
+pub async fn local_stat(
+    path: String,
+) -> Result<caterm_core::local_fs::LocalFileEntry, CatermError> {
+    run_blocking(move || caterm_core::local_fs::local_stat(&path)).await
+}
+
+#[tauri::command]
+pub async fn local_mkdir(path: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::local_fs::local_mkdir(&path)).await
+}
+
+#[tauri::command]
+pub async fn local_delete(
+    path: String,
+    is_dir: Option<bool>,
+    recursive: Option<bool>,
+) -> Result<(), CatermError> {
+    run_blocking(move || {
+        caterm_core::local_fs::local_delete(
+            &path,
+            is_dir.unwrap_or(false),
+            recursive.unwrap_or(false),
+        )
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn local_rename(old_path: String, new_path: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::local_fs::local_rename(&old_path, &new_path)).await
+}
+
+#[tauri::command]
+pub async fn local_read_file(path: String) -> Result<Vec<u8>, CatermError> {
+    run_blocking(move || caterm_core::local_fs::local_read_file(&path)).await
+}
+
+#[tauri::command]
+pub async fn local_write_file(path: String, data: Vec<u8>) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::local_fs::local_write_file(&path, &data)).await
 }
 
 #[tauri::command]

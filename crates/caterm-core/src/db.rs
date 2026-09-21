@@ -33,6 +33,7 @@ pub fn open_encrypted(data_dir: &Path, passphrase: &str) -> Result<Connection, C
 
     init_schema(&conn)?;
     migrate_hosts_secret_column(&conn)?;
+    migrate_hosts_os_column(&conn)?;
     Ok(conn)
 }
 
@@ -46,6 +47,7 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             username TEXT NOT NULL,
             auth_method TEXT NOT NULL,
             tags TEXT NOT NULL,
+            os TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
          );
@@ -118,6 +120,22 @@ fn migrate_hosts_secret_column(conn: &Connection) -> Result<(), CatermError> {
             .map_err(|e| {
                 CatermError::Db(DbError::Generic(format!(
                     "gagal migrasi kolom secret_enc: {e}"
+                )))
+            })?;
+    }
+    Ok(())
+}
+
+fn migrate_hosts_os_column(conn: &Connection) -> Result<(), CatermError> {
+    let has_column: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('hosts') WHERE name = 'os'")
+        .and_then(|mut stmt| stmt.exists([]))
+        .unwrap_or(false);
+    if !has_column {
+        conn.execute_batch("ALTER TABLE hosts ADD COLUMN os TEXT")
+            .map_err(|e| {
+                CatermError::Db(DbError::Generic(format!(
+                    "gagal migrasi kolom os: {e}"
                 )))
             })?;
     }

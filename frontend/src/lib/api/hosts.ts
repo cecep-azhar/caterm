@@ -14,6 +14,7 @@ export interface HostRecord {
   username: string;
   authMethod: AuthMethod;
   tags: string[];
+  os?: string;
   createdAt: number;
   updatedAt: number;
   /** Whether a password/passphrase is already stored for this host (never the value itself). */
@@ -28,6 +29,7 @@ export interface HostInput {
   username: string;
   authMethod: AuthMethod;
   tags: string[];
+  os?: string;
   /** Write-only. Omit to leave the stored secret untouched, "" to clear it, or a new
    * password/passphrase to (re)encrypt and store it. Never comes back out via HostRecord. */
   secret?: string;

@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/state';
+  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import {
     listRemoteDir,
     readRemoteFile,
@@ -9,123 +10,210 @@
     deleteRemoteFile,
     renameRemoteFile,
     copyRemoteFile,
-    type SftpFileEntry
+    sftpChmod,
+    sftpUpload,
+    sftpDownload,
+    sftpCancel,
+    type SftpFileEntry,
+    type SftpProgressPayload
   } from '$lib/api/sftp';
+  import {
+    localListDir,
+    localStat,
+    localMkdir,
+    localDelete,
+    localRename,
+    localReadFile,
+    localWriteFile,
+    type LocalFileEntry
+  } from '$lib/api/local_fs';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
 
+  interface TransferItem {
+    id: string;
+    source: string;
+    target: string;
+    direction: 'upload' | 'download';
+    status: 'queued' | 'active' | 'completed' | 'failed' | 'cancelled';
+    bytesTransferred: number;
+    totalBytes: number;
+    speedBps: number;
+    error?: string;
+  }
+
+  // Hosts & Navigation
   let hosts = $state<HostRecord[]>([]);
   let currentHostId = $state('');
-  let currentPath = $state('/');
-  let files = $state<SftpFileEntry[]>([]);
-  let isLoading = $state(false);
+  let viewMode = $state<'dual' | 'single'>('dual');
+  let activePane = $state<'local' | 'remote'>('remote');
+
+  // Local Pane State
+  let localPath = $state('~');
+  let localFiles = $state<LocalFileEntry[]>([]);
+  let localLoading = $state(false);
+  let localSelectedPaths = $state<Set<string>>(new Set());
+  let localLastSelected = $state<LocalFileEntry | null>(null);
+
+  // Remote Pane State
+  let remotePath = $state('/');
+  let remoteFiles = $state<SftpFileEntry[]>([]);
+  let remoteLoading = $state(false);
+  let remoteSelectedPaths = $state<Set<string>>(new Set());
+  let remoteLastSelected = $state<SftpFileEntry | null>(null);
+
+  // Notifications
   let errorMsg = $state('');
   let successMsg = $state('');
 
-  // Multi-selection state
-  let selectedPaths = $state<Set<string>>(new Set());
+  // Transfer Queue State
+  let transfers = $state<TransferItem[]>([]);
+  let isQueueRunning = $state(false);
+  let unlistenProgress: UnlistenFn | null = null;
 
-  // Selected file for single operations
-  let selectedFile = $state<SftpFileEntry | null>(null);
-
-  // Clipboard for copy / cut
-  let clipboard = $state<{
-    action: 'copy' | 'cut';
-    file: SftpFileEntry;
-    sourceHostId: string;
-  } | null>(null);
-
-  // Modals state
-  let showNewFileModal = $state(false);
-  let newFileName = $state('');
-
+  // Modals
   let showNewFolderModal = $state(false);
   let newFolderName = $state('');
+  let newFolderTargetPane = $state<'local' | 'remote'>('remote');
 
   let showRenameModal = $state(false);
+  let renameItem = $state<{ pane: 'local' | 'remote'; path: string; name: string } | null>(null);
   let renameNewName = $state('');
 
   let showDeleteModal = $state(false);
-  let fileToDelete = $state<SftpFileEntry | null>(null);
-  let isBatchDeleting = $state(false);
+  let deleteTarget = $state<{ pane: 'local' | 'remote'; paths: string[] } | null>(null);
 
   let showEditorModal = $state(false);
-  let editorFilePath = $state('');
-  let editorFileName = $state('');
+  let editorItem = $state<{ pane: 'local' | 'remote'; path: string; name: string } | null>(null);
   let editorContent = $state('');
-  let isSavingEditor = $state(false);
-  let isReadingEditor = $state(false);
+  let isEditorSaving = $state(false);
+  let isEditorLoading = $state(false);
 
-  let showDiffModal = $state(false);
-  let diffFileA = $state<SftpFileEntry | null>(null);
-  let diffFileB = $state<SftpFileEntry | null>(null);
-  let diffContentA = $state<string[]>([]);
-  let diffContentB = $state<string[]>([]);
-  let isLoadingDiff = $state(false);
+  let showChmodModal = $state(false);
+  let chmodTarget = $state<SftpFileEntry | null>(null);
+  let chmodOctal = $state('0755');
+  let chmodUserR = $state(true);
+  let chmodUserW = $state(true);
+  let chmodUserX = $state(true);
+  let chmodGroupR = $state(true);
+  let chmodGroupW = $state(false);
+  let chmodGroupX = $state(true);
+  let chmodOtherR = $state(true);
+  let chmodOtherW = $state(false);
+  let chmodOtherX = $state(true);
 
-  let uploadInputRef: HTMLInputElement;
-
-  function toggleSelect(path: string) {
-    const next = new Set(selectedPaths);
-    if (next.has(path)) {
-      next.delete(path);
-    } else {
-      next.add(path);
-    }
-    selectedPaths = next;
+  function notifySuccess(msg: string) {
+    successMsg = msg;
+    setTimeout(() => {
+      if (successMsg === msg) successMsg = '';
+    }, 4000);
   }
 
-  function toggleSelectAll() {
-    if (selectedPaths.size === files.length && files.length > 0) {
-      selectedPaths = new Set();
-    } else {
-      selectedPaths = new Set(files.map(f => f.path));
-    }
+  function formatSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   }
 
-  async function handleCreateFile() {
-    if (!newFileName.trim()) return;
-    const dest = joinPath(currentPath, newFileName.trim());
-    try {
-      await writeRemoteFile(currentHostId, dest, []);
-      notifySuccess(`Created file "${newFileName.trim()}"`);
-      showNewFileModal = false;
-      newFileName = '';
-      await fetchFiles();
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to create file');
-    }
+  function formatSpeed(bps: number): string {
+    return `${formatSize(bps)}/s`;
   }
 
-  async function handleCreateFolder() {
-    if (!newFolderName.trim()) return;
-    const dest = joinPath(currentPath, newFolderName.trim());
-    try {
-      await mkdirRemoteDir(currentHostId, dest);
-      notifySuccess(`Created folder "${newFolderName.trim()}"`);
-      showNewFolderModal = false;
-      newFolderName = '';
-      await fetchFiles();
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to create folder');
-    }
+  function formatMtime(mtime: number): string {
+    if (!mtime) return '-';
+    return new Date(mtime * 1000).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   }
 
-  async function handleBatchDelete() {
-    if (selectedPaths.size === 0) return;
-    isLoading = true;
+  function formatPermissions(mode?: number): string {
+    if (mode === undefined || mode === 0) return '---------';
+    const octal = (mode & 0o777).toString(8).padStart(3, '0');
+    const rwx = (d: number) => {
+      let s = '';
+      s += d & 4 ? 'r' : '-';
+      s += d & 2 ? 'w' : '-';
+      s += d & 1 ? 'x' : '-';
+      return s;
+    };
+    return (
+      rwx(parseInt(octal[0] || '0', 8)) +
+      rwx(parseInt(octal[1] || '0', 8)) +
+      rwx(parseInt(octal[2] || '0', 8))
+    );
+  }
+
+  function joinPath(dir: string, name: string): string {
+    if (dir === '/' || dir === '.' || !dir) return `/${name}`;
+    return `${dir.replace(/\/+$/, '')}/${name}`;
+  }
+
+  // --- LOCAL FS LOGIC ---
+  async function fetchLocalFiles() {
+    localLoading = true;
     errorMsg = '';
     try {
-      for (const path of selectedPaths) {
-        await deleteRemoteFile(currentHostId, path);
+      localFiles = await localListDir(localPath);
+      // Canonicalize display path if needed
+      if (localFiles.length > 0 && localPath === '~') {
+        const parent = localFiles[0].path.substring(0, localFiles[0].path.lastIndexOf('/')) || '~';
+        localPath = parent;
       }
-      notifySuccess(`Deleted ${selectedPaths.size} item(s)`);
-      selectedPaths = new Set();
-      await fetchFiles();
     } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to delete some items');
+      errorMsg = `Local FS Error: ${e?.message || e}`;
+      localFiles = [];
     } finally {
-      isLoading = false;
+      localLoading = false;
     }
+  }
+
+  function navigateLocal(path: string) {
+    localPath = path;
+    localSelectedPaths = new Set();
+    fetchLocalFiles();
+  }
+
+  function goUpLocal() {
+    if (localPath === '/' || localPath === '') return;
+    const parts = localPath.split('/').filter(Boolean);
+    parts.pop();
+    localPath = '/' + parts.join('/');
+    if (localPath === '') localPath = '/';
+    fetchLocalFiles();
+  }
+
+  // --- REMOTE SFTP LOGIC ---
+  async function fetchRemoteFiles() {
+    if (!currentHostId) return;
+    remoteLoading = true;
+    errorMsg = '';
+    try {
+      remoteFiles = await listRemoteDir(currentHostId, remotePath);
+    } catch (e: any) {
+      errorMsg = `Remote SFTP Error: ${e?.message || e}`;
+      remoteFiles = [];
+    } finally {
+      remoteLoading = false;
+    }
+  }
+
+  function navigateRemote(path: string) {
+    remotePath = path;
+    remoteSelectedPaths = new Set();
+    fetchRemoteFiles();
+  }
+
+  function goUpRemote() {
+    if (remotePath === '/' || remotePath === '') return;
+    const parts = remotePath.split('/').filter(Boolean);
+    parts.pop();
+    remotePath = '/' + parts.join('/');
+    if (remotePath === '') remotePath = '/';
+    fetchRemoteFiles();
   }
 
   async function loadHosts() {
@@ -142,735 +230,883 @@
     }
   }
 
-  async function fetchFiles() {
-    if (!currentHostId) return;
-    isLoading = true;
-    errorMsg = '';
-    selectedFile = null;
+  // --- SELECTION HELPERS ---
+  function toggleLocalSelect(file: LocalFileEntry) {
+    const next = new Set(localSelectedPaths);
+    if (next.has(file.path)) {
+      next.delete(file.path);
+    } else {
+      next.add(file.path);
+    }
+    localSelectedPaths = next;
+    localLastSelected = file;
+    activePane = 'local';
+  }
+
+  function toggleRemoteSelect(file: SftpFileEntry) {
+    const next = new Set(remoteSelectedPaths);
+    if (next.has(file.path)) {
+      next.delete(file.path);
+    } else {
+      next.add(file.path);
+    }
+    remoteSelectedPaths = next;
+    remoteLastSelected = file;
+    activePane = 'remote';
+  }
+
+  // --- QUEUE & TRANSFER ENGINE ---
+  function enqueueTransfer(
+    direction: 'upload' | 'download',
+    source: string,
+    target: string
+  ) {
+    const id = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    transfers = [
+      ...transfers,
+      {
+        id,
+        direction,
+        source,
+        target,
+        status: 'queued',
+        bytesTransferred: 0,
+        totalBytes: 0,
+        speedBps: 0
+      }
+    ];
+    runTransferQueue();
+  }
+
+  async function runTransferQueue() {
+    if (isQueueRunning) return;
+    isQueueRunning = true;
+
+    while (true) {
+      const nextIndex = transfers.findIndex((t) => t.status === 'queued');
+      if (nextIndex === -1) break;
+
+      const item = transfers[nextIndex];
+      transfers[nextIndex].status = 'active';
+
+      try {
+        if (item.direction === 'upload') {
+          await sftpUpload(currentHostId, item.source, item.target, item.id);
+        } else {
+          await sftpDownload(currentHostId, item.source, item.target, item.id);
+        }
+        transfers[nextIndex].status = 'completed';
+        transfers[nextIndex].bytesTransferred = transfers[nextIndex].totalBytes;
+      } catch (err: any) {
+        const msg = String(err?.message || err);
+        if (msg.includes('cancelled')) {
+          transfers[nextIndex].status = 'cancelled';
+        } else {
+          transfers[nextIndex].status = 'failed';
+          transfers[nextIndex].error = msg;
+        }
+      }
+    }
+
+    isQueueRunning = false;
+    // Refresh both panes
+    await Promise.all([fetchLocalFiles(), fetchRemoteFiles()]);
+  }
+
+  async function cancelQueueItem(id: string) {
     try {
-      files = await listRemoteDir(currentHostId, currentPath);
+      await sftpCancel(id);
+      const idx = transfers.findIndex((t) => t.id === id);
+      if (idx !== -1 && transfers[idx].status === 'active') {
+        transfers[idx].status = 'cancelled';
+      }
     } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to list directory');
-      files = [];
-    } finally {
-      isLoading = false;
+      errorMsg = `Cancel failed: ${e?.message || e}`;
     }
   }
+
+  function clearCompletedTransfers() {
+    transfers = transfers.filter((t) => t.status === 'active' || t.status === 'queued');
+  }
+
+  // --- ACTIONS (F5: Transfer, F6: Move, F7: Mkdir, F8: Delete, F2: Rename, F4: Edit) ---
+  function handleCopyTransfer() {
+    if (activePane === 'local') {
+      // Upload selected local files to remote current dir
+      if (localSelectedPaths.size === 0 && localLastSelected) {
+        localSelectedPaths.add(localLastSelected.path);
+      }
+      for (const p of localSelectedPaths) {
+        const name = p.split('/').pop() || 'file';
+        const remoteTarget = joinPath(remotePath, name);
+        enqueueTransfer('upload', p, remoteTarget);
+      }
+      notifySuccess(`Queued ${localSelectedPaths.size} item(s) for upload.`);
+      localSelectedPaths = new Set();
+    } else {
+      // Download selected remote files to local current dir
+      if (remoteSelectedPaths.size === 0 && remoteLastSelected) {
+        remoteSelectedPaths.add(remoteLastSelected.path);
+      }
+      for (const p of remoteSelectedPaths) {
+        const name = p.split('/').pop() || 'file';
+        const localTarget = joinPath(localPath, name);
+        enqueueTransfer('download', p, localTarget);
+      }
+      notifySuccess(`Queued ${remoteSelectedPaths.size} item(s) for download.`);
+      remoteSelectedPaths = new Set();
+    }
+  }
+
+  function openNewFolderModal(pane: 'local' | 'remote') {
+    newFolderTargetPane = pane;
+    newFolderName = '';
+    showNewFolderModal = true;
+  }
+
+  async function confirmNewFolder() {
+    if (!newFolderName.trim()) return;
+    const folder = newFolderName.trim();
+    showNewFolderModal = false;
+
+    try {
+      if (newFolderTargetPane === 'local') {
+        const dest = joinPath(localPath, folder);
+        await localMkdir(dest);
+        notifySuccess(`Created local folder "${folder}"`);
+        await fetchLocalFiles();
+      } else {
+        const dest = joinPath(remotePath, folder);
+        await mkdirRemoteDir(currentHostId, dest);
+        notifySuccess(`Created remote folder "${folder}"`);
+        await fetchRemoteFiles();
+      }
+    } catch (e: any) {
+      errorMsg = `Failed to create folder: ${e?.message || e}`;
+    }
+  }
+
+  function openRenameModal() {
+    if (activePane === 'local' && localLastSelected) {
+      renameItem = { pane: 'local', path: localLastSelected.path, name: localLastSelected.name };
+      renameNewName = localLastSelected.name;
+      showRenameModal = true;
+    } else if (activePane === 'remote' && remoteLastSelected) {
+      renameItem = { pane: 'remote', path: remoteLastSelected.path, name: remoteLastSelected.name };
+      renameNewName = remoteLastSelected.name;
+      showRenameModal = true;
+    }
+  }
+
+  async function confirmRename() {
+    if (!renameItem || !renameNewName.trim() || renameNewName.trim() === renameItem.name) {
+      showRenameModal = false;
+      return;
+    }
+    const newName = renameNewName.trim();
+    const parent = renameItem.path.substring(0, renameItem.path.lastIndexOf('/')) || '/';
+    const newPath = joinPath(parent, newName);
+    showRenameModal = false;
+
+    try {
+      if (renameItem.pane === 'local') {
+        await localRename(renameItem.path, newPath);
+        notifySuccess(`Renamed local file to "${newName}"`);
+        await fetchLocalFiles();
+      } else {
+        await renameRemoteFile(currentHostId, renameItem.path, newPath);
+        notifySuccess(`Renamed remote file to "${newName}"`);
+        await fetchRemoteFiles();
+      }
+    } catch (e: any) {
+      errorMsg = `Failed to rename: ${e?.message || e}`;
+    }
+  }
+
+  function openDeleteModal() {
+    if (activePane === 'local' && localSelectedPaths.size > 0) {
+      deleteTarget = { pane: 'local', paths: Array.from(localSelectedPaths) };
+      showDeleteModal = true;
+    } else if (activePane === 'local' && localLastSelected) {
+      deleteTarget = { pane: 'local', paths: [localLastSelected.path] };
+      showDeleteModal = true;
+    } else if (activePane === 'remote' && remoteSelectedPaths.size > 0) {
+      deleteTarget = { pane: 'remote', paths: Array.from(remoteSelectedPaths) };
+      showDeleteModal = true;
+    } else if (activePane === 'remote' && remoteLastSelected) {
+      deleteTarget = { pane: 'remote', paths: [remoteLastSelected.path] };
+      showDeleteModal = true;
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || deleteTarget.paths.length === 0) {
+      showDeleteModal = false;
+      return;
+    }
+    showDeleteModal = false;
+
+    try {
+      if (deleteTarget.pane === 'local') {
+        for (const p of deleteTarget.paths) {
+          await localDelete(p, true, true);
+        }
+        notifySuccess(`Deleted ${deleteTarget.paths.length} local item(s)`);
+        localSelectedPaths = new Set();
+        localLastSelected = null;
+        await fetchLocalFiles();
+      } else {
+        for (const p of deleteTarget.paths) {
+          await deleteRemoteFile(currentHostId, p, true, true);
+        }
+        notifySuccess(`Deleted ${deleteTarget.paths.length} remote item(s)`);
+        remoteSelectedPaths = new Set();
+        remoteLastSelected = null;
+        await fetchRemoteFiles();
+      }
+    } catch (e: any) {
+      errorMsg = `Failed to delete: ${e?.message || e}`;
+    }
+  }
+
+  async function openEditorModal() {
+    const isLocal = activePane === 'local';
+    const target = isLocal ? localLastSelected : remoteLastSelected;
+    if (!target || target.is_dir) return;
+
+    editorItem = { pane: isLocal ? 'local' : 'remote', path: target.path, name: target.name };
+    showEditorModal = true;
+    isEditorLoading = true;
+    editorContent = '';
+
+    try {
+      let bytes: number[] = [];
+      if (isLocal) {
+        bytes = await localReadFile(target.path);
+      } else {
+        bytes = await readRemoteFile(currentHostId, target.path);
+      }
+      editorContent = new TextDecoder('utf-8').decode(new Uint8Array(bytes));
+    } catch (e: any) {
+      errorMsg = `Failed to read file: ${e?.message || e}`;
+      showEditorModal = false;
+    } finally {
+      isEditorLoading = false;
+    }
+  }
+
+  async function saveEditorFile() {
+    if (!editorItem) return;
+    isEditorSaving = true;
+    try {
+      const bytes = Array.from(new TextEncoder().encode(editorContent));
+      if (editorItem.pane === 'local') {
+        await localWriteFile(editorItem.path, bytes);
+        notifySuccess(`Saved local file "${editorItem.name}"`);
+        await fetchLocalFiles();
+      } else {
+        await writeRemoteFile(currentHostId, editorItem.path, bytes);
+        notifySuccess(`Saved remote file "${editorItem.name}"`);
+        await fetchRemoteFiles();
+      }
+      showEditorModal = false;
+    } catch (e: any) {
+      errorMsg = `Failed to save file: ${e?.message || e}`;
+    } finally {
+      isEditorSaving = false;
+    }
+  }
+
+  // --- CHMOD MODAL ---
+  function openChmodModal(file: SftpFileEntry) {
+    chmodTarget = file;
+    const mode = file.mode || 0o755;
+    const oct = (mode & 0o777).toString(8).padStart(3, '0');
+    chmodOctal = oct;
+    updateChmodCheckboxesFromOctal(oct);
+    showChmodModal = true;
+  }
+
+  function updateChmodCheckboxesFromOctal(oct: string) {
+    const u = parseInt(oct[0] || '0', 8);
+    const g = parseInt(oct[1] || '0', 8);
+    const o = parseInt(oct[2] || '0', 8);
+    chmodUserR = !!(u & 4);
+    chmodUserW = !!(u & 2);
+    chmodUserX = !!(u & 1);
+    chmodGroupR = !!(g & 4);
+    chmodGroupW = !!(g & 2);
+    chmodGroupX = !!(g & 1);
+    chmodOtherR = !!(o & 4);
+    chmodOtherW = !!(o & 2);
+    chmodOtherX = !!(o & 1);
+  }
+
+  function updateChmodOctalFromCheckboxes() {
+    const u = (chmodUserR ? 4 : 0) + (chmodUserW ? 2 : 0) + (chmodUserX ? 1 : 0);
+    const g = (chmodGroupR ? 4 : 0) + (chmodGroupW ? 2 : 0) + (chmodGroupX ? 1 : 0);
+    const o = (chmodOtherR ? 4 : 0) + (chmodOtherW ? 2 : 0) + (chmodOtherX ? 1 : 0);
+    chmodOctal = `${u}${g}${o}`;
+  }
+
+  async function confirmChmod() {
+    if (!chmodTarget) return;
+    showChmodModal = false;
+    try {
+      const mode = parseInt(chmodOctal, 8);
+      await sftpChmod(currentHostId, chmodTarget.path, mode);
+      notifySuccess(`Changed permissions for "${chmodTarget.name}" to ${chmodOctal}`);
+      await fetchRemoteFiles();
+    } catch (e: any) {
+      errorMsg = `Chmod error: ${e?.message || e}`;
+    }
+  }
+
+  // --- DRAG & DROP ---
+  function onDragStart(event: DragEvent, sourcePane: 'local' | 'remote', item: LocalFileEntry | SftpFileEntry) {
+    if (!event.dataTransfer) return;
+    event.dataTransfer.setData('text/plain', JSON.stringify({ pane: sourcePane, path: item.path, name: item.name }));
+    event.dataTransfer.effectAllowed = 'copy';
+  }
+
+  function onDragOver(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  function onDrop(event: DragEvent, targetPane: 'local' | 'remote') {
+    event.preventDefault();
+    if (!event.dataTransfer) return;
+    const raw = event.dataTransfer.getData('text/plain');
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed.pane === targetPane) return; // Same pane drag-and-drop ignored for now
+
+      if (parsed.pane === 'local' && targetPane === 'remote') {
+        const remoteDest = joinPath(remotePath, parsed.name);
+        enqueueTransfer('upload', parsed.path, remoteDest);
+        notifySuccess(`Queued "${parsed.name}" for upload.`);
+      } else if (parsed.pane === 'remote' && targetPane === 'local') {
+        const localDest = joinPath(localPath, parsed.name);
+        enqueueTransfer('download', parsed.path, localDest);
+        notifySuccess(`Queued "${parsed.name}" for download.`);
+      }
+    } catch {}
+  }
+
+  // --- KEYBOARD SHORTCUTS ---
+  function handleKeydown(e: KeyboardEvent) {
+    // If inside an input or modal, ignore global hotkeys
+    if (
+      showNewFolderModal ||
+      showRenameModal ||
+      showDeleteModal ||
+      showEditorModal ||
+      showChmodModal
+    ) {
+      return;
+    }
+
+    if (e.key === 'F5') {
+      e.preventDefault();
+      handleCopyTransfer();
+    } else if (e.key === 'F6') {
+      e.preventDefault();
+      handleCopyTransfer(); // Move parity
+    } else if (e.key === 'F7') {
+      e.preventDefault();
+      openNewFolderModal(activePane);
+    } else if (e.key === 'F8' || e.key === 'Delete') {
+      e.preventDefault();
+      openDeleteModal();
+    } else if (e.key === 'F2') {
+      e.preventDefault();
+      openRenameModal();
+    } else if (e.key === 'F4') {
+      e.preventDefault();
+      openEditorModal();
+    }
+  }
+
+  onMount(async () => {
+    window.addEventListener('keydown', handleKeydown);
+
+    unlistenProgress = await listen<SftpProgressPayload>('sftp-progress', (event) => {
+      const payload = event.payload;
+      const idx = transfers.findIndex((t) => t.id === payload.transfer_id);
+      if (idx !== -1) {
+        transfers[idx].bytesTransferred = payload.bytes_transferred;
+        transfers[idx].totalBytes = payload.total_bytes;
+        transfers[idx].speedBps = payload.speed_bps;
+      }
+    });
+
+    await loadHosts();
+    await fetchLocalFiles();
+    if (currentHostId) {
+      await fetchRemoteFiles();
+    }
+  });
+
+  onDestroy(() => {
+    window.removeEventListener('keydown', handleKeydown);
+    if (unlistenProgress) {
+      unlistenProgress();
+    }
+  });
 
   $effect(() => {
     const hostParam = page.url.searchParams.get('host');
     if (hostParam && hostParam !== currentHostId && hosts.some((h) => h.id === hostParam)) {
       currentHostId = hostParam;
-      fetchFiles();
+      fetchRemoteFiles();
     }
   });
-
-  onMount(async () => {
-    await loadHosts();
-    if (currentHostId) {
-      await fetchFiles();
-    }
-  });
-
-  function navigateTo(path: string) {
-    currentPath = path;
-    fetchFiles();
-  }
-
-  function goUp() {
-    if (currentPath === '/') return;
-    const parts = currentPath.split('/').filter(Boolean);
-    parts.pop();
-    currentPath = '/' + parts.join('/');
-    if (currentPath === '') currentPath = '/';
-    fetchFiles();
-  }
-
-  function formatSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  }
-
-  function joinPath(dir: string, name: string): string {
-    if (dir === '/' || dir === '.' || !dir) return `/${name}`;
-    return `${dir.replace(/\/+$/, '')}/${name}`;
-  }
-
-  function notifySuccess(msg: string) {
-    successMsg = msg;
-    setTimeout(() => {
-      if (successMsg === msg) successMsg = '';
-    }, 4000);
-  }
-
-  // --- RENAME ACTION ---
-  function openRenameModal(file: SftpFileEntry) {
-    selectedFile = file;
-    renameNewName = file.name;
-    showRenameModal = true;
-  }
-
-  async function submitRename() {
-    if (!selectedFile || !renameNewName.trim() || renameNewName === selectedFile.name) {
-      showRenameModal = false;
-      return;
-    }
-    const oldPath = selectedFile.path;
-    const parentDir = oldPath.substring(0, oldPath.lastIndexOf('/')) || '/';
-    const newPath = joinPath(parentDir, renameNewName.trim());
-
-    try {
-      await renameRemoteFile(currentHostId, oldPath, newPath);
-      notifySuccess(`Renamed "${selectedFile.name}" to "${renameNewName.trim()}"`);
-      showRenameModal = false;
-      await fetchFiles();
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to rename');
-    }
-  }
-
-  // --- DELETE ACTION ---
-  function openDeleteModal(file: SftpFileEntry) {
-    fileToDelete = file;
-    showDeleteModal = true;
-  }
-
-  async function confirmDelete() {
-    if (!fileToDelete) return;
-    try {
-      await deleteRemoteFile(currentHostId, fileToDelete.path);
-      notifySuccess(`Deleted "${fileToDelete.name}"`);
-      showDeleteModal = false;
-      fileToDelete = null;
-      await fetchFiles();
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to delete file');
-    }
-  }
-
-  // --- COPY / CUT / PASTE ---
-  function triggerCopy(file: SftpFileEntry) {
-    clipboard = { action: 'copy', file, sourceHostId: currentHostId };
-    notifySuccess(`Copied "${file.name}" to clipboard`);
-  }
-
-  function triggerCut(file: SftpFileEntry) {
-    clipboard = { action: 'cut', file, sourceHostId: currentHostId };
-    notifySuccess(`Cut "${file.name}" to clipboard`);
-  }
-
-  async function triggerPaste() {
-    if (!clipboard) return;
-    const destPath = joinPath(currentPath, clipboard.file.name);
-    if (clipboard.sourceHostId !== currentHostId) {
-      errorMsg = 'Cross-host copy/cut is not supported yet.';
-      return;
-    }
-    if (clipboard.file.path === destPath) {
-      errorMsg = 'Source and destination paths are identical.';
-      return;
-    }
-
-    try {
-      if (clipboard.action === 'cut') {
-        await renameRemoteFile(currentHostId, clipboard.file.path, destPath);
-        notifySuccess(`Moved "${clipboard.file.name}" to current directory`);
-        clipboard = null;
-      } else {
-        await copyRemoteFile(currentHostId, clipboard.file.path, destPath);
-        notifySuccess(`Pasted "${clipboard.file.name}" to current directory`);
-      }
-      await fetchFiles();
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to paste file');
-    }
-  }
-
-  // --- OPEN TEXT EDITOR ---
-  async function openTextEditor(file: SftpFileEntry) {
-    if (file.is_dir) return;
-    editorFileName = file.name;
-    editorFilePath = file.path;
-    isReadingEditor = true;
-    showEditorModal = true;
-    editorContent = '';
-    errorMsg = '';
-
-    try {
-      const bytes = await readRemoteFile(currentHostId, file.path);
-      const decoder = new TextDecoder('utf-8');
-      editorContent = decoder.decode(new Uint8Array(bytes));
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to read file content');
-      showEditorModal = false;
-    } finally {
-      isReadingEditor = false;
-    }
-  }
-
-  async function saveEditorContent() {
-    if (!editorFilePath) return;
-    isSavingEditor = true;
-    try {
-      const encoder = new TextEncoder();
-      const bytes = Array.from(encoder.encode(editorContent));
-      await writeRemoteFile(currentHostId, editorFilePath, bytes);
-      notifySuccess(`Saved "${editorFileName}" successfully`);
-      showEditorModal = false;
-      await fetchFiles();
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to save file');
-    } finally {
-      isSavingEditor = false;
-    }
-  }
-
-  // --- UPLOAD FILES ---
-  function openUploadDialog() {
-    if (uploadInputRef) {
-      uploadInputRef.value = '';
-      uploadInputRef.click();
-    }
-  }
-
-  async function handleFileUpload(event: Event) {
-    const target = event.target as HTMLInputElement;
-    const uploadFiles = target.files;
-    if (!uploadFiles || uploadFiles.length === 0) return;
-
-    isLoading = true;
-    errorMsg = '';
-    try {
-      for (let i = 0; i < uploadFiles.length; i++) {
-        const file = uploadFiles[i];
-        const destPath = joinPath(currentPath, file.name);
-        const arrayBuffer = await file.arrayBuffer();
-        const uint8 = new Uint8Array(arrayBuffer);
-        await writeRemoteFile(currentHostId, destPath, Array.from(uint8));
-      }
-      notifySuccess(`Successfully uploaded ${uploadFiles.length} file(s)`);
-      await fetchFiles();
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to upload file(s)');
-    } finally {
-      isLoading = false;
-    }
-  }
-
-  // --- FILE COMPARISON (DIFF) ---
-  function openDiffSelect(file: SftpFileEntry) {
-    diffFileA = file;
-    diffFileB = null;
-    diffContentA = [];
-    diffContentB = [];
-    showDiffModal = true;
-  }
-
-  async function loadDiffFiles() {
-    if (!diffFileA || !diffFileB) return;
-    isLoadingDiff = true;
-    try {
-      const [bytesA, bytesB] = await Promise.all([
-        readRemoteFile(currentHostId, diffFileA.path),
-        readRemoteFile(currentHostId, diffFileB.path)
-      ]);
-      const decoder = new TextDecoder('utf-8');
-      diffContentA = decoder.decode(new Uint8Array(bytesA)).split('\n');
-      diffContentB = decoder.decode(new Uint8Array(bytesB)).split('\n');
-    } catch (e: any) {
-      errorMsg = String(e?.message || e || 'Failed to load files for diff');
-    } finally {
-      isLoadingDiff = false;
-    }
-  }
 </script>
 
-<div class="max-w-6xl mx-auto space-y-4">
-  <!-- Hidden File Input for Upload -->
-  <input
-    type="file"
-    multiple
-    bind:this={uploadInputRef}
-    onchange={handleFileUpload}
-    class="hidden"
-  />
-
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
+<div class="h-full flex flex-col space-y-3">
+  <!-- Top Bar: Host Selector & Controls -->
+  <div class="flex flex-wrap items-center justify-between gap-3 bg-[#1e232a] p-3 rounded-lg border border-slate-800">
     <div class="flex items-center gap-3">
-      <div class="p-2.5 bg-emerald-500/10 text-emerald-500 dark:text-emerald-400 rounded-xl border border-emerald-500/20 shadow-sm">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-        </svg>
-      </div>
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight text-neutral-900 dark:text-white">SFTP File Manager</h1>
-        <p class="text-xs text-neutral-500 dark:text-neutral-400">Manage remote files, inspect contents, compare diffs, and transfer assets over SSH.</p>
-      </div>
-    </div>
-
-    <div class="flex items-center gap-2">
-      {#if currentHostId}
-        <a
-          href="/session?host={currentHostId}"
-          class="px-3 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 rounded-lg text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1.5 transition-colors shadow-sm"
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold uppercase text-slate-400">Remote Host:</span>
+        <select
+          bind:value={currentHostId}
+          onchange={() => fetchRemoteFiles()}
+          class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
         >
-          <svg class="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-          </svg>
-          <span>Open Terminal</span>
-        </a>
-      {/if}
-      <button
-        onclick={() => (showNewFileModal = true)}
-        disabled={!currentHostId || isLoading}
-        class="px-3 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 text-neutral-800 dark:text-neutral-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-        title="Create New File"
-      >
-        <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-        <span>New File</span>
-      </button>
-      <button
-        onclick={() => (showNewFolderModal = true)}
-        disabled={!currentHostId || isLoading}
-        class="px-3 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 text-neutral-800 dark:text-neutral-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-        title="Create New Folder"
-      >
-        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
-        </svg>
-        <span>New Folder</span>
-      </button>
-      <button
-        onclick={openUploadDialog}
-        disabled={!currentHostId || isLoading}
-        class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-        </svg>
-        <span>Upload Files</span>
-      </button>
-    </div>
-  </div>
-
-  <!-- Host & Path Bar -->
-  <div class="grid grid-cols-1 md:grid-cols-12 gap-2">
-    <div class="md:col-span-4">
-      <select
-        bind:value={currentHostId}
-        onchange={fetchFiles}
-        class="w-full bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 transition-colors shadow-sm"
-      >
-        {#if hosts.length === 0}
-          <option value="">No hosts available</option>
-        {:else}
           {#each hosts as h}
-            <option value={h.id}>{h.label || h.address} ({h.username}@{h.address})</option>
+            <option value={h.id}>{h.label} ({h.username}@{h.address}:{h.port})</option>
           {/each}
-        {/if}
-      </select>
+        </select>
+      </div>
+
+      <div class="flex items-center border border-slate-700 rounded bg-slate-900 p-0.5 text-xs">
+        <button
+          onclick={() => (viewMode = 'dual')}
+          class={`px-2.5 py-1 rounded font-medium transition ${
+            viewMode === 'dual' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Dual Pane
+        </button>
+        <button
+          onclick={() => (viewMode = 'single')}
+          class={`px-2.5 py-1 rounded font-medium transition ${
+            viewMode === 'single' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
+          }`}
+        >
+          Remote Only
+        </button>
+      </div>
     </div>
 
-    <div class="md:col-span-8 flex gap-2">
-      <button
-        onclick={goUp}
-        disabled={currentPath === '/' || !currentHostId}
-        class="px-3 py-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-400 dark:hover:border-neutral-700 disabled:opacity-50 transition-colors shadow-sm"
-        title="Go up one folder"
+    <!-- Quick Action Hotkeys Reference -->
+    <div class="hidden lg:flex items-center gap-2 text-xs text-slate-400">
+      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F5</span> Copy
+      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F7</span> New Folder
+      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F8</span> Delete
+      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F2</span> Rename
+      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F4</span> Edit
+    </div>
+
+    {#if currentHostId}
+      <a
+        href={`/session?host=${currentHostId}`}
+        class="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-2.5 py-1.5 rounded border border-slate-700 transition"
       >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path>
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-      </button>
-      <input
-        type="text"
-        bind:value={currentPath}
-        onkeydown={(e) => e.key === 'Enter' && fetchFiles()}
-        placeholder="/"
-        class="flex-1 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 transition-colors font-mono shadow-sm"
-      />
-      <button
-        onclick={fetchFiles}
-        disabled={!currentHostId || isLoading}
-        class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
-      >
-        Go
-      </button>
-      {#if clipboard}
-        <button
-          onclick={triggerPaste}
-          class="px-3.5 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors animate-pulse"
-          title="Paste '{clipboard.file.name}' ({clipboard.action})"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-          </svg>
-          <span>Paste ({clipboard.action})</span>
-        </button>
-      {/if}
-    </div>
+        Terminal Here
+      </a>
+    {/if}
   </div>
 
-  <!-- Selection & Multi-Action Toolbar -->
-  <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg">
-    <div class="flex items-center gap-2">
-      <button
-        onclick={toggleSelectAll}
-        disabled={files.length === 0}
-        class="px-2.5 py-1 text-xs font-semibold rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50"
-      >
-        {selectedPaths.size === files.length && files.length > 0 ? 'Deselect All' : 'Select All'}
-      </button>
-      {#if selectedPaths.size > 0}
-        <span class="text-xs font-medium text-sky-600 dark:text-sky-400">
-          {selectedPaths.size} selected
-        </span>
-        <button
-          onclick={handleBatchDelete}
-          disabled={isLoading}
-          class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
-          title="Delete all selected items"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-          <span>Batch Delete</span>
-        </button>
-      {/if}
-    </div>
-
-    <div class="flex items-center gap-2">
-      {#if selectedFile && !selectedFile.is_dir}
-        <button
-          onclick={() => openTextEditor(selectedFile!)}
-          class="px-2.5 py-1 text-xs font-semibold rounded border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 flex items-center gap-1 shadow-sm transition-colors"
-          title="Edit Text"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-          </svg>
-          <span>Open Text</span>
-        </button>
-        <button
-          onclick={() => openDiffSelect(selectedFile!)}
-          class="px-2.5 py-1 text-xs font-semibold rounded border border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 flex items-center gap-1 shadow-sm transition-colors"
-          title="Compare with another file"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-          </svg>
-          <span>Compare Files</span>
-        </button>
-      {/if}
-
-      {#if selectedFile}
-        <button
-          onclick={() => triggerCopy(selectedFile!)}
-          class="px-2.5 py-1 text-xs font-semibold rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1 shadow-sm transition-colors"
-          title="Copy"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-          </svg>
-          <span>Copy</span>
-        </button>
-        <button
-          onclick={() => triggerCut(selectedFile!)}
-          class="px-2.5 py-1 text-xs font-semibold rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1 shadow-sm transition-colors"
-          title="Cut"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879a3 3 0 11-4.242-4.242 3 3 0 014.242 0L12 12zm0 0l-2.879-2.879a3 3 0 10-4.242 4.242 3 3 0 004.242 0L12 12z"></path>
-          </svg>
-          <span>Cut</span>
-        </button>
-      {/if}
-
-      {#if clipboard}
-        <button
-          onclick={triggerPaste}
-          class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors animate-pulse"
-          title="Paste '{clipboard.file.name}'"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-          </svg>
-          <span>Paste ({clipboard.action})</span>
-        </button>
-      {/if}
-    </div>
-  </div>
-
-  <!-- Messages -->
+  <!-- Error / Success Banners -->
   {#if errorMsg}
-    <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center justify-between">
+    <div class="bg-red-950/80 border border-red-800 text-red-300 text-xs px-3 py-2 rounded flex justify-between items-center">
       <span>{errorMsg}</span>
-      <button
-        onclick={() => (errorMsg = '')}
-        class="text-xs font-semibold px-2 py-0.5 rounded hover:bg-red-500/20"
-      >
-        Dismiss
-      </button>
+      <button onclick={() => (errorMsg = '')} class="text-red-400 hover:text-red-200">✕</button>
     </div>
   {/if}
   {#if successMsg}
-    <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-600 dark:text-emerald-400 text-sm flex items-center justify-between">
+    <div class="bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs px-3 py-2 rounded flex justify-between items-center">
       <span>{successMsg}</span>
-      <button
-        onclick={() => (successMsg = '')}
-        class="text-xs font-semibold px-2 py-0.5 rounded hover:bg-emerald-500/20"
-      >
-        Dismiss
-      </button>
+      <button onclick={() => (successMsg = '')} class="text-emerald-400 hover:text-emerald-200">✕</button>
     </div>
   {/if}
 
-  <!-- Files Table -->
-  <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl overflow-hidden shadow-sm">
-    <div class="overflow-x-auto">
-      <table class="w-full text-left text-sm text-neutral-600 dark:text-neutral-400">
-        <thead class="bg-neutral-50 dark:bg-neutral-950/60 text-xs uppercase text-neutral-500 border-b border-neutral-200 dark:border-neutral-800">
-          <tr>
-            <th class="px-3 py-3 w-10 text-center">
-              <input
-                type="checkbox"
-                checked={selectedPaths.size === files.length && files.length > 0}
-                onchange={toggleSelectAll}
-                class="rounded border-neutral-300 dark:border-neutral-700 text-sky-600 focus:ring-0"
-              />
-            </th>
-            <th class="px-4 py-3 font-semibold">Name</th>
-            <th class="px-4 py-3 font-semibold w-24">Size</th>
-            <th class="px-4 py-3 font-semibold w-36">Modified</th>
-            <th class="px-4 py-3 font-semibold w-48 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800/60">
-          {#if isLoading}
-            <tr>
-              <td colspan="5" class="px-4 py-12 text-center text-neutral-500">
-                <div class="inline-flex items-center gap-2">
-                  <div class="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-                  <span>Loading directory contents...</span>
-                </div>
-              </td>
-            </tr>
-          {:else if files.length === 0}
-            <tr>
-              <td colspan="5" class="px-4 py-12 text-center text-neutral-500">
-                This directory is empty.
-              </td>
-            </tr>
-          {:else}
-            {#each files as file}
-              <tr
-                class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group {selectedFile?.path === file.path ? 'bg-sky-50/50 dark:bg-sky-950/20' : ''}"
-                onclick={() => (selectedFile = file)}
-              >
-                <td class="px-3 py-2.5 text-center" onclick={(e) => e.stopPropagation()}>
-                  <input
-                    type="checkbox"
-                    checked={selectedPaths.has(file.path)}
-                    onchange={() => toggleSelect(file.path)}
-                    class="rounded border-neutral-300 dark:border-neutral-700 text-sky-600 focus:ring-0"
-                  />
-                </td>
-                <td class="px-4 py-2.5 flex items-center gap-3">
-                  {#if file.is_dir}
-                    <button
-                      onclick={() => navigateTo(file.path)}
-                      class="flex items-center gap-2.5 text-left group-hover:text-sky-600 dark:group-hover:text-sky-400 transition-colors"
-                    >
-                      <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"></path>
-                      </svg>
-                      <span class="font-medium text-neutral-900 dark:text-neutral-100">{file.name}</span>
-                    </button>
-                  {:else}
-                    <div class="flex items-center gap-2.5 truncate">
-                      <svg class="w-5 h-5 text-neutral-400 dark:text-neutral-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                      </svg>
-                      <span class="text-neutral-800 dark:text-neutral-200 truncate">{file.name}</span>
-                    </div>
-                  {/if}
-                </td>
-                <td class="px-4 py-2.5 whitespace-nowrap text-xs text-neutral-500 font-mono">
-                  {file.is_dir ? '-' : formatSize(file.size)}
-                </td>
-                <td class="px-4 py-2.5 whitespace-nowrap text-xs text-neutral-500">
-                  {file.mtime ? new Date(file.mtime * 1000).toLocaleString() : '-'}
-                </td>
-                <td class="px-4 py-2.5 whitespace-nowrap text-right">
-                  <div class="flex items-center justify-end gap-1 opacity-90 group-hover:opacity-100">
-                    {#if !file.is_dir}
-                      <button
-                        onclick={(e) => { e.stopPropagation(); openTextEditor(file); }}
-                        class="p-1.5 text-neutral-500 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                        title="Edit Text"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-                        </svg>
-                      </button>
-                      <button
-                        onclick={(e) => { e.stopPropagation(); openDiffSelect(file); }}
-                        class="p-1.5 text-neutral-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                        title="Compare with another file"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-                        </svg>
-                      </button>
-                      <button
-                        onclick={(e) => { e.stopPropagation(); triggerCopy(file); }}
-                        class="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                        title="Copy"
-                      >
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                        </svg>
-                      </button>
-                    {/if}
-                    <button
-                      onclick={(e) => { e.stopPropagation(); triggerCut(file); }}
-                      class="p-1.5 text-neutral-500 hover:text-amber-600 dark:hover:text-amber-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                      title="Cut (Move)"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879a3 3 0 11-4.242-4.242 3 3 0 014.242 0L12 12zm0 0l-2.879-2.879a3 3 0 10-4.242 4.242 3 3 0 004.242 0L12 12z"></path>
-                      </svg>
-                    </button>
-                    <button
-                      onclick={(e) => { e.stopPropagation(); openRenameModal(file); }}
-                      class="p-1.5 text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                      title="Rename"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-                      </svg>
-                    </button>
-                    <button
-                      onclick={(e) => { e.stopPropagation(); openDeleteModal(file); }}
-                      class="p-1.5 text-neutral-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors"
-                      title="Delete"
-                    >
-                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                      </svg>
-                    </button>
-                  </div>
-                </td>
+  <!-- Main Panes Area -->
+  <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
+    <!-- LEFT PANE: Local File System -->
+    {#if viewMode === 'dual'}
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <div
+        class={`flex flex-col bg-[#181c22] rounded-lg border overflow-hidden transition ${
+          activePane === 'local' ? 'border-cyan-500/80 ring-1 ring-cyan-500/40' : 'border-slate-800'
+        }`}
+        onclick={() => (activePane = 'local')}
+        role="region"
+        aria-label="Local File System"
+        ondragover={onDragOver}
+        ondrop={(e) => onDrop(e, 'local')}
+      >
+        <!-- Local Toolbar & Path -->
+        <div class="p-2 bg-[#1e232a] border-b border-slate-800 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="text-xs font-bold text-amber-400">Local:</span>
+            <button
+              onclick={goUpLocal}
+              class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs flex items-center gap-1"
+              title="Parent Directory"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+              </svg>
+            </button>
+            <button
+              onclick={() => navigateLocal('~')}
+              class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs"
+              title="Home Directory (~)"
+            >
+              ~
+            </button>
+          </div>
+          <input
+            type="text"
+            bind:value={localPath}
+            onkeydown={(e) => e.key === 'Enter' && fetchLocalFiles()}
+            class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+          />
+          <button
+            onclick={() => openNewFolderModal('local')}
+            class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 flex items-center gap-1"
+            title="New Folder"
+          >
+            +Dir
+          </button>
+        </div>
+
+        <!-- Local File Table -->
+        <div class="flex-1 overflow-auto text-xs font-mono">
+          <table class="w-full border-collapse">
+            <thead class="sticky top-0 bg-slate-900/95 text-slate-400 border-b border-slate-800 select-none">
+              <tr>
+                <th class="text-left py-1.5 px-3">Name</th>
+                <th class="text-right py-1.5 px-3">Size</th>
+                <th class="text-right py-1.5 px-3">Modified</th>
               </tr>
-            {/each}
-          {/if}
-        </tbody>
-      </table>
+            </thead>
+            <tbody class="divide-y divide-slate-800/40">
+              {#if localLoading}
+                <tr>
+                  <td colspan="3" class="text-center py-6 text-slate-500">Loading local directory...</td>
+                </tr>
+              {:else if localFiles.length === 0}
+                <tr>
+                  <td colspan="3" class="text-center py-6 text-slate-500">Empty directory</td>
+                </tr>
+              {:else}
+                {#each localFiles as item}
+                  <tr
+                    class={`cursor-pointer select-none transition ${
+                      localSelectedPaths.has(item.path) || localLastSelected?.path === item.path
+                        ? 'bg-cyan-950/60 text-cyan-200'
+                        : 'hover:bg-slate-800/40 text-slate-300'
+                    }`}
+                    onclick={() => toggleLocalSelect(item)}
+                    ondblclick={() => item.is_dir ? navigateLocal(item.path) : openEditorModal()}
+                    draggable="true"
+                    ondragstart={(e) => onDragStart(e, 'local', item)}
+                  >
+                    <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
+                      {#if item.is_dir}
+                        <span class="text-amber-400">📁</span>
+                      {:else}
+                        <span class="text-slate-400">📄</span>
+                      {/if}
+                      <span class="truncate">{item.name}</span>
+                    </td>
+                    <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                      {item.is_dir ? '<DIR>' : formatSize(item.size)}
+                    </td>
+                    <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                      {formatMtime(item.mtime)}
+                    </td>
+                  </tr>
+                {/each}
+              {/if}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {/if}
+
+    <!-- RIGHT PANE: Remote SFTP Server -->
+    <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+    <div
+      class={`flex flex-col bg-[#181c22] rounded-lg border overflow-hidden transition ${
+        viewMode === 'single' ? 'col-span-1 md:col-span-2' : ''
+      } ${activePane === 'remote' ? 'border-cyan-500/80 ring-1 ring-cyan-500/40' : 'border-slate-800'}`}
+      onclick={() => (activePane = 'remote')}
+      role="region"
+      aria-label="Remote SFTP Server"
+      ondragover={onDragOver}
+      ondrop={(e) => onDrop(e, 'remote')}
+    >
+      <!-- Remote Toolbar & Path -->
+      <div class="p-2 bg-[#1e232a] border-b border-slate-800 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-1.5">
+          <span class="text-xs font-bold text-cyan-400">Remote:</span>
+          <button
+            onclick={goUpRemote}
+            class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs flex items-center gap-1"
+            title="Parent Directory"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
+            </svg>
+          </button>
+          <button
+            onclick={() => navigateRemote('/')}
+            class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs"
+            title="Root Directory (/)"
+          >
+            /
+          </button>
+        </div>
+        <input
+          type="text"
+          bind:value={remotePath}
+          onkeydown={(e) => e.key === 'Enter' && fetchRemoteFiles()}
+          class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+        />
+        <button
+          onclick={() => openNewFolderModal('remote')}
+          class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 flex items-center gap-1"
+          title="New Folder"
+        >
+          +Dir
+        </button>
+      </div>
+
+      <!-- Remote File Table -->
+      <div class="flex-1 overflow-auto text-xs font-mono">
+        <table class="w-full border-collapse">
+          <thead class="sticky top-0 bg-slate-900/95 text-slate-400 border-b border-slate-800 select-none">
+            <tr>
+              <th class="text-left py-1.5 px-3">Name</th>
+              <th class="text-right py-1.5 px-3">Size</th>
+              <th class="text-center py-1.5 px-3">Rights</th>
+              <th class="text-right py-1.5 px-3">Modified</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/40">
+            {#if remoteLoading}
+              <tr>
+                <td colspan="4" class="text-center py-6 text-slate-500">Loading remote directory...</td>
+              </tr>
+            {:else if remoteFiles.length === 0}
+              <tr>
+                <td colspan="4" class="text-center py-6 text-slate-500">Empty directory</td>
+              </tr>
+            {:else}
+              {#each remoteFiles as item}
+                <tr
+                  class={`cursor-pointer select-none transition ${
+                    remoteSelectedPaths.has(item.path) || remoteLastSelected?.path === item.path
+                      ? 'bg-cyan-950/60 text-cyan-200'
+                      : 'hover:bg-slate-800/40 text-slate-300'
+                  }`}
+                  onclick={() => toggleRemoteSelect(item)}
+                  ondblclick={() => item.is_dir ? navigateRemote(item.path) : openEditorModal()}
+                  draggable="true"
+                  ondragstart={(e) => onDragStart(e, 'remote', item)}
+                >
+                  <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
+                    {#if item.is_dir}
+                      <span class="text-amber-400">📁</span>
+                    {:else}
+                      <span class="text-slate-400">📄</span>
+                    {/if}
+                    <span class="truncate">{item.name}</span>
+                  </td>
+                  <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                    {item.is_dir ? '<DIR>' : formatSize(item.size)}
+                  </td>
+                  <td
+                    class="py-1.5 px-3 text-center text-slate-400 hover:text-cyan-300 cursor-pointer whitespace-nowrap"
+                    onclick={(e) => { e.stopPropagation(); openChmodModal(item); }}
+                  >
+                    {formatPermissions(item.mode)}
+                  </td>
+                  <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                    {formatMtime(item.mtime)}
+                  </td>
+                </tr>
+              {/each}
+            {/if}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Panel: Transfer Queue Manager -->
+  <div class="h-36 bg-[#181c22] rounded-lg border border-slate-800 flex flex-col overflow-hidden text-xs">
+    <div class="bg-[#1e232a] px-3 py-1.5 border-b border-slate-800 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-slate-300">Transfer Queue</span>
+        <span class="text-slate-500">
+          ({transfers.filter((t) => t.status === 'active').length} active, {transfers.filter((t) => t.status === 'queued').length} queued)
+        </span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          onclick={clearCompletedTransfers}
+          class="text-slate-400 hover:text-slate-200 px-2 py-0.5 rounded hover:bg-slate-800 transition"
+        >
+          Clear Finished
+        </button>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-auto divide-y divide-slate-800/40 font-mono">
+      {#if transfers.length === 0}
+        <div class="text-center py-6 text-slate-500">No active or queued transfers</div>
+      {:else}
+        {#each transfers as item}
+          <div class="p-2 flex items-center justify-between gap-3 hover:bg-slate-800/30">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 truncate">
+                <span class={`font-bold ${item.direction === 'upload' ? 'text-cyan-400' : 'text-emerald-400'}`}>
+                  {item.direction === 'upload' ? '▲ UPLOAD' : '▼ DOWNLOAD'}
+                </span>
+                <span class="text-slate-300 truncate">{item.source.split('/').pop()}</span>
+                <span class="text-slate-500">→</span>
+                <span class="text-slate-400 truncate">{item.target}</span>
+              </div>
+
+              <!-- Progress Bar -->
+              <div class="mt-1 flex items-center gap-2">
+                <div class="flex-1 bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    class={`h-full transition-all duration-150 ${
+                      item.status === 'completed'
+                        ? 'bg-emerald-500'
+                        : item.status === 'failed'
+                        ? 'bg-red-500'
+                        : item.status === 'cancelled'
+                        ? 'bg-slate-600'
+                        : 'bg-cyan-500'
+                    }`}
+                    style={`width: ${
+                      item.totalBytes > 0
+                        ? Math.min(100, (item.bytesTransferred / item.totalBytes) * 100)
+                        : item.status === 'completed' ? 100 : 0
+                    }%`}
+                  ></div>
+                </div>
+                <span class="text-[10px] text-slate-400 whitespace-nowrap">
+                  {formatSize(item.bytesTransferred)} / {formatSize(item.totalBytes)}
+                </span>
+                {#if item.status === 'active' && item.speedBps > 0}
+                  <span class="text-[10px] text-cyan-400 whitespace-nowrap">
+                    ({formatSpeed(item.speedBps)})
+                  </span>
+                {/if}
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span
+                class={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                  item.status === 'completed'
+                    ? 'bg-emerald-950 text-emerald-300'
+                    : item.status === 'failed'
+                    ? 'bg-red-950 text-red-300'
+                    : item.status === 'active'
+                    ? 'bg-cyan-950 text-cyan-300'
+                    : 'bg-slate-800 text-slate-400'
+                }`}
+              >
+                {item.status}
+              </span>
+              {#if item.status === 'active'}
+                <button
+                  onclick={() => cancelQueueItem(item.id)}
+                  class="text-red-400 hover:text-red-200 text-xs px-1.5 py-0.5 rounded bg-red-950/40 hover:bg-red-900/60"
+                  title="Cancel Transfer"
+                >
+                  ✕
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      {/if}
     </div>
   </div>
 </div>
 
-<!-- NEW FILE MODAL -->
-{#if showNewFileModal}
-  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
-      <h3 class="text-base font-semibold text-neutral-900 dark:text-white">Create New File</h3>
-      <div>
-        <label class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1" for="new-file-name">File Name</label>
-        <input
-          id="new-file-name"
-          type="text"
-          bind:value={newFileName}
-          placeholder="config.json or script.sh"
-          onkeydown={(e) => e.key === 'Enter' && handleCreateFile()}
-          class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
-        />
-      </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button
-          onclick={() => { showNewFileModal = false; newFileName = ''; }}
-          class="px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-lg"
-        >
-          Cancel
-        </button>
-        <button
-          onclick={handleCreateFile}
-          disabled={!newFileName.trim()}
-          class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
-        >
-          Create File
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- NEW FOLDER MODAL -->
+<!-- MODAL: NEW FOLDER -->
 {#if showNewFolderModal}
-  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
-      <h3 class="text-base font-semibold text-neutral-900 dark:text-white">Create New Folder</h3>
-      <div>
-        <label class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1" for="new-folder-name">Folder Name</label>
-        <input
-          id="new-folder-name"
-          type="text"
-          bind:value={newFolderName}
-          placeholder="my-project or logs"
-          onkeydown={(e) => e.key === 'Enter' && handleCreateFolder()}
-          class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
-        />
-      </div>
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-[#1e232a] border border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-slate-200">
+        New Folder ({newFolderTargetPane === 'local' ? 'Local' : 'Remote'})
+      </h3>
+      <input
+        type="text"
+        bind:value={newFolderName}
+        placeholder="Folder name"
+        onkeydown={(e) => e.key === 'Enter' && confirmNewFolder()}
+        class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+      />
       <div class="flex justify-end gap-2 pt-2">
         <button
-          onclick={() => { showNewFolderModal = false; newFolderName = ''; }}
-          class="px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-lg"
+          onclick={() => (showNewFolderModal = false)}
+          class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
         >
           Cancel
         </button>
         <button
-          onclick={handleCreateFolder}
-          disabled={!newFolderName.trim()}
-          class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
+          onclick={confirmNewFolder}
+          class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
         >
-          Create Folder
+          Create
         </button>
       </div>
     </div>
   </div>
 {/if}
 
-<!-- RENAME MODAL -->
-{#if showRenameModal}
-  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
-      <h3 class="text-base font-semibold text-neutral-900 dark:text-white">Rename File or Folder</h3>
-      <div>
-        <label class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1" for="new-name-input">New Name</label>
-        <input
-          id="new-name-input"
-          type="text"
-          bind:value={renameNewName}
-          onkeydown={(e) => e.key === 'Enter' && submitRename()}
-          class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500"
-        />
-      </div>
+<!-- MODAL: RENAME -->
+{#if showRenameModal && renameItem}
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-[#1e232a] border border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-slate-200">Rename Item</h3>
+      <input
+        type="text"
+        bind:value={renameNewName}
+        onkeydown={(e) => e.key === 'Enter' && confirmRename()}
+        class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+      />
       <div class="flex justify-end gap-2 pt-2">
         <button
           onclick={() => (showRenameModal = false)}
-          class="px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-lg"
+          class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
         >
           Cancel
         </button>
         <button
-          onclick={submitRename}
-          class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold rounded-lg"
+          onclick={confirmRename}
+          class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
         >
           Rename
         </button>
@@ -879,25 +1115,24 @@
   </div>
 {/if}
 
-<!-- DELETE MODAL -->
-{#if showDeleteModal && fileToDelete}
-  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
-      <h3 class="text-base font-semibold text-neutral-900 dark:text-white">Confirm Delete</h3>
-      <p class="text-xs text-neutral-600 dark:text-neutral-400">
-        Are you sure you want to permanently delete <strong class="text-neutral-900 dark:text-white font-mono">{fileToDelete.name}</strong>?
-        This action cannot be undone.
+<!-- MODAL: DELETE CONFIRMATION -->
+{#if showDeleteModal && deleteTarget}
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-[#1e232a] border border-red-900/60 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-red-400">Confirm Deletion</h3>
+      <p class="text-xs text-slate-300">
+        Are you sure you want to permanently delete {deleteTarget.paths.length} item(s) from {deleteTarget.pane === 'local' ? 'Local FS' : 'Remote SFTP'}?
       </p>
       <div class="flex justify-end gap-2 pt-2">
         <button
           onclick={() => (showDeleteModal = false)}
-          class="px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-lg"
+          class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
         >
           Cancel
         </button>
         <button
           onclick={confirmDelete}
-          class="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded-lg"
+          class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-medium"
         >
           Delete
         </button>
@@ -906,126 +1141,126 @@
   </div>
 {/if}
 
-<!-- TEXT EDITOR MODAL -->
-{#if showEditorModal}
-  <div class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50 dark:bg-neutral-950/70">
+<!-- MODAL: TEXT EDITOR -->
+{#if showEditorModal && editorItem}
+  <div class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-[#1e232a] border border-slate-700 rounded-lg w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-          </svg>
-          <span class="text-sm font-semibold text-neutral-900 dark:text-white font-mono">{editorFileName}</span>
-          <span class="text-xs text-neutral-500 font-mono truncate max-w-sm">({editorFilePath})</span>
+          <span class="text-xs font-bold text-cyan-400">Editor:</span>
+          <span class="text-xs text-slate-200 font-mono">{editorItem.name}</span>
+          <span class="text-xs text-slate-500">({editorItem.pane})</span>
         </div>
         <div class="flex items-center gap-2">
           <button
-            onclick={() => (showEditorModal = false)}
-            class="px-3 py-1 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-md"
+            onclick={saveEditorFile}
+            disabled={isEditorSaving || isEditorLoading}
+            class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-xs font-medium flex items-center gap-1"
           >
-            Close
+            {isEditorSaving ? 'Saving...' : 'Save'}
           </button>
           <button
-            onclick={saveEditorContent}
-            disabled={isSavingEditor || isReadingEditor}
-            class="px-3.5 py-1 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-semibold rounded-md flex items-center gap-1.5 shadow-sm"
+            onclick={() => (showEditorModal = false)}
+            class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
           >
-            {#if isSavingEditor}
-              <div class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            {/if}
-            <span>Save</span>
+            Close
           </button>
         </div>
       </div>
 
-      <div class="flex-1 p-3 bg-neutral-950 flex flex-col min-h-[350px]">
-        {#if isReadingEditor}
-          <div class="flex-1 flex items-center justify-center text-neutral-400 text-xs gap-2">
-            <div class="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-            <span>Fetching remote file...</span>
+      <div class="flex-1 p-2 bg-[#12161b] relative overflow-hidden flex flex-col">
+        {#if isEditorLoading}
+          <div class="absolute inset-0 flex items-center justify-center bg-black/40 text-xs text-slate-400">
+            Loading file contents...
           </div>
-        {:else}
-          <textarea
-            bind:value={editorContent}
-            spellcheck="false"
-            class="w-full flex-1 bg-transparent text-neutral-200 font-mono text-xs leading-relaxed focus:outline-none resize-none p-2 border border-neutral-800 rounded"
-          ></textarea>
         {/if}
+        <textarea
+          bind:value={editorContent}
+          class="w-full h-full bg-transparent text-slate-200 font-mono text-xs p-2 resize-none focus:outline-none"
+          spellcheck="false"
+        ></textarea>
       </div>
     </div>
   </div>
 {/if}
 
-<!-- FILE DIFF / COMPARISON MODAL -->
-{#if showDiffModal && diffFileA}
-  <div class="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl w-full max-w-5xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="px-4 py-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between bg-neutral-50 dark:bg-neutral-950/70">
-        <div>
-          <h3 class="text-sm font-semibold text-neutral-900 dark:text-white">Compare Files</h3>
-          <p class="text-xs text-neutral-500">Side-by-side text diff comparison</p>
+<!-- MODAL: CHMOD PERMISSIONS -->
+{#if showChmodModal && chmodTarget}
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-[#1e232a] border border-slate-700 rounded-lg max-w-md w-full p-4 space-y-4 shadow-xl text-xs">
+      <h3 class="text-sm font-bold text-slate-200">
+        Permissions for <span class="text-cyan-400">{chmodTarget.name}</span>
+      </h3>
+
+      <div class="grid grid-cols-3 gap-3 bg-slate-900 p-3 rounded border border-slate-800">
+        <!-- User -->
+        <div class="space-y-1.5">
+          <span class="font-bold text-slate-400">Owner</span>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodUserR} onchange={updateChmodOctalFromCheckboxes} /> Read
+          </label>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodUserW} onchange={updateChmodOctalFromCheckboxes} /> Write
+          </label>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodUserX} onchange={updateChmodOctalFromCheckboxes} /> Execute
+          </label>
         </div>
-        <button
-          onclick={() => (showDiffModal = false)}
-          class="px-3 py-1 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-md"
-        >
-          Close
-        </button>
+
+        <!-- Group -->
+        <div class="space-y-1.5">
+          <span class="font-bold text-slate-400">Group</span>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodGroupR} onchange={updateChmodOctalFromCheckboxes} /> Read
+          </label>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodGroupW} onchange={updateChmodOctalFromCheckboxes} /> Write
+          </label>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodGroupX} onchange={updateChmodOctalFromCheckboxes} /> Execute
+          </label>
+        </div>
+
+        <!-- Others -->
+        <div class="space-y-1.5">
+          <span class="font-bold text-slate-400">Others</span>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodOtherR} onchange={updateChmodOctalFromCheckboxes} /> Read
+          </label>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodOtherW} onchange={updateChmodOctalFromCheckboxes} /> Write
+          </label>
+          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+            <input type="checkbox" bind:checked={chmodOtherX} onchange={updateChmodOctalFromCheckboxes} /> Execute
+          </label>
+        </div>
       </div>
 
-      <div class="p-3 border-b border-neutral-200 dark:border-neutral-800 bg-neutral-100/50 dark:bg-neutral-900/50 flex flex-wrap items-center gap-3">
-        <div class="text-xs">
-          <span class="text-neutral-500">File A:</span>
-          <span class="font-mono font-semibold text-sky-600 dark:text-sky-400 ml-1">{diffFileA.name}</span>
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-slate-400">Octal:</span>
+          <input
+            type="text"
+            bind:value={chmodOctal}
+            oninput={() => updateChmodCheckboxesFromOctal(chmodOctal)}
+            maxlength="4"
+            class="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center font-mono text-cyan-400 focus:outline-none"
+          />
         </div>
-        <div class="text-xs flex items-center gap-2 flex-1">
-          <span class="text-neutral-500">File B:</span>
-          <select
-            bind:value={diffFileB}
-            onchange={loadDiffFiles}
-            class="bg-white dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded px-2 py-1 text-xs text-neutral-900 dark:text-white focus:outline-none"
+        <div class="flex gap-2">
+          <button
+            onclick={() => (showChmodModal = false)}
+            class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded"
           >
-            <option value={null}>Select comparison file...</option>
-            {#each files.filter((f) => !f.is_dir && f.path !== diffFileA?.path) as f}
-              <option value={f}>{f.name}</option>
-            {/each}
-          </select>
+            Cancel
+          </button>
+          <button
+            onclick={confirmChmod}
+            class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-medium"
+          >
+            Apply
+          </button>
         </div>
-      </div>
-
-      <div class="flex-1 overflow-auto p-3 bg-neutral-950 font-mono text-xs">
-        {#if isLoadingDiff}
-          <div class="py-16 text-center text-neutral-400 flex items-center justify-center gap-2">
-            <div class="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
-            <span>Reading files for comparison...</span>
-          </div>
-        {:else if !diffFileB}
-          <div class="py-16 text-center text-neutral-500">
-            Please select File B from the dropdown above to view differences.
-          </div>
-        {:else}
-          <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-0.5">
-              <div class="text-sky-400 font-semibold mb-2 pb-1 border-b border-neutral-800">{diffFileA.name}</div>
-              {#each diffContentA as line, idx}
-                {@const isDiff = diffContentB[idx] !== line}
-                <div class="px-1 py-0.5 whitespace-pre-wrap break-all rounded {isDiff ? 'bg-red-950/40 text-red-200 border-l-2 border-red-500' : 'text-neutral-400'}">
-                  <span class="text-neutral-600 select-none mr-2">{idx + 1}</span>{line || ' '}
-                </div>
-              {/each}
-            </div>
-
-            <div class="space-y-0.5">
-              <div class="text-emerald-400 font-semibold mb-2 pb-1 border-b border-neutral-800">{diffFileB.name}</div>
-              {#each diffContentB as line, idx}
-                {@const isDiff = diffContentA[idx] !== line}
-                <div class="px-1 py-0.5 whitespace-pre-wrap break-all rounded {isDiff ? 'bg-emerald-950/40 text-emerald-200 border-l-2 border-emerald-500' : 'text-neutral-400'}">
-                  <span class="text-neutral-600 select-none mr-2">{idx + 1}</span>{line || ' '}
-                </div>
-              {/each}
-            </div>
-          </div>
-        {/if}
       </div>
     </div>
   </div>
