@@ -28,12 +28,19 @@
 - [x] **`T2-CORE-02` — Command Logs (Audit)**: Implemented full-stack audit logs for PTY terminal commands, tunnel start/stop, vault lock/unlock, and SSH key deploy. Logs are saved in `caterm.db` and masked for secrets using regex. SvelteKit UI in `/command-logs` with filtering, search, and CSV export.
 - [x] **Investigations Feature (21 Sep 2026)**: Added full-stack Investigations feature (Model in `caterm-core/src/investigations.rs` with `id, title, host_id, status, notes, evidence`). Persisted to `caterm.db`. Built UI timeline in `frontend/src/routes/investigations/+page.svelte` aligned with Agent 4's Audit log design.
 
-## Final Release Status (21 Sep 2026)
-- [x] **Quality Gates**: `npm run check` in `frontend/` passed cleanly (0 errors). Core Rust workspace binaries (`caterm-core`, `caterm-app`, `catermctl`) compiled cleanly under MSVC + OpenSSL release targets.
-- [x] **Installer Build**: Successfully generated Windows installation packages via `cargo tauri build`:
-  - **NSIS Installer (.exe)**: `D:\Project\caterm\target\release\bundle\nsis\CATerm_2.0.9_x64-setup.exe`
-  - **MSI Installer (.msi)**: `D:\Project\caterm\target\release\bundle\msi\CATerm_2.0.9_x64_en-US.msi`
-- [x] **Release Status**: `SELESAI` (v2.0.9 final release ready for deployment).
+- [x] **Prompt Studio & AI Ops Assistant (21 Sep 2026)**:
+  - **AI Planning Engine**: Modul Rust di `caterm-core/src/ai.rs` dengan schema `ai_settings`, `ai_execution_plans`, `ai_plan_steps` di SQLite. Mendukung custom provider (OpenAI, Anthropic, Ollama, 9router) dan built-in fallback heuristic engine dengan preset cerdas (Laravel 11 Dev, Docker, Node.js, UFW Security).
+  - **Human-in-the-Loop Confirmation**: Antarmuka konfirmasi langkah eksekusi di `frontend/src/routes/prompt-studio/+page.svelte` dengan seleksi checkbox per langkah, indikator `SUDO / SYSTEM`, dan terminal viewer live.
+  - **Automated SSH Execution & Audit Trail**: Eksekusi SSH non-interactive channel per step dengan pelaporan status realtime dan pencatatan otomatis ke `command_logs` (event `AI_AUTOMATION`).
+
+## Final Release Status (21 Sep 2026 - v2.0.10)
+- [x] **Quality Gates**: `npm run check` and `npm run build` in `frontend/` passed cleanly (0 errors). Rust workspace tests in `caterm-core` (43 unittests, 8 AI tests) passed.
+- [x] **Installer Build**: Successfully generated Windows installation packages via `cargo tauri build` for version **2.0.10**:
+  - **NSIS Installer (.exe)**: `D:\Project\caterm\target
+elease\bundle\nsis\CATerm_2.0.10_x64-setup.exe`
+  - **MSI Installer (.msi)**: `D:\Project\caterm\target
+elease\bundle\msi\CATerm_2.0.10_x64_en-US.msi`
+- [x] **Release Status**: `SELESAI` (v2.0.10 final release ready for deployment).
 - [x] **UI/UX & Responsiveness Overhaul (21 Sep 2026)**:
   - **Auto-collapsing Icon Sidebar**: Menu sebelah kiri otomatis menciut menjadi *icon-only* saat ada koneksi aktif (`sessionTabs.length > 0`), dilengkapi tombol manual toggle dan tooltip informatif.
   - **Optimasi Luas Layar**: Menghapus padding `p-6` yang boros pada sesi aktif (`p-0 md:p-1`), compact header bar, dan terminal pane memenuhi 100% viewport.

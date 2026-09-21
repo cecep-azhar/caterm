@@ -64,3 +64,12 @@
 
 ## 12. CLI (catermctl)
 - [x] Implement CLI parity (host, vault, connect, tunnel, monitor, key, audit) in caterm-cli/src/main.rs calling caterm-core.
+
+## 13. Prompt Studio (AI Ops Assistant & Automation)
+- [x] Backend AI module di `caterm-core/src/ai.rs` (OpenAI/Anthropic/Ollama/9router API client dengan built-in fallback heuristic plan generator).
+- [x] Skema SQLite: tabel `ai_settings` untuk konfigurasi provider, base URL, API key, dan model name.
+- [x] Tauri commands: `get_ai_settings`, `save_ai_settings`, `ai_generate_plan`, `ai_execute_step` terdaftar di runtime, build.rs, dan capabilities default.json.
+- [x] Prompt Studio UI di `frontend/src/routes/prompt-studio/+page.svelte` dengan preset Ubuntu Laravel dev, Docker, Node.js, UFW.
+- [x] Human-in-the-loop plan confirmation: review langkah, checklist per langkah, visualisasi sudo warning sebelum eksekusi.
+- [x] Eksekusi SSH non-interactive berurutan dengan output live streaming dan pelacakan audit di `command_logs` (event `AI_AUTOMATION`).
+
