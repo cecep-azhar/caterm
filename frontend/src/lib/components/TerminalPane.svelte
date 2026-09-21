@@ -18,11 +18,14 @@
 
   let {
     host,
+    isActive = true,
     onSplitRight,
     onSplitDown,
     onClose
   }: {
     host: HostRecord;
+    /** Whether this pane is the one the user is looking at (drives focus + snippet target). */
+    isActive?: boolean;
     onSplitRight?: () => void;
     onSplitDown?: () => void;
     onClose?: () => void;
@@ -38,8 +41,41 @@
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
   let terminalContainer: HTMLDivElement;
 
+  // Component scope, not `onMount` scope: a pane can become the visible one long after it
+  // mounted, and the effect below needs to reach the live session to retarget snippets and
+  // re-fit the viewport.
+  let session = $state<SshSession | null>(null);
+  let term: Terminal | null = null;
+  let fitAddon: FitAddon | null = null;
+
+  // Injects a snippet command as if it were typed + Enter (T7). Reuses the same
+  // sshWrite path as real keystrokes so the terminal output stays consistent.
+  function injectCommand(cmd: string) {
+    if (!session) return;
+    void sshWrite(session.sessionId, cmd + '\r').catch(() => {});
+  }
+
+  function markActive() {
+    if (session) {
+      setActiveSession({ sessionId: session.sessionId, label: host.label, inject: injectCommand });
+    }
+  }
+
+  // Panes are kept mounted while hidden so their SSH session and scrollback survive tab
+  // switching. A hidden pane keeps its layout box (visibility, not display), so xterm stays
+  // correctly sized — the re-fit here is belt and braces for a resize that happened while away.
+  $effect(() => {
+    if (!isActive || !session) return;
+    markActive();
+    fitAddon?.fit();
+    if (term) {
+      void sshResize(session.sessionId, term.cols, term.rows).catch(() => {});
+      term.focus();
+    }
+  });
+
   onMount(() => {
-    const term = new Terminal({
+    const terminal = new Terminal({
       theme: {
         background: '#09090b',
         foreground: '#e4e4e7',
@@ -49,14 +85,15 @@
       fontSize: 13,
       cursorBlink: true
     });
+    term = terminal;
 
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(terminalContainer);
-    fitAddon.fit();
+    const fit = new FitAddon();
+    fitAddon = fit;
+    terminal.loadAddon(fit);
+    terminal.open(terminalContainer);
+    fit.fit();
 
     let disposed = false;
-    let session: SshSession | null = null;
     const unlisteners: UnlistenFn[] = [];
 
     // Output that arrived while `sshConnect` was still in flight — we subscribe *before*
@@ -77,23 +114,10 @@
     function reportFailure(what: string, err: unknown) {
       if (disposed || reportedFailure) return;
       reportedFailure = true;
-      term.write(`\r\n\x1b[31m${what}: ${errorMessage(err)}\x1b[0m\r\n`);
+      terminal.write(`\r\n\x1b[31m${what}: ${errorMessage(err)}\x1b[0m\r\n`);
     }
 
-    // Injects a snippet command as if it were typed + Enter (T7). Reuses the same
-    // echo/sshWrite path as real keystrokes below so the terminal output stays consistent.
-    function injectCommand(cmd: string) {
-      if (!session) return;
-      void sshWrite(session.sessionId, cmd + '\r').catch((err) => reportFailure('Send failed', err));
-    }
-
-    function markActive() {
-      if (session) {
-        setActiveSession({ sessionId: session.sessionId, label: host.label, inject: injectCommand });
-      }
-    }
-
-    term.writeln(
+    terminal.writeln(
       `\x1b[1;32mWelcome to CATerm v2\x1b[0m — connecting to \x1b[1;36m${host.label}\x1b[0m (${host.address})...`
     );
 
@@ -103,7 +127,7 @@
           await onSshOutput(({ sessionId, data }) => {
             if (disposed) return;
             if (session) {
-              if (sessionId === session.sessionId) term.write(data);
+              if (sessionId === session.sessionId) terminal.write(data);
               return;
             }
             const buffered = early.get(sessionId) ?? [];
@@ -116,13 +140,13 @@
           await onSshClosed(({ sessionId }) => {
             if (disposed || !session || sessionId !== session.sessionId) return;
             status = 'offline';
-            term.write('\r\n\x1b[33mconnection closed by remote host\x1b[0m\r\n');
+            terminal.write('\r\n\x1b[33mconnection closed by remote host\x1b[0m\r\n');
           })
         );
       } catch (err) {
         if (!disposed) {
           status = 'offline';
-          term.write(
+          terminal.write(
             `\r\n\x1b[31mTidak bisa berlangganan output terminal: ${errorMessage(err)}\x1b[0m\r\n`
           );
         }
@@ -138,54 +162,69 @@
 
         session = opened;
         status = 'connected';
-        fitAddon.fit();
-        void sshResize(opened.sessionId, term.cols, term.rows).catch((err) =>
+        fit.fit();
+        void sshResize(opened.sessionId, terminal.cols, terminal.rows).catch((err) =>
           reportFailure('Resize failed', err)
         );
-        term.write(`\r\n\x1b[32mconnected\x1b[0m (session ${opened.sessionId})\r\n`);
+        terminal.write(`\r\n\x1b[32mconnected\x1b[0m (session ${opened.sessionId})\r\n`);
 
-        for (const chunk of early.get(opened.sessionId) ?? []) term.write(chunk);
+        for (const chunk of early.get(opened.sessionId) ?? []) terminal.write(chunk);
         early.clear();
-
-        markActive();
-        term.focus();
       } catch (err) {
         if (disposed) return;
         status = 'offline';
-        term.write(`\r\n\x1b[31mSSH connection failed: ${errorMessage(err)}\x1b[0m\r\n`);
+        terminal.write(`\r\n\x1b[31mSSH connection failed: ${errorMessage(err)}\x1b[0m\r\n`);
       }
     })();
 
-    term.onData((data) => {
+    terminal.onData((data) => {
       // Send keystroke to the real Rust SSH PTY backend
       if (session) {
         void sshWrite(session.sessionId, data).catch((err) => reportFailure('Send failed', err));
       }
     });
 
-    const handleResize = () => {
-      fitAddon.fit();
+    // Watch the container, not the window. A pane is resized by things the window never sees:
+    // switching split layout, toggling the SFTP panel, collapsing the sidebar. Panes now stay
+    // mounted across all of those (so sessions survive), which means nothing else would ever
+    // re-measure xterm and the terminal would keep rendering at its old column count.
+    let fitQueued = false;
+    const applyFit = () => {
+      fitQueued = false;
+      // A hidden pane has a zero-height box only if something collapses it; re-fitting to 0
+      // would destroy the buffer geometry, so skip and wait until it is laid out again.
+      if (terminalContainer.clientWidth === 0 || terminalContainer.clientHeight === 0) return;
+      fit.fit();
       if (session) {
-        void sshResize(session.sessionId, term.cols, term.rows).catch(() => {});
+        void sshResize(session.sessionId, terminal.cols, terminal.rows).catch(() => {});
       }
     };
-    window.addEventListener('resize', handleResize);
-    terminalContainer.addEventListener('click', () => {
-      markActive();
-      term.focus();
+    const observer = new ResizeObserver(() => {
+      if (fitQueued) return;
+      fitQueued = true;
+      requestAnimationFrame(applyFit);
     });
+    observer.observe(terminalContainer);
+
+    const handleClick = () => {
+      markActive();
+      terminal.focus();
+    };
+    terminalContainer.addEventListener('click', handleClick);
 
     return () => {
       disposed = true;
       for (const unlisten of unlisteners) unlisten();
       unlisteners.length = 0;
-      window.removeEventListener('resize', handleResize);
-      terminalContainer.removeEventListener('click', markActive);
+      observer.disconnect();
+      terminalContainer.removeEventListener('click', handleClick);
       if (session) {
         clearActiveSession(session.sessionId);
         void sshDisconnect(session.sessionId).catch(() => {});
       }
-      term.dispose();
+      term = null;
+      fitAddon = null;
+      terminal.dispose();
     };
   });
 </script>

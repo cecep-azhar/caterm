@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import TerminalPane from '$lib/components/TerminalPane.svelte';
   import SessionFileManager from '$lib/components/SessionFileManager.svelte';
@@ -8,6 +9,7 @@
     getSessionView,
     setSelectedHostId,
     setShowFiles,
+    setLayout,
     resetLayout
   } from '$lib/stores/sessionView.svelte';
 
@@ -15,6 +17,20 @@
   // (single row — see routes/+layout.svelte), so they live in a shared store instead of here.
   const view = getSessionView();
   let loadError = $state('');
+
+  // Split layouts are a desktop affordance; phones always show one terminal at a time. This is
+  // tracked in JS rather than with `sm:` classes because rendering a separate mobile tree would
+  // mount a *second* TerminalPane per host — and a display:none component still runs onMount,
+  // so every host would open two SSH sessions.
+  let isWideViewport = $state(true);
+
+  onMount(() => {
+    const query = window.matchMedia('(min-width: 640px)');
+    const sync = () => (isWideViewport = query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    return () => query.removeEventListener('change', sync);
+  });
 
   // Opens a tab for every host named in `?host=<id>` or `?hosts=<id1>,<id2>,...` — this is
   // the ONLY way a session tab gets created. No fallback/demo hosts: with no matching query
@@ -44,7 +60,6 @@
   });
 
   const tabs = $derived(getTabs());
-  const pane = (i: number): HostRecord | undefined => tabs[i]?.id !== undefined ? tabs[i].host : undefined;
 
   $effect(() => {
     if (tabs.length > 0 && (!view.selectedHostId || !tabs.some((t) => t.host.id === view.selectedHostId))) {
@@ -61,11 +76,37 @@
     return tabs[0]?.host;
   });
 
+  /** A single pane is the only sensible arrangement on a phone, or with one host open. */
+  const effectiveLayout = $derived(!isWideViewport || tabs.length === 1 ? 1 : view.layout);
+
+  const containerClass = $derived(
+    effectiveLayout === 2
+      ? 'flex flex-col h-full gap-1 sm:gap-1.5'
+      : effectiveLayout === 3
+        ? 'flex h-full gap-1 sm:gap-1.5'
+        : effectiveLayout === 4
+          ? 'grid grid-cols-2 auto-rows-fr h-full gap-1 sm:gap-1.5'
+          : 'relative h-full w-full'
+  );
+
+  /**
+   * In the stacked (single-pane) arrangement every tab stays mounted and only the selected one
+   * is shown, so switching tabs never tears down an SSH session or loses scrollback. Hiding is
+   * done with `invisible` rather than `hidden`: `display:none` collapses the box to 0x0 and
+   * xterm would re-measure itself to nothing.
+   */
+  function paneClass(hostId: string): string {
+    if (effectiveLayout !== 1) return 'min-h-0 min-w-0 flex-1';
+    return hostId === activeHost?.id
+      ? 'absolute inset-0 z-10'
+      : 'absolute inset-0 invisible pointer-events-none';
+  }
+
   function close(host: HostRecord) {
     closeTab(host.id);
     if (getTabs().length === 0) resetLayout();
     if (view.selectedHostId === host.id) {
-      setSelectedHostId(tabs[0]?.host.id || '');
+      setSelectedHostId(getTabs()[0]?.host.id || '');
     }
   }
 </script>
@@ -85,11 +126,11 @@
       </div>
     {:else}
       <div class="flex h-full gap-1 sm:gap-1.5 overflow-hidden">
-        <!-- Terminal Panes Section (Responsive) -->
+        <!-- Terminal Panes Section -->
         <div class="flex-1 min-w-0 h-full overflow-hidden flex flex-col">
-          <!-- Mobile tab switcher (only when multi-host on mobile) -->
-          {#if tabs.length > 1}
-            <div class="sm:hidden flex items-center gap-1 overflow-x-auto pb-1.5 mb-1 scrollbar-none shrink-0">
+          <!-- Mobile tab switcher (only when multi-host on a phone) -->
+          {#if tabs.length > 1 && !isWideViewport}
+            <div class="flex items-center gap-1 overflow-x-auto pb-1.5 mb-1 scrollbar-none shrink-0">
               {#each tabs as tab (tab.id)}
                 <button
                   onclick={() => setSelectedHostId(tab.host.id)}
@@ -102,50 +143,24 @@
             </div>
           {/if}
 
-          <!-- Mobile view: single clean full-viewport terminal for selected host -->
-          <div class="sm:hidden flex-1 min-h-0">
-            {#if activeHost}
-              <TerminalPane host={activeHost} onClose={() => close(activeHost)} />
-            {/if}
-          </div>
-
-          <!-- Desktop view: multi-pane layout options -->
-          <div class="hidden sm:block flex-1 min-h-0 h-full">
-            {#if view.layout === 1 || tabs.length === 1}
-              {@const h = activeHost || pane(0)}
-              {#if h}
-                <TerminalPane
-                  host={h}
-                  onSplitRight={tabs.length > 1 ? () => (view.layout = 3) : undefined}
-                  onSplitDown={tabs.length > 1 ? () => (view.layout = 2) : undefined}
-                  onClose={() => close(h)}
-                />
-              {/if}
-            {:else if view.layout === 2}
-              <div class="flex flex-col h-full gap-1 sm:gap-1.5">
-                {#each tabs as tab (tab.id)}
-                  <div class="flex-1 min-h-0">
-                    <TerminalPane host={tab.host} onClose={() => close(tab.host)} />
-                  </div>
-                {/each}
-              </div>
-            {:else if view.layout === 3}
-              <div class="flex h-full gap-1 sm:gap-1.5">
-                {#each tabs as tab (tab.id)}
-                  <div class="flex-1 min-w-0">
-                    <TerminalPane host={tab.host} onClose={() => close(tab.host)} />
-                  </div>
-                {/each}
-              </div>
-            {:else if view.layout === 4}
-              <div class="grid grid-cols-2 grid-rows-2 h-full gap-1 sm:gap-1.5">
-                {#each tabs.slice(0, 4) as tab (tab.id)}
-                  <div class="min-h-0 min-w-0">
-                    <TerminalPane host={tab.host} onClose={() => close(tab.host)} />
-                  </div>
-                {/each}
-              </div>
-            {/if}
+          <!-- One TerminalPane instance per open tab, keyed by host id and never rebuilt by a
+               layout or tab change. Re-using a single instance across hosts is what made the
+               XPC tab render YPC's live session: Svelte swapped the `host` prop but onMount —
+               and therefore the xterm instance and the SSH session — stayed with the old host. -->
+          <div class="flex-1 min-h-0">
+            <div class={containerClass}>
+              {#each tabs as tab (tab.id)}
+                <div class={paneClass(tab.host.id)}>
+                  <TerminalPane
+                    host={tab.host}
+                    isActive={effectiveLayout === 1 ? tab.host.id === activeHost?.id : true}
+                    onSplitRight={effectiveLayout === 1 && tabs.length > 1 ? () => setLayout(3) : undefined}
+                    onSplitDown={effectiveLayout === 1 && tabs.length > 1 ? () => setLayout(2) : undefined}
+                    onClose={() => close(tab.host)}
+                  />
+                </div>
+              {/each}
+            </div>
           </div>
         </div>
 
