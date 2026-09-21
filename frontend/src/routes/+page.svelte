@@ -42,11 +42,11 @@
     const count = selectedIds.length;
     if (count === 0) return;
     const ok = await confirmModal(
-      `Hapus ${count} host terpilih? Kredensial tersimpannya ikut terhapus dan tidak bisa dikembalikan.`,
-      'Hapus Host Terpilih',
+      `Delete ${count} selected host(s)? Stored credentials will also be permanently deleted and cannot be recovered.`,
+      'Delete Selected Hosts',
       true,
-      'Hapus',
-      'Batal'
+      'Delete',
+      'Cancel'
     );
     if (!ok) return;
 
@@ -62,9 +62,9 @@
     await refreshHosts();
 
     if (failed.length > 0) {
-      showToast(`Gagal menghapus: ${failed.join(', ')}`, 'error');
+      showToast(`Failed to delete: ${failed.join(', ')}`, 'error');
     } else {
-      showToast(`${count} host dihapus.`, 'success');
+      showToast(`${count} host(s) deleted.`, 'success');
     }
   }
 
@@ -145,7 +145,7 @@
       };
       await saveHost(input);
       isAddModalOpen = false;
-      showToast(editingId ? 'Host berhasil diperbarui' : 'Host berhasil ditambahkan', 'success');
+      showToast(editingId ? 'Host successfully updated' : 'Host successfully added', 'success');
       await refreshHosts();
     } catch (err: any) {
       errorMsg = typeof err === 'string' ? err : (err?.message || 'Failed to save host');
@@ -156,15 +156,33 @@
   }
 
   async function handleDelete(id: string) {
-    const confirmed = await confirmModal('Apakah Anda yakin ingin menghapus host ini dari database?', 'Hapus Host', true, 'Hapus', 'Batal');
+    const confirmed = await confirmModal('Are you sure you want to delete this host from the database?', 'Delete Host', true, 'Delete', 'Cancel');
     if (confirmed) {
       try {
         await deleteHost(id);
-        showToast('Host berhasil dihapus', 'success');
+        showToast('Host successfully deleted', 'success');
         await refreshHosts();
       } catch (err: any) {
-        showToast(err?.message || 'Gagal menghapus host', 'error');
+        showToast(err?.message || 'Failed to delete host', 'error');
       }
+    }
+  }
+
+  async function handleClone(host: HostRecord) {
+    try {
+      const input: HostInput = {
+        label: `${host.label} (Copy)`,
+        address: host.address,
+        port: host.port,
+        username: host.username,
+        authMethod: host.authMethod,
+        tags: [...host.tags]
+      };
+      await saveHost(input);
+      showToast(`Host "${host.label}" cloned successfully`, 'success');
+      await refreshHosts();
+    } catch (err: any) {
+      showToast(err?.message || 'Failed to clone host', 'error');
     }
   }
 
@@ -210,26 +228,26 @@
   {#if selectedIds.length > 0}
     <div class="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900">
       <span class="text-sm font-medium text-sky-800 dark:text-sky-300">
-        {selectedIds.length} host terpilih
+        {selectedIds.length} host(s) selected
       </span>
       <div class="flex items-center gap-2 ml-auto">
         <button
           onclick={connectSelected}
           class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium transition-colors"
         >
-          Connect semua
+          Connect All
         </button>
         <button
           onclick={deleteSelected}
           class="px-3 py-1.5 rounded-lg text-xs font-medium border border-rose-300 dark:border-rose-900 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
         >
-          Hapus
+          Delete
         </button>
         <button
           onclick={clearSelection}
           class="px-3 py-1.5 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
         >
-          Batal
+          Deselect
         </button>
       </div>
     </div>
@@ -274,7 +292,7 @@
 
             <div class="space-y-1 font-mono text-xs text-neutral-500 dark:text-neutral-400">
               <p><span class="text-neutral-400 dark:text-neutral-500">Address:</span> <span class="text-sky-600 dark:text-sky-400">{host.username}@{host.address}:{host.port}</span></p>
-              <p><span class="text-neutral-400 dark:text-neutral-500">Auth:</span> <span class="text-neutral-700 dark:text-neutral-300">{host.authMethod.type}</span> {#if host.hasSecret}<span class="text-emerald-600 dark:text-emerald-500">• tersimpan</span>{:else}<span class="text-amber-600 dark:text-amber-500">• belum ada password</span>{/if}</p>
+              <p><span class="text-neutral-400 dark:text-neutral-500">Auth:</span> <span class="text-neutral-700 dark:text-neutral-300">{host.authMethod.type}</span> {#if host.hasSecret}<span class="text-emerald-600 dark:text-emerald-500">• saved</span>{:else}<span class="text-amber-600 dark:text-amber-500">• no password</span>{/if}</p>
             </div>
 
             {#if host.tags.length > 0}
@@ -291,16 +309,26 @@
               onclick={() => toggleSelected(host.id)}
               aria-pressed={isSelected(host.id)}
               class="px-2 py-1.5 rounded-md text-xs font-medium border transition-all {isSelected(host.id) ? 'bg-sky-600 border-sky-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
-              title={isSelected(host.id) ? 'Batalkan pilihan' : 'Pilih untuk aksi massal'}
+              title={isSelected(host.id) ? 'Deselect' : 'Select for batch action'}
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
             </button>
             <button
               onclick={() => openSession(host.id)}
               class="flex-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-medium shadow-lg shadow-sky-600/20 transition-all flex items-center justify-center gap-1.5"
-              title="Buka sesi baru (bisa lebih dari satu untuk host yang sama)">
+              title="Open new session (can open multiple for the same host)">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
               Connect
+            </button>
+            <button
+              onclick={() => handleClone(host)}
+              class="px-2.5 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all flex items-center justify-center"
+              title="Clone / Duplicate Host"
+              aria-label="Clone Host"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
             </button>
             <a
               href="/sftp?host={host.id}"
@@ -310,7 +338,7 @@
             <button
               onclick={() => (detailHost = host)}
               class="px-2 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
-              title="Detail host & riwayat aktivitas"
+              title="Host details & activity history"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
             </button>
@@ -423,11 +451,11 @@
           <input
             type="password"
             bind:value={formSecret}
-            placeholder={editingId && editingHadSecret ? 'Kosongkan untuk tidak mengubah' : (formAuthType === 'key' ? 'Kosongkan jika key tidak berpassphrase' : 'Wajib diisi agar bisa connect')}
+            placeholder={editingId && editingHadSecret ? 'Leave blank to keep unchanged' : (formAuthType === 'key' ? 'Leave blank if key has no passphrase' : 'Required to connect')}
             class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
           />
           {/if}
-          <p class="text-neutral-500 text-xs mt-1">Disimpan terenkripsi (AES-256-GCM) di database lokal — tidak pernah dikirim balik ke UI.</p>
+          <p class="text-neutral-500 text-xs mt-1">Stored encrypted (AES-256-GCM) in local database — never returned to the UI.</p>
         </div>
 
         <div>

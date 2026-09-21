@@ -105,6 +105,8 @@ pub fn run(start: std::time::Instant) {
             commands::read_remote_file,
             commands::write_remote_file,
             commands::delete_remote_file,
+            commands::sftp_rename,
+            commands::sftp_copy,
             commands::export_encrypted_backup,
             commands::import_encrypted_backup,
             commands::list_keys,

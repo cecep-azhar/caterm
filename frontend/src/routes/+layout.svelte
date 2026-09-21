@@ -53,16 +53,44 @@
     stopMonitoring();
   });
 
-  const appWindow = typeof window !== 'undefined' && (window as any).__TAURI__ ? getCurrentWindow() : null;
+  const isTauri = typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__);
+  const appWindow = isTauri ? getCurrentWindow() : null;
 
   async function minimizeWindow() {
-    if (appWindow) await appWindow.minimize();
+    try {
+      if (appWindow) {
+        await appWindow.minimize();
+      } else if (typeof window !== 'undefined') {
+        const win = getCurrentWindow();
+        await win.minimize();
+      }
+    } catch (e) {
+      console.warn('Failed to minimize window:', e);
+    }
   }
   async function maximizeWindow() {
-    if (appWindow) await appWindow.toggleMaximize();
+    try {
+      if (appWindow) {
+        await appWindow.toggleMaximize();
+      } else if (typeof window !== 'undefined') {
+        const win = getCurrentWindow();
+        await win.toggleMaximize();
+      }
+    } catch (e) {
+      console.warn('Failed to toggle maximize window:', e);
+    }
   }
   async function closeWindow() {
-    if (appWindow) await appWindow.close();
+    try {
+      if (appWindow) {
+        await appWindow.close();
+      } else if (typeof window !== 'undefined') {
+        const win = getCurrentWindow();
+        await win.close();
+      }
+    } catch (e) {
+      console.warn('Failed to close window:', e);
+    }
   }
 
   let toastsList = $derived(getToasts());
@@ -158,67 +186,56 @@
     {
       href: '/',
       label: 'Hosts',
-      iconColor: 'text-sky-500 dark:text-sky-400',
       path: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'
+    },
+    {
+      href: '/sftp',
+      label: 'Files (SFTP)',
+      path: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z'
     },
     {
       href: '/prompt-studio',
       label: 'Prompt Studio',
-      iconColor: 'text-violet-500 dark:text-violet-400',
       path: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'
     },
     {
       href: '/groups',
       label: 'Groups',
-      iconColor: 'text-indigo-500 dark:text-indigo-400',
       path: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
     },
     {
       href: '/snippets',
       label: 'Snippets',
-      iconColor: 'text-emerald-500 dark:text-emerald-400',
       path: 'M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4'
-    },
-    {
-      href: '/sftp',
-      label: 'Files (SFTP)',
-      iconColor: 'text-teal-500 dark:text-teal-400',
-      path: 'M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z'
     },
     {
       href: '/teams',
       label: 'Teams',
-      iconColor: 'text-blue-500 dark:text-blue-400',
       path: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z'
     },
     {
       href: '/port-forwarding',
       label: 'Port forwarding',
-      iconColor: 'text-amber-500 dark:text-amber-400',
       path: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4'
     },
     {
       href: '/monitoring',
       label: 'Monitoring',
-      iconColor: 'text-purple-500 dark:text-purple-400',
       path: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
     },
     {
       href: '/command-logs',
       label: 'Command logs',
-      iconColor: 'text-gray-500 dark:text-gray-400',
       path: 'M4 6h16M4 12h16M4 18h16'
     },
     {
       href: '/investigations',
       label: 'Investigations',
-      iconColor: 'text-orange-500 dark:text-orange-400',
       path: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
     },
     {
       href: '/ssh-keys',
       label: 'SSH keys',
-      iconColor: 'text-rose-500 dark:text-rose-400',
       path: 'M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z'
     }
   ];
@@ -258,7 +275,7 @@
         <div class="flex items-center gap-2">
           <Logo size={22} mode="brand" />
           <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide">CATerm</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.0.10</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.1</span>
         </div>
         <button
           onclick={() => mobileDrawerOpen = false}
@@ -277,9 +294,9 @@
             href={item.href}
             onclick={() => mobileDrawerOpen = false}
             title={item.label}
-            class="p-2.5 rounded-lg flex items-center gap-3 transition-colors {isActive(item.href) ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
+            class="p-2.5 rounded-lg flex items-center gap-3 transition-colors {isActive(item.href) ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
           >
-            <svg class="w-5 h-5 shrink-0 {item.iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={item.path} />
             </svg>
             <span class="truncate">{item.label}</span>
@@ -352,7 +369,7 @@
           <div class="flex items-center gap-2 overflow-hidden min-w-0">
             <Logo size={22} mode="brand" />
             <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate">CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.0.10</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.1</span>
           </div>
           <button
             type="button"
@@ -374,9 +391,9 @@
           <a
             href={item.href}
             title={item.label}
-            class="p-2.5 rounded-lg flex items-center {isCollapsed ? 'justify-center' : 'gap-3'} transition-colors {isActive(item.href) ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
+            class="p-2.5 rounded-lg flex items-center {isCollapsed ? 'justify-center' : 'gap-3'} transition-colors {isActive(item.href) ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
           >
-            <svg class="w-5 h-5 shrink-0 {item.iconColor}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={item.path} />
             </svg>
             {#if !isCollapsed}
@@ -501,8 +518,8 @@
               <button
                 onclick={() => closeTab(tab.id)}
                 class="p-0.5 mr-1 rounded hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-rose-600 dark:hover:text-rose-400"
-                title="Tutup sesi {tabLabel(tab)}"
-                aria-label="Tutup sesi {tabLabel(tab)}"
+                title="Close session {tabLabel(tab)}"
+                aria-label="Close session {tabLabel(tab)}"
               >
                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
               </button>
@@ -516,8 +533,8 @@
         <a
           href="/"
           class="p-1 rounded shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          title="Sesi baru (pilih host)"
-          aria-label="Sesi baru"
+          title="New session (select host)"
+          aria-label="New session"
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         </a>
@@ -529,7 +546,7 @@
           <button
             onclick={handleFilesToggle}
             class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {view.showFiles ? 'bg-sky-600/20 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
-            title={view.showFiles ? 'Sembunyikan Remote Files (SFTP)' : 'Tampilkan Remote Files (SFTP)'}
+            title={view.showFiles ? 'Hide Remote Files (SFTP)' : 'Show Remote Files (SFTP)'}
           >
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
@@ -542,7 +559,7 @@
         <button
           onclick={handleAiToggle}
           class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
-          title={aiChat.open ? 'Tutup AI Assistant' : 'AI Assistant — diskusi lalu jalankan'}
+          title={aiChat.open ? 'Close AI Assistant' : 'AI Assistant — discuss and run'}
           aria-pressed={aiChat.open}
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

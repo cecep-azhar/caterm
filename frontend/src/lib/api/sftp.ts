@@ -23,3 +23,19 @@ export function writeRemoteFile(hostId: string, remotePath: string, data: number
 export function deleteRemoteFile(hostId: string, remotePath: string): Promise<void> {
   return invoke('delete_remote_file', { hostId, remotePath });
 }
+
+export function renameRemoteFile(
+  hostId: string,
+  oldPath: string,
+  newPath: string
+): Promise<void> {
+  return invoke('sftp_rename', { hostId, oldPath, newPath });
+}
+
+export function copyRemoteFile(
+  hostId: string,
+  srcPath: string,
+  dstPath: string
+): Promise<void> {
+  return invoke('sftp_copy', { hostId, srcPath, dstPath });
+}

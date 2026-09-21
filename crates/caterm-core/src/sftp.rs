@@ -131,6 +131,30 @@ pub fn delete_remote_file(host_id: &str, remote_path: &str) -> Result<(), Caterm
     })
 }
 
+pub fn rename_remote_file(
+    host_id: &str,
+    old_path: &str,
+    new_path: &str,
+) -> Result<(), CatermError> {
+    let old_p = old_path.to_string();
+    let new_p = new_path.to_string();
+
+    crate::ssh::with_exec_session(host_id, move |sess| {
+        let sftp = open_sftp(sess)?;
+        sftp.rename(Path::new(&old_p), Path::new(&new_p), None)
+            .map_err(|e| sftp_err(format!("Failed to rename remote file {old_p} -> {new_p}: {e}")))
+    })
+}
+
+pub fn copy_remote_file(
+    host_id: &str,
+    src_path: &str,
+    dst_path: &str,
+) -> Result<(), CatermError> {
+    let data = read_remote_file(host_id, src_path)?;
+    write_remote_file(host_id, dst_path, &data)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

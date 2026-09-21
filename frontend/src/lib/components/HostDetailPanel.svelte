@@ -51,7 +51,7 @@
       case 'key':
         return `Key file — ${auth.path || '-'}`;
       case 'keyId':
-        return 'Key dari vault';
+        return 'Vault Key';
     }
   });
 </script>
@@ -61,12 +61,12 @@
     type="button"
     class="absolute inset-0 bg-black/50 backdrop-blur-xs"
     onclick={onClose}
-    aria-label="Tutup panel detail"
+    aria-label="Close detail panel"
   ></button>
 
   <aside
     class="relative w-full max-w-md h-full bg-white dark:bg-neutral-950 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl flex flex-col"
-    aria-label="Detail host {host.label}"
+    aria-label="Host details {host.label}"
   >
     <header class="p-4 border-b border-neutral-200 dark:border-neutral-800 flex items-start justify-between gap-3 shrink-0">
       <div class="min-w-0">
@@ -78,7 +78,7 @@
       <button
         onclick={onClose}
         class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
-        aria-label="Tutup"
+        aria-label="Close"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -88,10 +88,10 @@
 
     <div class="flex-1 overflow-y-auto p-4 space-y-5">
       <section class="space-y-2">
-        <h3 class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Koneksi</h3>
+        <h3 class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Connection</h3>
         <dl class="text-xs space-y-1.5">
           <div class="flex justify-between gap-3">
-            <dt class="text-neutral-500 dark:text-neutral-400">Alamat</dt>
+            <dt class="text-neutral-500 dark:text-neutral-400">Address</dt>
             <dd class="font-mono text-neutral-800 dark:text-neutral-200 truncate">{host.address}</dd>
           </div>
           <div class="flex justify-between gap-3">
@@ -103,13 +103,13 @@
             <dd class="font-mono text-neutral-800 dark:text-neutral-200 truncate">{host.username}</dd>
           </div>
           <div class="flex justify-between gap-3">
-            <dt class="text-neutral-500 dark:text-neutral-400">Autentikasi</dt>
+            <dt class="text-neutral-500 dark:text-neutral-400">Authentication</dt>
             <dd class="text-neutral-800 dark:text-neutral-200 truncate text-right">{authLabel}</dd>
           </div>
           <div class="flex justify-between gap-3">
-            <dt class="text-neutral-500 dark:text-neutral-400">Kredensial</dt>
+            <dt class="text-neutral-500 dark:text-neutral-400">Credentials</dt>
             <dd class={host.hasSecret ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}>
-              {host.hasSecret ? 'Tersimpan terenkripsi' : 'Belum diset'}
+              {host.hasSecret ? 'Encrypted & Stored' : 'Not set'}
             </dd>
           </div>
         </dl>
@@ -129,19 +129,19 @@
       <section class="space-y-2">
         <div class="flex items-center justify-between">
           <h3 class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
-            Aktivitas terakhir
+            Recent Activity
           </h3>
           <a href="/command-logs" class="text-[11px] text-sky-600 dark:text-sky-400 hover:underline">
-            Semua log
+            All logs
           </a>
         </div>
 
         {#if isLoadingLogs}
-          <p class="text-xs text-neutral-500">Memuat log...</p>
+          <p class="text-xs text-neutral-500">Loading logs...</p>
         {:else if logError}
-          <p class="text-xs text-amber-600 dark:text-amber-400">Gagal memuat log: {logError}</p>
+          <p class="text-xs text-amber-600 dark:text-amber-400">Failed to load logs: {logError}</p>
         {:else if logs.length === 0}
-          <p class="text-xs text-neutral-500">Belum ada aktivitas tercatat untuk host ini.</p>
+          <p class="text-xs text-neutral-500">No activity recorded for this host yet.</p>
         {:else}
           <ul class="space-y-1.5">
             {#each logs as log (log.id)}

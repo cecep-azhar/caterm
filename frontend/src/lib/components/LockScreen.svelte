@@ -33,11 +33,11 @@
 
   async function handleUnlock() {
     if (!password) {
-      errorMsg = 'Master password tidak boleh kosong.';
+      errorMsg = 'Master password cannot be empty.';
       return;
     }
     if (password.length < 8) {
-      errorMsg = 'Master password minimal 8 karakter.';
+      errorMsg = 'Master password must be at least 8 characters.';
       return;
     }
     isLoading = true;
@@ -45,13 +45,13 @@
     try {
       await validateVaultPassword(password);
       if (isSetup) {
-        showToast('Vault berhasil dibuat dan dienkripsi.', 'success');
+        showToast('Vault successfully created and encrypted.', 'success');
       } else {
-        showToast('Vault berhasil dibuka.', 'success');
+        showToast('Vault successfully unlocked.', 'success');
       }
       onUnlocked();
     } catch (err: any) {
-      errorMsg = typeof err === 'string' ? err : (err?.message || 'Password tidak valid (minimal 8 karakter)');
+      errorMsg = typeof err === 'string' ? err : (err?.message || 'Invalid password (minimum 8 characters)');
       showToast(errorMsg, 'error');
     } finally {
       isLoading = false;
@@ -60,22 +60,22 @@
 
   async function handleReset() {
     const confirmed = await confirmModal(
-      'Reset Vault akan menghapus master password, local key, dan seluruh database secara permanen. Apakah Anda yakin?',
+      'Resetting the Vault will permanently delete master password, local key, and all stored data. Are you sure?',
       'Reset Local Vault',
       true,
-      'Ya, Reset Vault',
-      'Batal'
+      'Yes, Reset Vault',
+      'Cancel'
     );
     if (confirmed) {
       try {
         await resetVault();
-        successMsg = 'Reset vault berhasil! Seluruh database dan kunci lokal telah dibersihkan.';
-        showToast('Reset vault berhasil! Seluruh database telah dibersihkan.', 'success');
+        successMsg = 'Vault reset successfully! All database and local keys have been cleared.';
+        showToast('Vault reset successfully! All database records cleared.', 'success');
         isSetup = true;
         password = '';
         errorMsg = '';
       } catch (err: any) {
-        showToast('Gagal mereset vault: ' + String(err), 'error');
+        showToast('Failed to reset vault: ' + String(err), 'error');
       }
     }
   }
@@ -96,7 +96,7 @@
     <div class="relative z-10 flex items-center gap-3">
       <Logo size={40} mode="brand" />
       <div>
-        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.0.10</span></h1>
+        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.1.1</span></h1>
         <p class="text-xs text-neutral-400">Enterprise SSH Manager & Prompt Studio</p>
       </div>
     </div>
@@ -122,7 +122,7 @@
 
     <!-- Dedication Footer -->
     <div class="relative z-10 text-xs text-neutral-500">
-      Dedikasi: <span class="text-neutral-300 font-medium italic">Ke Lima Cahaya Hidupku Fatih, Harun, Ibrahim, Khadijah, Maryam dan Istri Tersayang Rini..</span>
+      Dedication: <span class="text-neutral-300 font-medium italic">To the Five Lights of My Life: Fatih, Harun, Ibrahim, Khadijah, Maryam, and My Beloved Wife Rini..</span>
     </div>
   </div>
 

@@ -73,6 +73,24 @@ pub async fn write_remote_file(
 pub async fn delete_remote_file(host_id: String, remote_path: String) -> Result<(), CatermError> {
     run_blocking(move || sftp::delete_remote_file(&host_id, &remote_path)).await
 }
+
+#[tauri::command]
+pub async fn sftp_rename(
+    host_id: String,
+    old_path: String,
+    new_path: String,
+) -> Result<(), CatermError> {
+    run_blocking(move || sftp::rename_remote_file(&host_id, &old_path, &new_path)).await
+}
+
+#[tauri::command]
+pub async fn sftp_copy(
+    host_id: String,
+    src_path: String,
+    dst_path: String,
+) -> Result<(), CatermError> {
+    run_blocking(move || sftp::copy_remote_file(&host_id, &src_path, &dst_path)).await
+}
 #[tauri::command]
 pub async fn export_encrypted_backup(passphrase: String) -> Result<String, CatermError> {
     run_blocking(move || backup::export_encrypted_backup(&passphrase)).await
