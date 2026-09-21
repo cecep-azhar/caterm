@@ -130,20 +130,20 @@
   });
 </script>
 
-<div class="flex flex-col h-full bg-[#09090b] border border-neutral-800 rounded-lg overflow-hidden">
-  <div class="h-8 bg-neutral-900 border-b border-neutral-800 px-3 flex items-center justify-between text-xs font-mono text-neutral-400">
-    <div class="flex items-center gap-2">
+<div class="flex flex-col h-full bg-[#09090b] border border-neutral-800 rounded-md overflow-hidden">
+  <div class="h-7 sm:h-8 bg-neutral-900/90 border-b border-neutral-800 px-2.5 flex items-center justify-between text-xs font-mono text-neutral-400 shrink-0">
+    <div class="flex items-center gap-2 min-w-0">
       <span
-        class="w-2 h-2 rounded-full {status === 'connected'
+        class="w-2 h-2 rounded-full shrink-0 {status === 'connected'
           ? 'bg-emerald-500'
           : status === 'connecting'
             ? 'bg-amber-500'
             : 'bg-neutral-600'}"
       ></span>
-      <span class="text-white font-medium">{host.label}</span>
-      <span class="text-neutral-500">({host.address})</span>
+      <span class="text-white font-medium truncate">{host.label}</span>
+      <span class="text-neutral-500 hidden sm:inline truncate">({host.address})</span>
     </div>
-    <div class="flex items-center gap-2 text-neutral-400">
+    <div class="flex items-center gap-2 text-neutral-400 shrink-0">
       {#if onSplitRight}
         <button onclick={onSplitRight} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Right (Vertical)">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
@@ -159,9 +159,9 @@
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       {/if}
-      <span class="ml-1 text-neutral-500">SSH</span>
-      <span class="text-neutral-500">UTF-8</span>
+      <span class="ml-1 text-neutral-500 hidden sm:inline">SSH</span>
+      <span class="text-neutral-500 hidden sm:inline">UTF-8</span>
     </div>
   </div>
-  <div bind:this={terminalContainer} class="flex-1 p-2 overflow-hidden"></div>
+  <div bind:this={terminalContainer} class="flex-1 p-1 overflow-hidden outline-none"></div>
 </div>
