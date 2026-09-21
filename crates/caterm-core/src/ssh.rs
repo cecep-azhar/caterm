@@ -9,14 +9,14 @@
 
 use crate::error::{CatermError, ValidationError};
 use crate::store::AuthMethod;
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
-use once_cell::sync::Lazy;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,6 +28,7 @@ pub struct SshSession {
 pub(crate) struct SessionHandle {
     pub(crate) tx: tokio::sync::mpsc::Sender<Vec<u8>>,
     pub(crate) output_buffer: Arc<Mutex<Vec<u8>>>,
+    pub(crate) input_buffer: Arc<Mutex<String>>,
     pub(crate) channel: Arc<Mutex<ssh2::Channel>>,
     pub(crate) session: Arc<Mutex<ssh2::Session>>,
     pub(crate) host_id: String,
@@ -66,19 +67,37 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     let addr = format!("{}:{port}", host.address);
 
     let tcp = std::net::TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Invalid address {addr}: {e}"))))?,
+        &addr.parse().map_err(|e| {
+            CatermError::Validation(ValidationError::Generic(format!(
+                "Invalid address {addr}: {e}"
+            )))
+        })?,
         Duration::from_secs(10),
-    ).map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Connection failed to {addr}: {e}"))))?;
+    )
+    .map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Connection failed to {addr}: {e}"
+        )))
+    })?;
 
-    tcp.set_nonblocking(false)
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to set blocking TCP stream: {e}"))))?;
+    tcp.set_nonblocking(false).map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to set blocking TCP stream: {e}"
+        )))
+    })?;
 
-    let mut sess = ssh2::Session::new()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH session creation failed: {e}"))))?;
+    let mut sess = ssh2::Session::new().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "SSH session creation failed: {e}"
+        )))
+    })?;
 
     sess.set_tcp_stream(tcp);
-    sess.handshake()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH handshake failed: {e}"))))?;
+    sess.handshake().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "SSH handshake failed: {e}"
+        )))
+    })?;
 
     // TOFU Host Key Verification (REQ-18, T2-SSH-04)
     let data_info = crate::paths::resolve_data_dir()?;
@@ -87,8 +106,11 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         let _ = std::fs::create_dir_all(parent);
     }
 
-    let mut known_hosts = sess.known_hosts()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to initialize known_hosts: {e}"))))?;
+    let mut known_hosts = sess.known_hosts().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to initialize known_hosts: {e}"
+        )))
+    })?;
 
     if kh_file.exists() {
         let _ = known_hosts.read_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH);
@@ -102,8 +124,18 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
             }
             ssh2::CheckResult::NotFound => {
                 // Trust On First Use: record the new key
-                known_hosts.add(&host.address, key, &format!("Added by CATerm for {}", host.label), key_type.into())
-                    .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to record TOFU host key: {e}"))))?;
+                known_hosts
+                    .add(
+                        &host.address,
+                        key,
+                        &format!("Added by CATerm for {}", host.label),
+                        key_type.into(),
+                    )
+                    .map_err(|e| {
+                        CatermError::Validation(ValidationError::Generic(format!(
+                            "Failed to record TOFU host key: {e}"
+                        )))
+                    })?;
                 let _ = known_hosts.write_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH);
             }
             ssh2::CheckResult::Mismatch => {
@@ -114,13 +146,13 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
             }
             ssh2::CheckResult::Failure => {
                 return Err(CatermError::Validation(ValidationError::Generic(
-                    "Host key verification check failed unexpectedly.".into()
+                    "Host key verification check failed unexpectedly.".into(),
                 )));
             }
         }
     } else {
         return Err(CatermError::Validation(ValidationError::Generic(
-            "Remote server did not present a host key.".into()
+            "Remote server did not present a host key.".into(),
         )));
     }
 
@@ -132,22 +164,28 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                     host.label
                 )))
             })?;
-            sess.userauth_password(&host.username, &password).map_err(|e| {
-                CatermError::Validation(ValidationError::Generic(format!(
-                    "Auth failed for user {}: {e}",
-                    host.username
-                )))
-            })?;
+            sess.userauth_password(&host.username, &password)
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!(
+                        "Auth failed for user {}: {e}",
+                        host.username
+                    )))
+                })?;
         }
         AuthMethod::Key { path } => {
             let expanded = crate::paths::expand_tilde(path);
-            sess.userauth_pubkey_file(&host.username, None, Path::new(&expanded), secret.as_deref())
-                .map_err(|e| {
-                    CatermError::Validation(ValidationError::Generic(format!(
-                        "Auth via SSH key gagal untuk {} ({}): {e}",
-                        host.username, expanded
-                    )))
-                })?;
+            sess.userauth_pubkey_file(
+                &host.username,
+                None,
+                Path::new(&expanded),
+                secret.as_deref(),
+            )
+            .map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Auth via SSH key gagal untuk {} ({}): {e}",
+                    host.username, expanded
+                )))
+            })?;
         }
         AuthMethod::KeyId { id } => {
             let priv_pem = crate::keys::get_private_key(id)?;
@@ -162,19 +200,29 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     }
 
     if !sess.authenticated() {
-        return Err(CatermError::Validation(ValidationError::Generic(
-            format!("Authentication failed for user {}", host.username)
-        )));
+        return Err(CatermError::Validation(ValidationError::Generic(format!(
+            "Authentication failed for user {}",
+            host.username
+        ))));
     }
 
-    let mut channel = sess.channel_session()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Channel creation failed: {e}"))))?;
+    let mut channel = sess.channel_session().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Channel creation failed: {e}"
+        )))
+    })?;
 
-    channel.request_pty("xterm-256color", None, Some((80, 24, 0, 0)))
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("PTY request failed: {e}"))))?;
+    channel
+        .request_pty("xterm-256color", None, Some((80, 24, 0, 0)))
+        .map_err(|e| {
+            CatermError::Validation(ValidationError::Generic(format!("PTY request failed: {e}")))
+        })?;
 
-    channel.shell()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Shell request failed: {e}"))))?;
+    channel.shell().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Shell request failed: {e}"
+        )))
+    })?;
 
     let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
     let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
@@ -230,6 +278,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     let handle = SessionHandle {
         tx,
         output_buffer,
+        input_buffer: Arc::new(Mutex::new(String::new())),
         channel: channel_arc,
         session: Arc::new(Mutex::new(sess)),
         host_id: host.id.clone(),
@@ -249,17 +298,38 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
 pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
     require_non_empty("session_id", session_id)?;
 
-    let (tx, output_buffer) = {
+    let (tx, output_buffer, input_buffer, host_id) = {
         let sessions = SESSIONS.lock().map_err(|_| {
             CatermError::Validation(ValidationError::Generic("Lock failure".into()))
         })?;
         let handle = sessions.get(session_id).ok_or_else(|| {
-            CatermError::Validation(ValidationError::Generic(format!("Session {session_id} not found")))
+            CatermError::Validation(ValidationError::Generic(format!(
+                "Session {session_id} not found"
+            )))
         })?;
-        (handle.tx.clone(), Arc::clone(&handle.output_buffer))
+        (
+            handle.tx.clone(),
+            Arc::clone(&handle.output_buffer),
+            Arc::clone(&handle.input_buffer),
+            handle.host_id.clone(),
+        )
     };
 
     if !data.is_empty() {
+        if let Ok(mut buf) = input_buffer.lock() {
+            if data == "\r" || data == "\n" {
+                if !buf.is_empty() {
+                    let _ = crate::audit::log_event("PTY_COMMAND", Some(&host_id), &buf);
+                    buf.clear();
+                }
+            } else if data == "\x7F" || data == "\x08" {
+                // Backspace
+                buf.pop();
+            } else if !data.contains('\x1b') {
+                // Ignore escape sequences
+                buf.push_str(data);
+            }
+        }
         let _ = tx.blocking_send(data.as_bytes().to_vec());
     }
 
@@ -282,7 +352,9 @@ pub fn read(session_id: &str) -> Result<String, CatermError> {
             CatermError::Validation(ValidationError::Generic("Lock failure".into()))
         })?;
         let handle = sessions.get(session_id).ok_or_else(|| {
-            CatermError::Validation(ValidationError::Generic(format!("Session {session_id} not found")))
+            CatermError::Validation(ValidationError::Generic(format!(
+                "Session {session_id} not found"
+            )))
         })?;
         Arc::clone(&handle.output_buffer)
     };
@@ -298,9 +370,9 @@ pub fn read(session_id: &str) -> Result<String, CatermError> {
 pub fn resize(session_id: &str, cols: u16, rows: u16) -> Result<(), CatermError> {
     require_non_empty("session_id", session_id)?;
 
-    let sessions = SESSIONS.lock().map_err(|_| {
-        CatermError::Validation(ValidationError::Generic("Lock failure".into()))
-    })?;
+    let sessions = SESSIONS
+        .lock()
+        .map_err(|_| CatermError::Validation(ValidationError::Generic("Lock failure".into())))?;
     if let Some(handle) = sessions.get(session_id)
         && let Ok(mut ch) = handle.channel.lock()
     {

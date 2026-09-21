@@ -10,8 +10,8 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -75,7 +75,11 @@ pub fn init_table(conn: &rusqlite::Connection) -> Result<(), CatermError> {
             target_port INTEGER NOT NULL
         );",
     )
-    .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to create tunnels table: {e}"))))?;
+    .map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to create tunnels table: {e}"
+        )))
+    })?;
     Ok(())
 }
 
@@ -119,7 +123,8 @@ pub fn list_tunnels() -> Result<Vec<TunnelRecord>, CatermError> {
 
     let mut result = Vec::new();
     for r in rows {
-        result.push(r.map_err(|e| CatermError::Validation(ValidationError::Generic(e.to_string())))?);
+        result
+            .push(r.map_err(|e| CatermError::Validation(ValidationError::Generic(e.to_string())))?);
     }
     Ok(result)
 }
@@ -195,40 +200,74 @@ fn connect_host_session(host_id: &str) -> Result<ssh2::Session, CatermError> {
     let addr = format!("{}:{port}", host.address);
 
     let tcp = TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Invalid address {addr}: {e}"))))?,
+        &addr.parse().map_err(|e| {
+            CatermError::Validation(ValidationError::Generic(format!(
+                "Invalid address {addr}: {e}"
+            )))
+        })?,
         Duration::from_secs(10),
-    ).map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Connection failed to {addr}: {e}"))))?;
+    )
+    .map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Connection failed to {addr}: {e}"
+        )))
+    })?;
 
-    let mut sess = ssh2::Session::new()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH session creation failed: {e}"))))?;
+    let mut sess = ssh2::Session::new().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "SSH session creation failed: {e}"
+        )))
+    })?;
 
     sess.set_tcp_stream(tcp);
-    sess.handshake()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH handshake failed: {e}"))))?;
+    sess.handshake().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "SSH handshake failed: {e}"
+        )))
+    })?;
 
     match &host.auth_method {
         crate::store::AuthMethod::Password => {
             let password = secret.ok_or_else(|| {
-                CatermError::Validation(ValidationError::Generic(format!("Password host '{}' belum diset.", host.label)))
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Password host '{}' belum diset.",
+                    host.label
+                )))
             })?;
-            sess.userauth_password(&host.username, &password).map_err(|e| {
-                CatermError::Validation(ValidationError::Generic(format!("Auth failed: {e}")))
-            })?;
+            sess.userauth_password(&host.username, &password)
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!("Auth failed: {e}")))
+                })?;
         }
         crate::store::AuthMethod::Key { path } => {
             let expanded = crate::paths::expand_tilde(path);
-            sess.userauth_pubkey_file(&host.username, None, Path::new(&expanded), secret.as_deref())
-                .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Auth via key failed: {e}"))))?;
+            sess.userauth_pubkey_file(
+                &host.username,
+                None,
+                Path::new(&expanded),
+                secret.as_deref(),
+            )
+            .map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Auth via key failed: {e}"
+                )))
+            })?;
         }
         crate::store::AuthMethod::KeyId { id } => {
             let priv_pem = crate::keys::get_private_key(id)?;
             sess.userauth_pubkey_memory(&host.username, None, &priv_pem, None)
-                .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Auth via key id failed: {e}"))))?;
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!(
+                        "Auth via key id failed: {e}"
+                    )))
+                })?;
         }
     }
 
     if !sess.authenticated() {
-        return Err(CatermError::Validation(ValidationError::Generic("Authentication failed".into())));
+        return Err(CatermError::Validation(ValidationError::Generic(
+            "Authentication failed".into(),
+        )));
     }
 
     Ok(sess)
@@ -240,10 +279,25 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
         return Ok(()); // Already running
     }
 
-    let tunnels = list_tunnels()?;
-    let tun = tunnels.iter().find(|t| t.id == id).ok_or_else(|| {
-        CatermError::Validation(ValidationError::Generic(format!("Tunnel '{id}' not found")))
-    })?.clone();
+    let tunnel = get_tunnel(id)?;
+
+    // Log audit event
+    let _ = crate::audit::log_event(
+        "TUNNEL_START",
+        Some(&tunnel.host_id),
+        &format!(
+            "Started tunnel {} ({}) on port {}",
+            tunnel.name, tunnel.tunnel_type, tunnel.local_port
+        ),
+    );
+
+    let tun = tunnels
+        .iter()
+        .find(|t| t.id == id)
+        .ok_or_else(|| {
+            CatermError::Validation(ValidationError::Generic(format!("Tunnel '{id}' not found")))
+        })?
+        .clone();
 
     let shutdown_signal = Arc::new(AtomicBool::new(false));
     let shutdown_clone = Arc::clone(&shutdown_signal);
@@ -251,22 +305,22 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
     match tun.forward_type {
         ForwardType::Local => {
             let bind_str = format!("{}:{}", tun.bind_addr, tun.bind_port);
-            let listener = TcpListener::bind(&bind_str)
-                .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to bind local port {bind_str}: {e}"))))?;
-            
+            let listener = TcpListener::bind(&bind_str).map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Failed to bind local port {bind_str}: {e}"
+                )))
+            })?;
+
             listener.set_nonblocking(true).ok();
 
             let host_id = tun.host_id.clone();
             let target_addr = tun.target_addr.clone();
             let target_port = tun.target_port;
 
-            thread::spawn(move || {
-                let sess = match connect_host_session(&host_id) {
-                    Ok(s) => s,
-                    Err(_) => return,
-                };
-                let sess_arc = Arc::new(Mutex::new(sess));
+            let sess = connect_host_session(&host_id)?;
+            let sess_arc = Arc::new(Mutex::new(sess));
 
+            thread::spawn(move || {
                 while !shutdown_clone.load(Ordering::Relaxed) {
                     match listener.accept() {
                         Ok((mut local_stream, _)) => {
@@ -277,7 +331,11 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                             thread::spawn(move || {
                                 let mut channel = {
                                     let guard = sess_inner.lock();
-                                    match guard.channel_direct_tcpip(&t_addr, target_port as u16, None) {
+                                    match guard.channel_direct_tcpip(
+                                        &t_addr,
+                                        target_port as u16,
+                                        None,
+                                    ) {
                                         Ok(c) => c,
                                         Err(_) => return,
                                     }
@@ -298,7 +356,8 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                                 break;
                                             }
                                         }
-                                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                                        Err(ref e)
+                                            if e.kind() == std::io::ErrorKind::WouldBlock => {}
                                         Err(_) => break,
                                     }
 
@@ -311,7 +370,8 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                                 break;
                                             }
                                         }
-                                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                                        Err(ref e)
+                                            if e.kind() == std::io::ErrorKind::WouldBlock => {}
                                         Err(_) => break,
                                     }
 
@@ -329,19 +389,221 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                 }
             });
         }
-        _ => {
-            // Placeholder fallback for other tunnel types
+        ForwardType::Remote => {
+            let sess = connect_host_session(&tun.host_id)?;
+            let mut listener_channel = sess
+                .channel_forward_listen(tun.bind_port, Some(&tun.bind_addr), None)
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!(
+                        "Failed to remote bind: {e}"
+                    )))
+                })?;
+
+            let target_addr = tun.target_addr.clone();
+            let target_port = tun.target_port;
+
+            thread::spawn(move || {
+                while !shutdown_clone.load(Ordering::Relaxed) {
+                    if let Ok(mut remote_stream) = listener_channel.accept() {
+                        let t_addr = target_addr.clone();
+                        let shutdown_worker = Arc::clone(&shutdown_clone);
+                        thread::spawn(move || {
+                            let mut local_stream =
+                                match TcpStream::connect(format!("{}:{}", t_addr, target_port)) {
+                                    Ok(s) => s,
+                                    Err(_) => return,
+                                };
+                            local_stream.set_nonblocking(true).ok();
+                            let mut buf = [0u8; 8192];
+                            while !shutdown_worker.load(Ordering::Relaxed) {
+                                let mut active = false;
+                                match local_stream.read(&mut buf) {
+                                    Ok(0) => break,
+                                    Ok(n) => {
+                                        active = true;
+                                        if remote_stream.write_all(&buf[..n]).is_err() {
+                                            break;
+                                        }
+                                    }
+                                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                                    Err(_) => break,
+                                }
+                                match remote_stream.read(&mut buf) {
+                                    Ok(0) => break,
+                                    Ok(n) => {
+                                        active = true;
+                                        if local_stream.write_all(&buf[..n]).is_err() {
+                                            break;
+                                        }
+                                    }
+                                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                                    Err(_) => break,
+                                }
+                                if !active {
+                                    thread::sleep(Duration::from_millis(5));
+                                }
+                            }
+                        });
+                    } else {
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                }
+            });
+        }
+        ForwardType::Dynamic => {
+            let bind_str = format!("{}:{}", tun.bind_addr, tun.bind_port);
+            let listener = TcpListener::bind(&bind_str).map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Failed to bind local port {bind_str}: {e}"
+                )))
+            })?;
+            listener.set_nonblocking(true).ok();
+
+            let sess = connect_host_session(&tun.host_id)?;
+            let sess_arc = Arc::new(Mutex::new(sess));
+
+            thread::spawn(move || {
+                while !shutdown_clone.load(Ordering::Relaxed) {
+                    match listener.accept() {
+                        Ok((mut local_stream, _)) => {
+                            let sess_inner = Arc::clone(&sess_arc);
+                            let shutdown_worker = Arc::clone(&shutdown_clone);
+
+                            thread::spawn(move || {
+                                local_stream.set_nonblocking(false).ok();
+                                let mut buf = [0u8; 512];
+                                if local_stream.read_exact(&mut buf[0..2]).is_err() || buf[0] != 5 {
+                                    return;
+                                }
+                                let nmethods = buf[1] as usize;
+                                if local_stream.read_exact(&mut buf[0..nmethods]).is_err() {
+                                    return;
+                                }
+                                if local_stream.write_all(&[5, 0]).is_err() {
+                                    return;
+                                }
+
+                                if local_stream.read_exact(&mut buf[0..4]).is_err()
+                                    || buf[0] != 5
+                                    || buf[1] != 1
+                                {
+                                    return;
+                                }
+                                let atyp = buf[3];
+                                let mut target_host = String::new();
+                                if atyp == 1 {
+                                    if local_stream.read_exact(&mut buf[0..4]).is_err() {
+                                        return;
+                                    }
+                                    target_host =
+                                        format!("{}.{}.{}.{}", buf[0], buf[1], buf[2], buf[3]);
+                                } else if atyp == 3 {
+                                    if local_stream.read_exact(&mut buf[0..1]).is_err() {
+                                        return;
+                                    }
+                                    let len = buf[0] as usize;
+                                    if local_stream.read_exact(&mut buf[0..len]).is_err() {
+                                        return;
+                                    }
+                                    target_host = String::from_utf8_lossy(&buf[0..len]).to_string();
+                                } else if atyp == 4 {
+                                    if local_stream.read_exact(&mut buf[0..16]).is_err() {
+                                        return;
+                                    }
+                                    return; // IPv6 not implemented
+                                } else {
+                                    return;
+                                }
+
+                                if local_stream.read_exact(&mut buf[0..2]).is_err() {
+                                    return;
+                                }
+                                let target_port = u16::from_be_bytes([buf[0], buf[1]]);
+
+                                let mut channel = {
+                                    let guard = sess_inner.lock();
+                                    match guard.channel_direct_tcpip(
+                                        &target_host,
+                                        target_port,
+                                        None,
+                                    ) {
+                                        Ok(c) => c,
+                                        Err(_) => return,
+                                    }
+                                };
+
+                                if local_stream
+                                    .write_all(&[5, 0, 0, 1, 0, 0, 0, 0, 0, 0])
+                                    .is_err()
+                                {
+                                    return;
+                                }
+
+                                local_stream.set_nonblocking(true).ok();
+                                let mut buf2 = [0u8; 8192];
+                                while !shutdown_worker.load(Ordering::Relaxed) {
+                                    let mut active = false;
+                                    match local_stream.read(&mut buf2) {
+                                        Ok(0) => break,
+                                        Ok(n) => {
+                                            active = true;
+                                            if channel.write_all(&buf2[..n]).is_err() {
+                                                break;
+                                            }
+                                        }
+                                        Err(ref e)
+                                            if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                                        Err(_) => break,
+                                    }
+                                    match channel.read(&mut buf2) {
+                                        Ok(0) => break,
+                                        Ok(n) => {
+                                            active = true;
+                                            if local_stream.write_all(&buf2[..n]).is_err() {
+                                                break;
+                                            }
+                                        }
+                                        Err(ref e)
+                                            if e.kind() == std::io::ErrorKind::WouldBlock => {}
+                                        Err(_) => break,
+                                    }
+                                    if !active {
+                                        thread::sleep(Duration::from_millis(5));
+                                    }
+                                }
+                            });
+                        }
+                        Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            thread::sleep(Duration::from_millis(50));
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
         }
     }
 
-    ACTIVE_TUNNELS.lock().insert(id.to_string(), ActiveTunnel { shutdown_signal });
+    ACTIVE_TUNNELS
+        .lock()
+        .insert(id.to_string(), ActiveTunnel { shutdown_signal });
     Ok(())
 }
 
 /// Stop an active port forward tunnel listener.
 pub fn stop_tunnel(id: &str) -> Result<(), CatermError> {
-    if let Some(tunnel) = ACTIVE_TUNNELS.lock().remove(id) {
-        tunnel.shutdown_signal.store(true, Ordering::Relaxed);
+    if let Some(active) = ACTIVE_TUNNELS.lock().remove(id) {
+        active.shutdown_signal.store(true, Ordering::Relaxed);
+
+        if let Ok(tunnel) = get_tunnel(id) {
+            let _ = crate::audit::log_event(
+                "TUNNEL_STOP",
+                Some(&tunnel.host_id),
+                &format!(
+                    "Stopped tunnel {} ({}) on port {}",
+                    tunnel.name, tunnel.tunnel_type, tunnel.local_port
+                ),
+            );
+        }
     }
     Ok(())
 }

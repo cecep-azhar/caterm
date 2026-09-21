@@ -56,7 +56,11 @@ pub fn init_table(conn: &rusqlite::Connection) -> Result<(), CatermError> {
             created_at TEXT NOT NULL
         );",
     )
-    .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to create ssh_keys table: {e}"))))?;
+    .map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to create ssh_keys table: {e}"
+        )))
+    })?;
     Ok(())
 }
 
@@ -86,7 +90,8 @@ pub fn list_keys() -> Result<Vec<KeyRecord>, CatermError> {
 
     let mut result = Vec::new();
     for r in rows {
-        result.push(r.map_err(|e| CatermError::Validation(ValidationError::Generic(e.to_string())))?);
+        result
+            .push(r.map_err(|e| CatermError::Validation(ValidationError::Generic(e.to_string())))?);
     }
     Ok(result)
 }
@@ -97,26 +102,37 @@ pub fn generate_key(input: KeyInput) -> Result<KeyRecord, CatermError> {
 
     let mut rng = rand::thread_rng();
     let priv_key = match input.algorithm.as_str() {
-        "Ed25519" => PrivateKey::random(&mut rng, Algorithm::Ed25519)
-            .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to generate Ed25519 key: {e}"))))?,
-        "RSA-4096" | "RSA" => PrivateKey::random(&mut rng, Algorithm::Rsa { hash: None })
-            .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to generate RSA key: {e}"))))?,
+        "Ed25519" => PrivateKey::random(&mut rng, Algorithm::Ed25519).map_err(|e| {
+            CatermError::Validation(ValidationError::Generic(format!(
+                "Failed to generate Ed25519 key: {e}"
+            )))
+        })?,
+        "RSA-4096" | "RSA" => {
+            PrivateKey::random(&mut rng, Algorithm::Rsa { hash: None }).map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Failed to generate RSA key: {e}"
+                )))
+            })?
+        }
         other => {
             return Err(CatermError::Validation(ValidationError::Generic(format!(
                 "Algoritma '{other}' tidak didukung. Gunakan 'Ed25519' atau 'RSA-4096'."
-            ))))
+            ))));
         }
     };
 
     let fingerprint = priv_key.fingerprint(HashAlg::Sha256).to_string();
-    let public_key = priv_key
-        .public_key()
-        .to_openssh()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to encode public key: {e}"))))?;
+    let public_key = priv_key.public_key().to_openssh().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to encode public key: {e}"
+        )))
+    })?;
 
-    let private_key_pem = priv_key
-        .to_openssh(LineEnding::LF)
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to encode private key: {e}"))))?;
+    let private_key_pem = priv_key.to_openssh(LineEnding::LF).map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to encode private key: {e}"
+        )))
+    })?;
 
     let data_info = crate::paths::resolve_data_dir()?;
     let key = crate::vault::load_or_create_local_key(&data_info.path)?;
@@ -156,17 +172,28 @@ pub fn generate_key(input: KeyInput) -> Result<KeyRecord, CatermError> {
 }
 
 /// Import an existing OpenSSH or PKCS#8 private key.
-pub fn import_key(name: &str, private_key_pem: &str, passphrase: Option<&str>) -> Result<KeyRecord, CatermError> {
+pub fn import_key(
+    name: &str,
+    private_key_pem: &str,
+    passphrase: Option<&str>,
+) -> Result<KeyRecord, CatermError> {
     require_non_empty("name", name)?;
     require_non_empty("private_key_pem", private_key_pem)?;
 
     let parsed_key = if let Some(pass) = passphrase {
         PrivateKey::from_openssh(private_key_pem)
             .and_then(|k| k.decrypt(pass))
-            .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Gagal mendeskripsi private key dengan passphrase: {e}"))))?
+            .map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Gagal mendeskripsi private key dengan passphrase: {e}"
+                )))
+            })?
     } else {
-        PrivateKey::from_openssh(private_key_pem)
-            .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Invalid OpenSSH private key: {e}"))))?
+        PrivateKey::from_openssh(private_key_pem).map_err(|e| {
+            CatermError::Validation(ValidationError::Generic(format!(
+                "Invalid OpenSSH private key: {e}"
+            )))
+        })?
     };
 
     let algorithm = match parsed_key.algorithm() {
@@ -176,14 +203,17 @@ pub fn import_key(name: &str, private_key_pem: &str, passphrase: Option<&str>) -
     };
 
     let fingerprint = parsed_key.fingerprint(HashAlg::Sha256).to_string();
-    let public_key = parsed_key
-        .public_key()
-        .to_openssh()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to get public key: {e}"))))?;
+    let public_key = parsed_key.public_key().to_openssh().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to get public key: {e}"
+        )))
+    })?;
 
-    let clean_pem = parsed_key
-        .to_openssh(LineEnding::LF)
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to encode key: {e}"))))?;
+    let clean_pem = parsed_key.to_openssh(LineEnding::LF).map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Failed to encode key: {e}"
+        )))
+    })?;
 
     let data_info = crate::paths::resolve_data_dir()?;
     let key = crate::vault::load_or_create_local_key(&data_info.path)?;
@@ -272,7 +302,9 @@ pub fn get_private_key(id: &str) -> Result<String, CatermError> {
 
     let secret_enc: String = stmt
         .query_row(rusqlite::params![id], |row| row.get(0))
-        .map_err(|_| CatermError::Validation(ValidationError::Generic(format!("Key '{id}' not found"))))?;
+        .map_err(|_| {
+            CatermError::Validation(ValidationError::Generic(format!("Key '{id}' not found")))
+        })?;
 
     let decrypted = crate::secret::decrypt(&key, &secret_enc)?;
     Ok(decrypted)
@@ -286,7 +318,9 @@ pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError>
     // Get public key content
     let keys = list_keys()?;
     let target_key = keys.iter().find(|k| k.id == key_id).ok_or_else(|| {
-        CatermError::Validation(ValidationError::Generic(format!("Key '{key_id}' not found")))
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Key '{key_id}' not found"
+        )))
     })?;
 
     // Connect to target host
@@ -295,45 +329,82 @@ pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError>
     let addr = format!("{}:{port}", host.address);
 
     let tcp = std::net::TcpStream::connect_timeout(
-        &addr.parse().map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Invalid address {addr}: {e}"))))?,
+        &addr.parse().map_err(|e| {
+            CatermError::Validation(ValidationError::Generic(format!(
+                "Invalid address {addr}: {e}"
+            )))
+        })?,
         Duration::from_secs(10),
-    ).map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Connection failed to {addr}: {e}"))))?;
+    )
+    .map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Connection failed to {addr}: {e}"
+        )))
+    })?;
 
-    let mut sess = ssh2::Session::new()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH session creation failed: {e}"))))?;
+    let mut sess = ssh2::Session::new().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "SSH session creation failed: {e}"
+        )))
+    })?;
 
     sess.set_tcp_stream(tcp);
-    sess.handshake()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("SSH handshake failed: {e}"))))?;
+    sess.handshake().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "SSH handshake failed: {e}"
+        )))
+    })?;
 
     match &host.auth_method {
         crate::store::AuthMethod::Password => {
             let password = secret.ok_or_else(|| {
-                CatermError::Validation(ValidationError::Generic(format!("Password host '{}' belum diset.", host.label)))
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Password host '{}' belum diset.",
+                    host.label
+                )))
             })?;
-            sess.userauth_password(&host.username, &password).map_err(|e| {
-                CatermError::Validation(ValidationError::Generic(format!("Auth failed: {e}")))
-            })?;
+            sess.userauth_password(&host.username, &password)
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!("Auth failed: {e}")))
+                })?;
         }
         crate::store::AuthMethod::Key { path } => {
             let expanded = crate::paths::expand_tilde(path);
-            sess.userauth_pubkey_file(&host.username, None, Path::new(&expanded), secret.as_deref())
-                .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Auth via key failed: {e}"))))?;
+            sess.userauth_pubkey_file(
+                &host.username,
+                None,
+                Path::new(&expanded),
+                secret.as_deref(),
+            )
+            .map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Auth via key failed: {e}"
+                )))
+            })?;
         }
         crate::store::AuthMethod::KeyId { id } => {
             let priv_pem = get_private_key(id)?;
             sess.userauth_pubkey_memory(&host.username, None, &priv_pem, None)
-                .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Auth via key id failed: {e}"))))?;
+                .map_err(|e| {
+                    CatermError::Validation(ValidationError::Generic(format!(
+                        "Auth via key id failed: {e}"
+                    )))
+                })?;
         }
     }
 
     if !sess.authenticated() {
-        return Err(CatermError::Validation(ValidationError::Generic("Authentication failed".into())));
+        return Err(CatermError::Validation(ValidationError::Generic(
+            "Authentication failed".into(),
+        )));
     }
 
     // Deploy public key idempotently & fix permissions
-    let mut channel = sess.channel_session()
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Channel creation failed: {e}"))))?;
+    let mut channel = sess.channel_session().map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Channel creation failed: {e}"
+        )))
+    })?;
 
     let pub_key_line = target_key.public_key.trim();
     let cmd = format!(
@@ -341,10 +412,20 @@ pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError>
          grep -qF '{pub_key_line}' ~/.ssh/authorized_keys || echo '{pub_key_line}' >> ~/.ssh/authorized_keys"
     );
 
-    channel.exec(&cmd)
-        .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Exec deploy key failed: {e}"))))?;
+    channel.exec(&cmd).map_err(|e| {
+        CatermError::Validation(ValidationError::Generic(format!(
+            "Exec deploy key failed: {e}"
+        )))
+    })?;
 
     channel.wait_close().ok();
+
+    let _ = crate::audit::log_event(
+        "KEY_DEPLOY",
+        Some(&host.id),
+        &format!("Deployed key '{}' to host {}", target_key.name, host.label),
+    );
+
     Ok(())
 }
 

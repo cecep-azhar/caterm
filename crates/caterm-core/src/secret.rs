@@ -27,7 +27,9 @@ fn derive_key(local_key_hex: &str) -> [u8; 32] {
 pub fn encrypt(local_key_hex: &str, plaintext: &str) -> Result<String, CatermError> {
     let key = derive_key(local_key_hex);
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| {
-        CatermError::Vault(VaultError::Generic(format!("gagal inisialisasi cipher: {e}")))
+        CatermError::Vault(VaultError::Generic(format!(
+            "gagal inisialisasi cipher: {e}"
+        )))
     })?;
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let ciphertext = cipher.encrypt(&nonce, plaintext.as_bytes()).map_err(|e| {
@@ -46,7 +48,9 @@ pub fn encrypt(local_key_hex: &str, plaintext: &str) -> Result<String, CatermErr
 /// Decrypts a blob produced by [`encrypt`].
 pub fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<String, CatermError> {
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| {
-        CatermError::Vault(VaultError::Generic(format!("gagal inisialisasi cipher: {e}")))
+        CatermError::Vault(VaultError::Generic(format!(
+            "gagal inisialisasi cipher: {e}"
+        )))
     })?;
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     let ciphertext = cipher.encrypt(&nonce, plaintext).map_err(|e| {
@@ -68,7 +72,9 @@ pub fn decrypt_bytes(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, CatermErr
     })?;
     let raw = base64::engine::general_purpose::STANDARD
         .decode(payload)
-        .map_err(|e| CatermError::Vault(VaultError::Generic(format!("secret rusak (base64): {e}"))))?;
+        .map_err(|e| {
+            CatermError::Vault(VaultError::Generic(format!("secret rusak (base64): {e}")))
+        })?;
     if raw.len() < 12 {
         return Err(CatermError::Vault(VaultError::Generic(
             "secret rusak (terlalu pendek)".into(),
@@ -76,13 +82,13 @@ pub fn decrypt_bytes(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, CatermErr
     }
     let (nonce_bytes, ciphertext) = raw.split_at(12);
     let cipher = Aes256Gcm::new_from_slice(key).map_err(|e| {
-        CatermError::Vault(VaultError::Generic(format!("gagal inisialisasi cipher: {e}")))
+        CatermError::Vault(VaultError::Generic(format!(
+            "gagal inisialisasi cipher: {e}"
+        )))
     })?;
     cipher
         .decrypt(Nonce::from_slice(nonce_bytes), ciphertext)
-        .map_err(|e| {
-            CatermError::Vault(VaultError::Generic(format!("gagal dekripsi secret: {e}")))
-        })
+        .map_err(|e| CatermError::Vault(VaultError::Generic(format!("gagal dekripsi secret: {e}"))))
 }
 pub fn decrypt(local_key_hex: &str, encoded: &str) -> Result<String, CatermError> {
     let payload = encoded.strip_prefix(PREFIX).ok_or_else(|| {
@@ -90,7 +96,9 @@ pub fn decrypt(local_key_hex: &str, encoded: &str) -> Result<String, CatermError
     })?;
     let raw = base64::engine::general_purpose::STANDARD
         .decode(payload)
-        .map_err(|e| CatermError::Vault(VaultError::Generic(format!("secret rusak (base64): {e}"))))?;
+        .map_err(|e| {
+            CatermError::Vault(VaultError::Generic(format!("secret rusak (base64): {e}")))
+        })?;
     if raw.len() < 12 {
         return Err(CatermError::Vault(VaultError::Generic(
             "secret rusak (terlalu pendek)".into(),
@@ -99,7 +107,9 @@ pub fn decrypt(local_key_hex: &str, encoded: &str) -> Result<String, CatermError
     let (nonce_bytes, ciphertext) = raw.split_at(12);
     let key = derive_key(local_key_hex);
     let cipher = Aes256Gcm::new_from_slice(&key).map_err(|e| {
-        CatermError::Vault(VaultError::Generic(format!("gagal inisialisasi cipher: {e}")))
+        CatermError::Vault(VaultError::Generic(format!(
+            "gagal inisialisasi cipher: {e}"
+        )))
     })?;
     let plaintext = cipher
         .decrypt(Nonce::from_slice(nonce_bytes), ciphertext)

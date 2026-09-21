@@ -1,33 +1,25 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { pollActiveMetrics, type HostMetrics } from '$lib/api/monitor';
+  import { type HostMetrics } from '$lib/api/monitor';
+  import { monitorState } from '$lib/stores/monitorStore.svelte';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
 
-  let metrics: HostMetrics[] = [];
   let hosts: HostRecord[] = [];
   let errorMsg = '';
-  let isLoading = true;
-  let timer: ReturnType<typeof setInterval>;
+  let isLoading = $derived(monitorState.isPolling && monitorState.metrics.length === 0);
+  let metrics = $derived(monitorState.metrics);
 
-  async function loadMetrics() {
+  async function loadHosts() {
     try {
-      [metrics, hosts] = await Promise.all([pollActiveMetrics(), listHosts()]);
+      hosts = await listHosts();
       errorMsg = '';
     } catch (e: any) {
       errorMsg = String(e);
-    } finally {
-      isLoading = false;
     }
   }
 
   onMount(() => {
-    loadMetrics();
-    // Poll every 5 seconds
-    timer = setInterval(loadMetrics, 5000);
-  });
-
-  onDestroy(() => {
-    if (timer) clearInterval(timer);
+    loadHosts();
   });
 
   function getHostLabel(hostId: string): string {

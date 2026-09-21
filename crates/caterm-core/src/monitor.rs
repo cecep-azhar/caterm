@@ -22,10 +22,9 @@ pub struct HostMetrics {
 
 fn require_non_empty(field: &str, value: &str) -> Result<(), CatermError> {
     if value.trim().is_empty() {
-        return Err(CatermError::Validation(crate::error::ValidationError::Generic(format!(
-            "Field {} cannot be empty",
-            field
-        ))));
+        return Err(CatermError::Validation(
+            crate::error::ValidationError::Generic(format!("Field {} cannot be empty", field)),
+        ));
     }
     Ok(())
 }
@@ -34,18 +33,29 @@ pub fn fetch_metrics_for_host(host_id: &str) -> Result<HostMetrics, CatermError>
     require_non_empty("host_id", host_id)?;
 
     let sess_arc = {
-        let sessions = SESSIONS.lock().map_err(|_| CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string())))?;
+        let sessions = SESSIONS.lock().map_err(|_| {
+            CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string()))
+        })?;
         // Find session handle corresponding to host_id
         if let Some(session_handle) = sessions.values().find(|h| h.host_id == host_id) {
             session_handle.session.clone()
         } else {
-            return Err(CatermError::Ssh(crate::error::SshError::Generic(format!("Active session not found for host {}", host_id))));
+            return Err(CatermError::Ssh(crate::error::SshError::Generic(format!(
+                "Active session not found for host {}",
+                host_id
+            ))));
         }
     };
 
-    let sess_inner = sess_arc.lock().map_err(|_| CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string())))?;
+    let mut sess_inner = sess_arc.lock().map_err(|_| {
+        CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string()))
+    })?;
+    sess_inner.set_timeout(5000);
     let mut channel = sess_inner.channel_session().map_err(|e| {
-        CatermError::Ssh(crate::error::SshError::Generic(format!("Failed to open SSH monitoring channel: {}", e)))
+        CatermError::Ssh(crate::error::SshError::Generic(format!(
+            "Failed to open SSH monitoring channel: {}",
+            e
+        )))
     })?;
 
     // One-liner bash script to extract metrics safely without remote dependencies
@@ -82,7 +92,10 @@ pub fn fetch_metrics_for_host(host_id: &str) -> Result<HostMetrics, CatermError>
     "#;
 
     channel.exec(script).map_err(|e| {
-        CatermError::Ssh(crate::error::SshError::Generic(format!("Failed to execute monitoring script: {}", e)))
+        CatermError::Ssh(crate::error::SshError::Generic(format!(
+            "Failed to execute monitoring script: {}",
+            e
+        )))
     })?;
 
     let mut output = String::new();
@@ -93,7 +106,10 @@ pub fn fetch_metrics_for_host(host_id: &str) -> Result<HostMetrics, CatermError>
     let parts: Vec<&str> = output.split('|').collect();
 
     if parts.len() < 8 {
-        return Err(CatermError::Ssh(crate::error::SshError::Generic(format!("Invalid metrics response: {}", output))));
+        return Err(CatermError::Ssh(crate::error::SshError::Generic(format!(
+            "Invalid metrics response: {}",
+            output
+        ))));
     }
 
     Ok(HostMetrics {
@@ -111,7 +127,9 @@ pub fn fetch_metrics_for_host(host_id: &str) -> Result<HostMetrics, CatermError>
 
 pub fn poll_active_metrics() -> Result<Vec<HostMetrics>, CatermError> {
     let active_host_ids: Vec<String> = {
-        let sessions = SESSIONS.lock().map_err(|_| CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string())))?;
+        let sessions = SESSIONS.lock().map_err(|_| {
+            CatermError::Ssh(crate::error::SshError::Generic("Lock poisoned".to_string()))
+        })?;
         let mut ids: Vec<String> = sessions.values().map(|m| m.host_id.clone()).collect();
         ids.sort();
         ids.dedup();

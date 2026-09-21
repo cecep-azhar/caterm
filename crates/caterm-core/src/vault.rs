@@ -50,6 +50,7 @@ pub fn lock_vault() -> Result<(), CatermError> {
     }
     // Also stop all active tunnels on lock for Zero-Knowledge containment
     let _ = crate::tunnels::stop_all_tunnels();
+    let _ = crate::audit::log_event("VAULT_LOCK", None, "Vault locked");
     Ok(())
 }
 
@@ -103,6 +104,8 @@ pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
 
     let mut guard = ACTIVE_VAULT_KEY.write();
     *guard = Some(derived_key);
+
+    let _ = crate::audit::log_event("VAULT_UNLOCK", None, "Vault unlocked");
 
     Ok(())
 }

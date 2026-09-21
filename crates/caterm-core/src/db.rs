@@ -57,6 +57,17 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
          );
+         CREATE TABLE IF NOT EXISTS teams (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            color TEXT NOT NULL,
+            avatar TEXT,
+            members TEXT NOT NULL,
+            host_ids TEXT NOT NULL,
+            group_ids TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+         );
          CREATE TABLE IF NOT EXISTS snippets (
             id TEXT PRIMARY KEY,
             label TEXT NOT NULL,
@@ -65,6 +76,13 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             tags TEXT NOT NULL,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS command_logs (
+            id TEXT PRIMARY KEY,
+            event_type TEXT NOT NULL,
+            timestamp INTEGER NOT NULL,
+            host_id TEXT,
+            details TEXT NOT NULL
          );",
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal inisialisasi skema: {e}"))))

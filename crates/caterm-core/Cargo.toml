@@ -32,6 +32,8 @@ parking_lot = "0.12.5"
 once_cell = "1.21.4"
 ssh-key = { version = "0.6.7", features = ["ed25519", "rsa", "encryption", "alloc"] }
 chrono = "0.4.45"
+regex = "1.13.1"
+uuid = { version = "1.26.1", features = ["v4"] }
 
 [dev-dependencies]
 serde_json.workspace = true

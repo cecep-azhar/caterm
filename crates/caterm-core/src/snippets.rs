@@ -4,7 +4,7 @@
 
 use crate::db;
 use crate::error::{CatermError, DbError};
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -261,7 +261,11 @@ mod tests {
         .expect("save_snippet gagal");
 
         delete_snippet_in(&db.0, &saved.id).expect("delete_snippet gagal");
-        assert!(list_snippets_in(&db.0).expect("list_snippets gagal").is_empty());
+        assert!(
+            list_snippets_in(&db.0)
+                .expect("list_snippets gagal")
+                .is_empty()
+        );
         assert!(delete_snippet_in(&db.0, &saved.id).is_err());
     }
 }

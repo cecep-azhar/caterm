@@ -4,7 +4,7 @@
 //! `caterm-core` for the guard that enforces this.
 
 use caterm_core::{
-    CatermError, backup, groups, keys, monitor, sftp, snippets, ssh, store, tunnels, vault,
+    CatermError, backup, groups, keys, monitor, sftp, snippets, ssh, store, teams, tunnels, vault, audit,
 };
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
@@ -171,6 +171,11 @@ pub async fn validate_vault_password(password: String) -> Result<(), CatermError
 }
 
 #[tauri::command]
+pub async fn get_command_logs(host_id: Option<String>, search: Option<String>) -> Result<Vec<audit::CommandLog>, CatermError> {
+    run_blocking(move || audit::get_logs(host_id.as_deref(), search.as_deref())).await
+}
+
+#[tauri::command]
 pub async fn is_vault_initialized() -> Result<bool, CatermError> {
     run_blocking(vault::is_vault_initialized).await
 }
@@ -203,4 +208,19 @@ pub async fn ssh_resize(session_id: String, cols: u16, rows: u16) -> Result<(), 
 #[tauri::command]
 pub async fn ssh_disconnect(session_id: String) -> Result<(), CatermError> {
     run_blocking(move || ssh::disconnect(&session_id)).await
+}
+
+#[tauri::command]
+pub async fn list_teams() -> Result<Vec<teams::TeamRecord>, CatermError> {
+    run_blocking(teams::list_teams).await
+}
+
+#[tauri::command]
+pub async fn save_team(input: teams::TeamInput) -> Result<teams::TeamRecord, CatermError> {
+    run_blocking(move || teams::save_team(input)).await
+}
+
+#[tauri::command]
+pub async fn delete_team(id: String) -> Result<(), CatermError> {
+    run_blocking(move || teams::delete_team(&id)).await
 }

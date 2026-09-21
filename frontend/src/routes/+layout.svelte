@@ -6,6 +6,31 @@
   
   import { getTabs, closeTab } from '$lib/stores/sessionTabs.svelte';
   import { getToasts, showToast } from '$lib/stores/uiNotifications.svelte';
+  import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
+  import { onMount, onDestroy } from 'svelte';
+  
+  let timeAgo = $state('never');
+  
+  $effect(() => {
+    const updateTime = () => {
+      if (!monitorState.lastUpdated) { timeAgo = 'never'; return; }
+      const diff = Math.floor((Date.now() - monitorState.lastUpdated.getTime()) / 1000);
+      if (diff < 2) timeAgo = 'just now';
+      else if (diff < 60) timeAgo = `${diff}s ago`;
+      else timeAgo = `${Math.floor(diff/60)}m ago`;
+    };
+    updateTime();
+    const t = setInterval(updateTime, 1000);
+    return () => clearInterval(t);
+  });
+
+  onMount(() => {
+    startMonitoring();
+  });
+
+  onDestroy(() => {
+    stopMonitoring();
+  });
   import { getCurrentWindow } from '@tauri-apps/api/window';
 
   const appWindow = typeof window !== 'undefined' && (window as any).__TAURI__ ? getCurrentWindow() : null;
@@ -144,8 +169,8 @@
       <div class="flex items-center ml-auto gap-3 text-neutral-400 shrink-0">
         <!-- Live Status Indicator -->
         <div class="flex items-center gap-1.5 text-xs">
-          <span class="text-green-500 animate-pulse text-[10px]">●</span>
-          <span class="font-mono">just now</span>
+          <span class="text-green-500 animate-pulse text-[10px]" class:opacity-50={monitorState.isPolling}>●</span>
+          <span class="font-mono">{timeAgo}</span>
         </div>
         
         <div class="w-px h-4 bg-neutral-700 mx-1"></div>

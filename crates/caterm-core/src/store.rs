@@ -13,7 +13,7 @@
 use crate::db;
 use crate::error::{CatermError, DbError};
 use crate::groups;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,7 +114,9 @@ pub(crate) fn list_hosts_in(conn: &Connection) -> Result<Vec<HostRecord>, Caterm
 
     let mut out = Vec::new();
     for row in rows {
-        out.push(row.map_err(|e| CatermError::Db(DbError::Generic(format!("baris hosts rusak: {e}"))))?);
+        out.push(
+            row.map_err(|e| CatermError::Db(DbError::Generic(format!("baris hosts rusak: {e}"))))?,
+        );
     }
     Ok(out)
 }
@@ -144,8 +146,11 @@ pub(crate) fn save_host_in(
         Some(plaintext) => Some(crate::secret::encrypt(local_key, plaintext)?),
     };
 
-    let auth_json = serde_json::to_string(&input.auth_method)
-        .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal serialisasi auth_method: {e}"))))?;
+    let auth_json = serde_json::to_string(&input.auth_method).map_err(|e| {
+        CatermError::Db(DbError::Generic(format!(
+            "gagal serialisasi auth_method: {e}"
+        )))
+    })?;
     let tags_json = serde_json::to_string(&input.tags)
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal serialisasi tags: {e}"))))?;
 
@@ -201,7 +206,8 @@ fn delete_host_in(conn: &Connection, id: &str) -> Result<(), CatermError> {
     }
     // Keep the Hosts<->Groups link consistent: a deleted host can't stay referenced by any
     // group's host_ids (T6).
-    groups::strip_host_from_groups(conn, id)
+    groups::strip_host_from_groups(conn, id)?;
+    crate::teams::strip_host_from_teams(conn, id)
 }
 
 /// All saved hosts, in no particular order.
@@ -351,7 +357,8 @@ mod tests {
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].label, "Updated");
 
-        let (_, decrypted) = load_host_for_connect_in(&db.0, &first.id, TEST_KEY).expect("load gagal");
+        let (_, decrypted) =
+            load_host_for_connect_in(&db.0, &first.id, TEST_KEY).expect("load gagal");
         assert_eq!(decrypted.as_deref(), Some("hunter2"));
     }
 

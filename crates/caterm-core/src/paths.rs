@@ -111,7 +111,10 @@ mod expand_tilde_tests {
 
     #[test]
     fn leaves_absolute_paths_unchanged() {
-        assert_eq!(expand_tilde("/home/user/.ssh/id_ed25519"), "/home/user/.ssh/id_ed25519");
+        assert_eq!(
+            expand_tilde("/home/user/.ssh/id_ed25519"),
+            "/home/user/.ssh/id_ed25519"
+        );
     }
 
     #[test]

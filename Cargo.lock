@@ -486,6 +486,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rand",
+ "regex",
  "rusqlite",
  "secrecy",
  "serde",
@@ -495,6 +496,7 @@ dependencies = [
  "ssh2",
  "thiserror 2.0.20",
  "tokio",
+ "uuid",
  "zeroize",
 ]
 

@@ -46,3 +46,13 @@
 - [x] Implement minimum 8-character password requirement for vault unlock.
 ## 10. Audit & Completion
 - [x] Audited and completed Hosts, Groups, Snippets, and SSH Keys persistence to SQLite. Updated Hosts toolbar to match screenshot requirements.
+## 11. Teams
+- [x] Create Team model in `caterm-core` with SQLite storage (fields: id, name, color, avatar, members, host_ids, group_ids).
+- [x] Implement Tauri commands for list, save, delete.
+- [x] Create `frontend/src/routes/teams/+page.svelte` matching Hosts/Groups UI.
+
+- [x] **Agent 4 - Fitur Baru: Command Logs**: 
+  - Backend: Log events to encrypted SQLite (caterm-core/src/audit.rs).
+  - Track: PTY hook (commands), tunnels, vault, ssh keys.
+  - Privacy: Mask passwords and secrets automatically.
+  - Route: frontend/src/routes/command-logs/+page.svelte (scrollable, filter, search, export).

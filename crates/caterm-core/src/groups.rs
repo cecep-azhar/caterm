@@ -6,7 +6,7 @@
 use crate::db;
 use crate::error::{CatermError, DbError, ValidationError};
 use crate::store;
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -72,12 +72,17 @@ pub(crate) fn list_groups_in(conn: &Connection) -> Result<Vec<GroupRecord>, Cate
 
     let mut out = Vec::new();
     for row in rows {
-        out.push(row.map_err(|e| CatermError::Db(DbError::Generic(format!("baris groups rusak: {e}"))))?);
+        out.push(
+            row.map_err(|e| CatermError::Db(DbError::Generic(format!("baris groups rusak: {e}"))))?,
+        );
     }
     Ok(out)
 }
 
-pub(crate) fn save_group_in(conn: &Connection, input: GroupInput) -> Result<GroupRecord, CatermError> {
+pub(crate) fn save_group_in(
+    conn: &Connection,
+    input: GroupInput,
+) -> Result<GroupRecord, CatermError> {
     let known_ids: HashSet<String> = store::list_hosts_in(conn)?
         .into_iter()
         .map(|h| h.id)
@@ -105,8 +110,9 @@ pub(crate) fn save_group_in(conn: &Connection, input: GroupInput) -> Result<Grou
     };
     let id = id.unwrap_or_else(generate_id);
 
-    let host_ids_json = serde_json::to_string(&input.host_ids)
-        .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal serialisasi host_ids: {e}"))))?;
+    let host_ids_json = serde_json::to_string(&input.host_ids).map_err(|e| {
+        CatermError::Db(DbError::Generic(format!("gagal serialisasi host_ids: {e}")))
+    })?;
 
     conn.execute(
         "INSERT INTO groups (id, name, color, host_ids, created_at, updated_at)
@@ -116,7 +122,14 @@ pub(crate) fn save_group_in(conn: &Connection, input: GroupInput) -> Result<Grou
             color = excluded.color,
             host_ids = excluded.host_ids,
             updated_at = excluded.updated_at",
-        params![id, input.name, input.color, host_ids_json, created_at as i64, now as i64],
+        params![
+            id,
+            input.name,
+            input.color,
+            host_ids_json,
+            created_at as i64,
+            now as i64
+        ],
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal menyimpan group: {e}"))))?;
 
@@ -139,7 +152,7 @@ fn delete_group_in(conn: &Connection, id: &str) -> Result<(), CatermError> {
             "group dengan id {id} tidak ditemukan"
         ))));
     }
-    Ok(())
+    crate::teams::strip_group_from_teams(conn, id)
 }
 
 /// Removes `host_id` from every group's `host_ids`, keeping the Hosts<->Groups link
