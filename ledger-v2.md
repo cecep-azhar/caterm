@@ -34,3 +34,9 @@
   - **NSIS Installer (.exe)**: `D:\Project\caterm\target\release\bundle\nsis\CATerm_2.0.9_x64-setup.exe`
   - **MSI Installer (.msi)**: `D:\Project\caterm\target\release\bundle\msi\CATerm_2.0.9_x64_en-US.msi`
 - [x] **Release Status**: `SELESAI` (v2.0.9 final release ready for deployment).
+- [x] **UI/UX & Responsiveness Overhaul (21 Sep 2026)**:
+  - **Auto-collapsing Icon Sidebar**: Menu sebelah kiri otomatis menciut menjadi *icon-only* saat ada koneksi aktif (`sessionTabs.length > 0`), dilengkapi tombol manual toggle dan tooltip informatif.
+  - **Optimasi Luas Layar**: Menghapus padding `p-6` yang boros pada sesi aktif (`p-0 md:p-1`), compact header bar, dan terminal pane memenuhi 100% viewport.
+  - **Split Screen In-Connection**: Kontrol tata letak split (Single, Horizontal, Vertical, Grid 2x2) hanya muncul di dalam sesi koneksi multi-host (`tabs.length > 1`).
+  - **Penyimpanan Workspace**: Fitur simpan dan aktifkan kembali susunan tab, layout, serta status file explorer remote via `WorkspaceMenu` & `workspaceStore.svelte.ts` (`localStorage['caterm_workspaces_v2']`).
+  - **Navigasi Responsif Mobile**: Navigasi slide-out drawer dengan hamburger toggle pada layar kecil (<768px), layout terminal adaptif dan tab switcher khusus mobile agar terminal tetap terbaca jelas.
