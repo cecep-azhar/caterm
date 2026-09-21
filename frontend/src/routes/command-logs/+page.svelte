@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/state';
   import { invoke } from '@tauri-apps/api/core';
   import { save } from '@tauri-apps/plugin-dialog';
   import { writeTextFile } from '@tauri-apps/plugin-fs';
+  import { showToast } from '$lib/stores/uiNotifications.svelte';
 
   interface CommandLog {
     id: string;
@@ -12,73 +14,177 @@
     details: string;
   }
 
-  let logs: CommandLog[] = [];
-  let filteredLogs: CommandLog[] = [];
-  let hostFilter = '';
-  let eventFilter = '';
-  let dateFilter = '';
-  let searchQuery = '';
+  interface ParsedAiExec {
+    isAiExec: boolean;
+    command: string;
+    exitCode: number | null;
+    extra?: string;
+  }
+
+  let logs = $state<CommandLog[]>([]);
+  let hostFilter = $state('');
+  let eventFilter = $state('');
+  let dateFilter = $state('');
+  let searchQuery = $state('');
+  let isLoading = $state(false);
+
+  // Query param support: e.g. /command-logs?filter=AI_AUTOMATION
+  $effect(() => {
+    const qFilter = page.url.searchParams.get('filter');
+    if (qFilter && !eventFilter) {
+      eventFilter = qFilter;
+    }
+  });
 
   onMount(async () => {
+    const qFilter = page.url.searchParams.get('filter');
+    if (qFilter) {
+      eventFilter = qFilter;
+    }
     await fetchLogs();
   });
 
   async function fetchLogs() {
+    isLoading = true;
     try {
       logs = await invoke<CommandLog[]>('get_command_logs', {
         hostId: null,
         search: null
       });
-      applyFilters();
     } catch (e) {
       console.error('Failed to fetch logs', e);
+      showToast('Gagal memuat log audit.', 'error');
+    } finally {
+      isLoading = false;
     }
   }
 
-  function applyFilters() {
-    filteredLogs = logs.filter(log => {
+  function parseAiExec(details: string): ParsedAiExec {
+    if (!details || !details.includes('[AI-EXEC]')) {
+      return { isAiExec: false, command: '', exitCode: null };
+    }
+
+    const afterTag = details.replace('[AI-EXEC]', '').trim();
+    let exitCode: number | null = null;
+    let command = '';
+    let extra = '';
+
+    const exitMatch =
+      afterTag.match(/(?:exit(?:_code)?|status|code)\s*[:=]\s*(-?\d+)/i) ||
+      afterTag.match(/->\s*exit\s*(-?\d+)/i) ||
+      afterTag.match(/\(exit:\s*(-?\d+)\)/i);
+
+    if (exitMatch) {
+      exitCode = parseInt(exitMatch[1], 10);
+    }
+
+    const cmdKeyMatch = afterTag.match(/(?:cmd|command)\s*[:=]\s*(?:"([^"]+)"|'([^']+)'|([^,;|]+))/i);
+    if (cmdKeyMatch) {
+      command = (cmdKeyMatch[1] || cmdKeyMatch[2] || cmdKeyMatch[3] || '').trim();
+      let rest = afterTag.replace(cmdKeyMatch[0], '');
+      if (exitMatch) {
+        rest = rest.replace(exitMatch[0], '');
+      }
+      extra = rest.replace(/^[\s,;|()\-]+|[\s,;|()\-]+$/g, '').trim();
+    } else {
+      const quoteMatch = afterTag.match(/^"([^"]+)"|^'([^']+)'/);
+      if (quoteMatch) {
+        command = quoteMatch[1] || quoteMatch[2];
+        let rest = afterTag.slice(quoteMatch[0].length);
+        if (exitMatch) {
+          rest = rest.replace(exitMatch[0], '');
+        }
+        extra = rest.replace(/^[\s,;|()\-]+|[\s,;|()\-]+$/g, '').trim();
+      } else if (exitMatch && exitMatch.index !== undefined) {
+        command = afterTag.substring(0, exitMatch.index).replace(/^[\s,;|()\-]+|[\s,;|()\-]+$/g, '').trim();
+        extra = afterTag.substring(exitMatch.index + exitMatch[0].length).replace(/^[\s,;|()\-]+|[\s,;|()\-]+$/g, '').trim();
+      } else {
+        command = afterTag;
+      }
+    }
+
+    if ((command.startsWith('"') && command.endsWith('"')) || (command.startsWith("'") && command.endsWith("'"))) {
+      command = command.slice(1, -1);
+    }
+
+    return {
+      isAiExec: true,
+      command: command || afterTag,
+      exitCode,
+      extra: extra || undefined
+    };
+  }
+
+  let filteredLogs = $derived(
+    logs.filter((log) => {
       if (hostFilter && log.host_id !== hostFilter) return false;
       if (eventFilter && log.event_type !== eventFilter) return false;
-      
+
       if (dateFilter) {
         const logDate = new Date(log.timestamp).toISOString().split('T')[0];
         if (logDate !== dateFilter) return false;
       }
-      
+
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        if (!log.details.toLowerCase().includes(query) && !log.event_type.toLowerCase().includes(query)) {
+        if (
+          !log.details.toLowerCase().includes(query) &&
+          !log.event_type.toLowerCase().includes(query) &&
+          !(log.host_id && log.host_id.toLowerCase().includes(query))
+        ) {
           return false;
         }
       }
       return true;
-    });
-  }
+    })
+  );
 
-  $: {
-    if (searchQuery !== null || hostFilter !== null || eventFilter !== null || dateFilter !== null) {
-      applyFilters();
-    }
-  }
+  let aiAutomationCount = $derived(logs.filter((l) => l.event_type === 'AI_AUTOMATION').length);
+  let aiPlanCount = $derived(logs.filter((l) => l.event_type === 'AI_PLAN').length);
 
   async function exportLogs() {
     try {
-      const csvContent = "ID,EventType,Timestamp,HostID,Details\n" + 
-        filteredLogs.map(l => `"${l.id}","${l.event_type}","${new Date(l.timestamp).toISOString()}","${l.host_id || ''}","${l.details.replace(/"/g, '""')}"`).join("\n");
-      
-      const filePath = await save({
-        filters: [{
-          name: 'CSV',
-          extensions: ['csv']
-        }]
-      });
-      if (filePath) {
-        await writeTextFile(filePath, csvContent);
-        alert('Export successful!');
+      const csvContent =
+        'ID,EventType,Timestamp,HostID,Details\n' +
+        filteredLogs
+          .map(
+            (l) =>
+              `"${l.id}","${l.event_type}","${new Date(l.timestamp).toISOString()}","${l.host_id || ''}","${l.details.replace(/"/g, '""')}"`
+          )
+          .join('\n');
+
+      let saved = false;
+      try {
+        const filePath = await save({
+          filters: [
+            {
+              name: 'CSV',
+              extensions: ['csv']
+            }
+          ]
+        });
+        if (filePath) {
+          await writeTextFile(filePath, csvContent);
+          saved = true;
+          showToast('Audit log berhasil diekspor!', 'success');
+        }
+      } catch {
+        // Fallback to standard web download
+      }
+
+      if (!saved) {
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `caterm-audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('Audit log berhasil diunduh!', 'success');
       }
     } catch (e) {
       console.error('Export failed', e);
-      alert('Export failed.');
+      showToast('Gagal mengekspor audit log.', 'error');
     }
   }
 
@@ -87,53 +193,245 @@
   }
 </script>
 
-<div class="p-6 h-full flex flex-col bg-[#1E1E1E] text-white">
-  <div class="flex justify-between items-center mb-6">
-    <h1 class="text-2xl font-bold">Command Logs (Audit)</h1>
-    <button on:click={exportLogs} class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded shadow">Export CSV</button>
+<div class="h-full flex flex-col bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 md:p-6 shadow-sm">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">Command Logs (Audit)</h1>
+      <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
+        Pencatatan riwayat perintah terminal PTY, eksekusi AI otomatis, dan audit sistem E2EE.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button
+        onclick={fetchLogs}
+        disabled={isLoading}
+        class="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg text-sm transition-colors flex items-center gap-1.5"
+        title="Muat ulang log"
+      >
+        <svg class="w-4 h-4 {isLoading ? 'animate-spin' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span>Refresh</span>
+      </button>
+      <button
+        onclick={exportLogs}
+        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-lg transition-colors shadow flex items-center gap-1.5"
+      >
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+        </svg>
+        <span>Export CSV</span>
+      </button>
+    </div>
   </div>
 
-  <div class="flex gap-4 mb-4">
-    <input type="text" bind:value={searchQuery} placeholder="Search logs..." class="px-4 py-2 bg-[#2D2D2D] rounded border border-gray-700 flex-1" />
-    <input type="text" bind:value={hostFilter} placeholder="Filter by Host ID" class="px-4 py-2 bg-[#2D2D2D] rounded border border-gray-700 w-48" />
-    <select bind:value={eventFilter} class="px-4 py-2 bg-[#2D2D2D] rounded border border-gray-700 w-48">
-      <option value="">All Events</option>
-      <option value="PTY_COMMAND">PTY Command</option>
-      <option value="TUNNEL_START">Tunnel Start</option>
-      <option value="TUNNEL_STOP">Tunnel Stop</option>
-      <option value="VAULT_LOCK">Vault Lock</option>
-      <option value="VAULT_UNLOCK">Vault Unlock</option>
-      <option value="KEY_DEPLOY">Key Deploy</option>
-    </select>
-    <input type="date" bind:value={dateFilter} class="px-4 py-2 bg-[#2D2D2D] rounded border border-gray-700 w-48" />
+  <!-- Quick Filter Buttons -->
+  <div class="flex items-center gap-2 mb-4 overflow-x-auto pb-1 text-xs">
+    <span class="text-neutral-500 dark:text-neutral-400 font-medium shrink-0">Quick Filter:</span>
+    <button
+      type="button"
+      onclick={() => (eventFilter = '')}
+      class="px-2.5 py-1 rounded-md transition-colors shrink-0 {eventFilter === ''
+        ? 'bg-neutral-800 text-white dark:bg-white dark:text-black font-semibold'
+        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
+    >
+      All ({logs.length})
+    </button>
+    <button
+      type="button"
+      onclick={() => (eventFilter = eventFilter === 'AI_AUTOMATION' ? '' : 'AI_AUTOMATION')}
+      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all shrink-0 {eventFilter === 'AI_AUTOMATION'
+        ? 'bg-purple-600 text-white font-semibold ring-2 ring-purple-400/50 shadow-sm'
+        : 'bg-purple-500/15 text-purple-700 dark:text-purple-300 hover:bg-purple-500/25 border border-purple-500/30'}"
+    >
+      <svg class="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" />
+      </svg>
+      <span>AI Automation</span>
+      {#if aiAutomationCount > 0}
+        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-900/40 text-purple-800 dark:text-purple-200 font-semibold">{aiAutomationCount}</span>
+      {/if}
+    </button>
+    <button
+      type="button"
+      onclick={() => (eventFilter = eventFilter === 'AI_PLAN' ? '' : 'AI_PLAN')}
+      class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all shrink-0 {eventFilter === 'AI_PLAN'
+        ? 'bg-indigo-600 text-white font-semibold ring-2 ring-indigo-400/50 shadow-sm'
+        : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/25 border border-indigo-500/30'}"
+    >
+      <svg class="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+      </svg>
+      <span>AI Plan</span>
+      {#if aiPlanCount > 0}
+        <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 font-semibold">{aiPlanCount}</span>
+      {/if}
+    </button>
+    <button
+      type="button"
+      onclick={() => (eventFilter = eventFilter === 'PTY_COMMAND' ? '' : 'PTY_COMMAND')}
+      class="px-2.5 py-1 rounded-md transition-colors shrink-0 {eventFilter === 'PTY_COMMAND'
+        ? 'bg-blue-600 text-white font-semibold ring-2 ring-blue-400/50'
+        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
+    >
+      PTY Command
+    </button>
+    <button
+      type="button"
+      onclick={() => (eventFilter = eventFilter === 'KEY_DEPLOY' ? '' : 'KEY_DEPLOY')}
+      class="px-2.5 py-1 rounded-md transition-colors shrink-0 {eventFilter === 'KEY_DEPLOY'
+        ? 'bg-cyan-600 text-white font-semibold ring-2 ring-cyan-400/50'
+        : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
+    >
+      Key Deploy
+    </button>
   </div>
 
-  <div class="flex-1 overflow-auto bg-[#252526] rounded border border-gray-700">
+  <!-- Search & Filter Controls -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div class="relative sm:col-span-2 lg:col-span-1">
+      <input
+        type="text"
+        bind:value={searchQuery}
+        placeholder="Search logs..."
+        class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
+      />
+    </div>
+    <div>
+      <input
+        type="text"
+        bind:value={hostFilter}
+        placeholder="Filter by Host ID"
+        class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
+      />
+    </div>
+    <div>
+      <select
+        bind:value={eventFilter}
+        class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
+      >
+        <option value="">All Events</option>
+        <option value="AI_AUTOMATION">✨ AI Automation</option>
+        <option value="AI_PLAN">📋 AI Plan</option>
+        <option value="PTY_COMMAND">PTY Command</option>
+        <option value="TUNNEL_START">Tunnel Start</option>
+        <option value="TUNNEL_STOP">Tunnel Stop</option>
+        <option value="VAULT_LOCK">Vault Lock</option>
+        <option value="VAULT_UNLOCK">Vault Unlock</option>
+        <option value="KEY_DEPLOY">Key Deploy</option>
+      </select>
+    </div>
+    <div>
+      <input
+        type="date"
+        bind:value={dateFilter}
+        class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
+      />
+    </div>
+  </div>
+
+  <!-- Table Container -->
+  <div class="flex-1 overflow-auto bg-neutral-50 dark:bg-[#252526] rounded-lg border border-neutral-200 dark:border-neutral-700">
     <table class="w-full text-left border-collapse">
-      <thead class="sticky top-0 bg-[#2D2D2D] border-b border-gray-700">
+      <thead class="sticky top-0 bg-neutral-100 dark:bg-[#2D2D2D] border-b border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
         <tr>
-          <th class="p-3">Time</th>
-          <th class="p-3">Event</th>
-          <th class="p-3">Host ID</th>
+          <th class="p-3 w-44">Time</th>
+          <th class="p-3 w-40">Event</th>
+          <th class="p-3 w-32">Host ID</th>
           <th class="p-3">Details</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody class="divide-y divide-neutral-200/60 dark:divide-neutral-700/50 text-sm">
         {#each filteredLogs as log (log.id)}
-          <tr class="border-b border-gray-700/50 hover:bg-[#2A2D2E]">
-            <td class="p-3 whitespace-nowrap text-gray-400">{formatTime(log.timestamp)}</td>
-            <td class="p-3">
-              <span class="px-2 py-1 rounded text-xs font-mono bg-blue-500/20 text-blue-300">
-                {log.event_type}
-              </span>
+          <tr class="hover:bg-neutral-100/70 dark:hover:bg-[#2A2D2E] transition-colors">
+            <td class="p-3 whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400 font-mono">
+              {formatTime(log.timestamp)}
             </td>
-            <td class="p-3 text-gray-400">{log.host_id || '-'}</td>
-            <td class="p-3 font-mono text-sm break-all">{log.details}</td>
+            <td class="p-3">
+              {#if log.event_type === 'AI_AUTOMATION'}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/40 shadow-sm shadow-purple-950/10">
+                  <svg class="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 animate-pulse shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" />
+                  </svg>
+                  AI_AUTOMATION
+                </span>
+              {:else if log.event_type === 'AI_PLAN'}
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono font-medium bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                  <svg class="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  AI_PLAN
+                </span>
+              {:else if log.event_type === 'PTY_COMMAND'}
+                <span class="px-2 py-1 rounded text-xs font-mono bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                  {log.event_type}
+                </span>
+              {:else if log.event_type.startsWith('TUNNEL')}
+                <span class="px-2 py-1 rounded text-xs font-mono bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                  {log.event_type}
+                </span>
+              {:else if log.event_type.startsWith('VAULT')}
+                <span class="px-2 py-1 rounded text-xs font-mono bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  {log.event_type}
+                </span>
+              {:else if log.event_type === 'KEY_DEPLOY'}
+                <span class="px-2 py-1 rounded text-xs font-mono bg-cyan-500/20 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30">
+                  {log.event_type}
+                </span>
+              {:else}
+                <span class="px-2 py-1 rounded text-xs font-mono bg-neutral-200 dark:bg-neutral-700/50 text-neutral-700 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700">
+                  {log.event_type}
+                </span>
+              {/if}
+            </td>
+            <td class="p-3 text-neutral-500 dark:text-neutral-400 font-mono text-xs">
+              {log.host_id || '-'}
+            </td>
+            <td class="p-3">
+              {#if log.details.includes('[AI-EXEC]')}
+                {@const parsed = parseAiExec(log.details)}
+                <div class="flex flex-col gap-1.5 py-0.5 max-w-3xl">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                      <svg class="w-3 h-3 text-purple-600 dark:text-purple-400" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" />
+                      </svg>
+                      AI-EXEC
+                    </span>
+                    {#if parsed.exitCode !== null}
+                      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono font-semibold {parsed.exitCode === 0 ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30'}">
+                        <span class="w-1.5 h-1.5 rounded-full {parsed.exitCode === 0 ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}"></span>
+                        exit: {parsed.exitCode}
+                      </span>
+                    {/if}
+                  </div>
+                  <div class="font-mono text-xs bg-neutral-900 text-emerald-400 rounded-md px-3 py-2 border border-neutral-800 break-all select-text shadow-inner">
+                    <span class="text-neutral-500 select-none mr-1.5 font-bold">$</span>{parsed.command}
+                  </div>
+                  {#if parsed.extra}
+                    <div class="text-[11px] text-neutral-500 dark:text-neutral-400 font-mono break-all pl-1">
+                      {parsed.extra}
+                    </div>
+                  {/if}
+                </div>
+              {:else}
+                <div class="font-mono text-xs break-all text-neutral-800 dark:text-neutral-200">
+                  {log.details}
+                </div>
+              {/if}
+            </td>
           </tr>
         {/each}
         {#if filteredLogs.length === 0}
           <tr>
-            <td colspan="4" class="p-8 text-center text-gray-500">No logs found</td>
+            <td colspan="4" class="p-10 text-center text-neutral-400 dark:text-neutral-500 text-sm">
+              <div class="flex flex-col items-center justify-center gap-2">
+                <svg class="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>No logs found matching the current filters.</span>
+              </div>
+            </td>
           </tr>
         {/if}
       </tbody>
