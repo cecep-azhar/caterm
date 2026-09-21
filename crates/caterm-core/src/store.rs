@@ -211,7 +211,7 @@ fn delete_host_in(conn: &Connection, id: &str) -> Result<(), CatermError> {
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal hapus host: {e}"))))?;
     if affected == 0 {
         return Err(CatermError::Db(DbError::Generic(format!(
-            "host dengan id {id} tidak ditemukan"
+            "host with id {id} not found"
         ))));
     }
     // Keep the Hosts<->Groups link consistent: a deleted host can't stay referenced by any
@@ -250,7 +250,7 @@ pub(crate) fn load_host_for_connect_in(
             params![id],
             |row| Ok((row_to_host(row)?, row.get::<_, Option<String>>("secret_enc")?)),
         )
-        .map_err(|e| CatermError::Db(DbError::Generic(format!("host {id} tidak ditemukan: {e}"))))?;
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("host {id} not found: {e}"))))?;
 
     let secret = match secret_enc {
         Some(enc) if !enc.is_empty() => Some(crate::secret::decrypt(local_key, &enc)?),

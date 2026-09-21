@@ -22,12 +22,12 @@ pub fn open_encrypted(data_dir: &Path, passphrase: &str) -> Result<Connection, C
     // passphrase containing one can't break out of the string literal.
     let escaped = passphrase.replace('\'', "''");
     conn.execute_batch(&format!("PRAGMA key = '{escaped}';"))
-        .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal set kunci vault: {e}"))))?;
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("failed to set vault key: {e}"))))?;
 
     conn.query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(()))
         .map_err(|_| {
             CatermError::Db(DbError::Generic(
-                "kunci vault salah atau database rusak".into(),
+                "invalid vault key or corrupted database".into(),
             ))
         })?;
 

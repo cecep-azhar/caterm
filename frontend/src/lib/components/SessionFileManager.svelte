@@ -56,9 +56,9 @@
       files = res;
       pathInputValue = currentPath;
     } catch (e: any) {
-      const msg = typeof e === 'string' ? e : (e?.message || 'Gagal memuat direktori remote');
+      const msg = typeof e === 'string' ? e : (e?.message || 'Failed to load remote directory');
       if (msg.toLowerCase().includes('no active ssh session') && retryCount < 4) {
-        errorMsg = 'Menunggu koneksi SSH aktif...';
+        errorMsg = 'Waiting for active SSH connection...';
         retryTimer = setTimeout(() => {
           fetchFiles(retryCount + 1);
         }, 1200);

@@ -21,8 +21,8 @@ let confirmDialog = $state<ConfirmDialogState>({
   isOpen: false,
   title: '',
   message: '',
-  confirmText: 'Konfirmasi',
-  cancelText: 'Batal',
+  confirmText: 'Confirm',
+  cancelText: 'Cancel',
   danger: false
 });
 
@@ -48,10 +48,10 @@ export function getConfirmDialog(): ConfirmDialogState {
 
 export function confirmModal(
   message: string,
-  title = 'Konfirmasi Tindakan',
+  title = 'Confirm Action',
   danger = false,
-  confirmText = 'Lanjutkan',
-  cancelText = 'Batal'
+  confirmText = 'Continue',
+  cancelText = 'Cancel'
 ): Promise<boolean> {
   return new Promise((resolve) => {
     confirmDialog = {

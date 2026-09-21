@@ -566,7 +566,7 @@
 
 <div class="max-w-6xl mx-auto p-4 md:p-6 space-y-6 text-neutral-800 dark:text-neutral-200">
   <!-- Header -->
-  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800">
+  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
     <div class="flex items-center gap-3">
       <div class="w-10 h-10 rounded-xl bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-600 dark:text-violet-400">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -578,7 +578,7 @@
           <h1 class="text-xl md:text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Prompt Studio</h1>
           <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 font-semibold border border-violet-500/30">AI Ops Assistant</span>
         </div>
-        <p class="text-xs md:text-sm text-neutral-500 dark:text-neutral-400">Rencanakan, tinjau, dan eksekusi otomasi server dengan AI yang transparan & terkendali.</p>
+        <p class="text-xs md:text-sm text-neutral-500 dark:text-neutral-400">Plan, review, and execute server automations with transparent and controlled AI.</p>
       </div>
     </div>
 
@@ -588,9 +588,9 @@
       <div class="flex items-center gap-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-3 py-1.5 shadow-sm">
         <label for="target-host-select" class="text-xs text-neutral-500 dark:text-neutral-400 font-medium whitespace-nowrap">Target Host:</label>
         {#if isLoadingHosts}
-          <span class="text-xs text-neutral-400">Memuat host...</span>
+          <span class="text-xs text-neutral-400">Loading hosts...</span>
         {:else if hosts.length === 0}
-          <span class="text-xs text-amber-500 font-medium">Tidak ada host</span>
+          <span class="text-xs text-amber-500 font-medium">No hosts available</span>
         {:else}
           <select
             id="target-host-select"
@@ -609,8 +609,8 @@
       <!-- AI config now lives on the Settings page so there is exactly one place for it. -->
       <a
         href="/settings"
-        title="Pengaturan AI (halaman Settings)"
-        aria-label="Pengaturan AI"
+        title="AI Settings (Settings page)"
+        aria-label="AI Settings"
         class="p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 shadow-sm transition-colors inline-flex"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -625,20 +625,20 @@
   <section class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 md:p-5 shadow-sm space-y-4">
     <div>
       <label for="ai-ops-goal-input" class="block text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-2">
-        Tujuan / Instruksi Ops Server
+        Ops Goal / Instruction
       </label>
       <textarea
         id="ai-ops-goal-input"
         bind:value={goal}
         rows="3"
-        placeholder="Contoh: Setup Laptop Ubuntu saya untuk kebutuhan Development Laravel"
+        placeholder="e.g. Set up my Ubuntu laptop for Laravel and Docker development"
         class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-3 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
       ></textarea>
     </div>
 
     <!-- Quick Prompt Suggestion Chips -->
     <div class="space-y-1.5">
-      <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Rekomendasi Cepat:</span>
+      <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Quick Suggestions:</span>
       <div class="flex flex-wrap gap-2">
         {#each quickPrompts as qp}
           <button
@@ -717,14 +717,14 @@
                 onclick={() => toggleAllSteps(true)}
                 class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-medium transition-colors"
               >
-                Pilih Semua
+                Select All
               </button>
               <button
                 type="button"
                 onclick={() => toggleAllSteps(false)}
                 class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-medium transition-colors"
               >
-                Hapus Pilihan
+                Deselect All
               </button>
             </div>
           {/if}
@@ -733,7 +733,7 @@
         <!-- Requirement Tags -->
         {#if plan.requirements && plan.requirements.length > 0}
           <div class="pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-wrap items-center gap-2">
-            <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Komponen & Dependensi:</span>
+            <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Components & Dependencies:</span>
             {#each plan.requirements as req}
               <span class="text-xs font-medium px-2.5 py-1 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
                 {req}
@@ -907,7 +907,7 @@
             onclick={handleReset}
             class="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-medium text-sm transition-colors cursor-pointer"
           >
-            Batal / Reset
+            Cancel / Reset
           </button>
 
           <button
@@ -919,7 +919,7 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-            <span>Approve & Eksekusi di Host ({approvedCount} Langkah)</span>
+            <span>Approve & Execute on Host ({approvedCount} Steps)</span>
           </button>
         </div>
       {/if}
@@ -934,13 +934,13 @@
             </svg>
             <div>
               <p class="font-semibold text-sm text-sky-900 dark:text-sky-200">
-                Mengeksekusi langkah {currentExecutingIndex + 1} dari {steps.length}...
+                Executing step {currentExecutingIndex + 1} of {steps.length}...
               </p>
-              <p class="text-xs text-sky-700 dark:text-sky-400">Menjalankan perintah secara sekuensial di host target.</p>
+              <p class="text-xs text-sky-700 dark:text-sky-400">Running commands sequentially on target host.</p>
             </div>
           </div>
           <span class="text-xs font-mono font-bold px-2.5 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300">
-            {executionSuccessCount} Sukses • {executionFailedCount} Gagal
+            {executionSuccessCount} Succeeded • {executionFailedCount} Failed
           </span>
         </div>
       {/if}
@@ -962,12 +962,12 @@
             </div>
             <div class="flex-1">
               <h3 class="font-bold text-base text-neutral-900 dark:text-white">
-                {executionFailedCount === 0 ? 'Semua Langkah Berhasil Dieksekusi!' : 'Eksekusi Selesai Dengan Catatan'}
+                {executionFailedCount === 0 ? 'All Steps Executed Successfully!' : 'Execution Completed With Warnings'}
               </h3>
               <p class="text-xs md:text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
-                {executionSuccessCount} langkah sukses dieksekusi di host <span class="font-semibold text-neutral-900 dark:text-white">{selectedHost ? selectedHost.label : 'target'}</span>.
+                {executionSuccessCount} steps succeeded on host <span class="font-semibold text-neutral-900 dark:text-white">{selectedHost ? selectedHost.label : 'target'}</span>.
                 {#if executionFailedCount > 0}
-                  Terdapat {executionFailedCount} langkah yang mengalami error/kegagalan.
+                  {executionFailedCount} steps encountered errors.
                 {/if}
               </p>
             </div>
@@ -983,7 +983,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span>Buka Terminal Sesi</span>
+                <span>Open Terminal Session</span>
               </a>
             {/if}
 
@@ -994,7 +994,7 @@
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span>Lihat di Command Logs (Audit)</span>
+              <span>View in Command Logs</span>
             </a>
 
             <button
@@ -1002,7 +1002,7 @@
               onclick={handleReset}
               class="ml-auto px-4 py-2 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
             >
-              Mulai Tugas Baru
+              Start New Task
             </button>
           </div>
         </div>

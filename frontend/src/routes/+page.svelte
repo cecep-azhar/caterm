@@ -204,7 +204,7 @@
 
 <div class="max-w-6xl mx-auto space-y-6">
   <!-- Header & Actions -->
-  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
     <div>
       <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Hosts Management</h1>
       <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage saved SSH hosts, connection profiles, and credentials.</p>

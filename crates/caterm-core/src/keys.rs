@@ -27,7 +27,7 @@ pub struct KeyInput {
 fn require_non_empty(field: &str, value: &str) -> Result<(), CatermError> {
     if value.trim().is_empty() {
         return Err(CatermError::Validation(ValidationError::Generic(format!(
-            "{field} tidak boleh kosong"
+            "{field} cannot be empty"
         ))));
     }
     Ok(())
@@ -182,7 +182,7 @@ pub fn import_key(
             .and_then(|k| k.decrypt(pass))
             .map_err(|e| {
                 CatermError::Validation(ValidationError::Generic(format!(
-                    "Gagal mendeskripsi private key dengan passphrase: {e}"
+                    "Failed to decrypt private key with passphrase: {e}"
                 )))
             })?
     } else {
@@ -258,7 +258,7 @@ pub fn delete_key(id: &str) -> Result<(), CatermError> {
             && k_id == id
         {
             return Err(CatermError::Validation(ValidationError::Generic(format!(
-                "Gagal menghapus: Key ini sedang digunakan oleh Host '{}'. Ubah auth method host terlebih dahulu.",
+                "Failed to delete: Key is currently in use by Host '{}'. Please change host authentication method first.",
                 h.label
             ))));
         }

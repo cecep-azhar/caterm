@@ -28,14 +28,14 @@
   }
 </script>
 
-<div class="max-w-4xl mx-auto space-y-6">
-  <div class="flex items-center gap-3">
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex items-center gap-3 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
     <div class="p-2 bg-purple-500/10 text-purple-400 rounded-lg border border-purple-500/20">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
     </div>
     <div>
-      <h1 class="text-2xl font-bold text-white">System Monitoring</h1>
-      <p class="text-sm text-neutral-400">Real-time resource utilization (CPU, RAM, Disk, Net) across connected hosts.</p>
+      <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">System Monitoring</h1>
+      <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Real-time resource utilization (CPU, RAM, Disk, Net) across connected hosts.</p>
     </div>
   </div>
 

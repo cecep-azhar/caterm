@@ -93,7 +93,7 @@ static EXEC_SESSIONS: Lazy<Mutex<HashMap<String, Arc<Mutex<ssh2::Session>>>>> =
 fn require_non_empty(field: &str, value: &str) -> Result<(), CatermError> {
     if value.trim().is_empty() {
         return Err(CatermError::Validation(ValidationError::Generic(format!(
-            "{field} tidak boleh kosong"
+            "{field} cannot be empty"
         ))));
     }
     Ok(())
@@ -243,7 +243,7 @@ fn authenticate(
             )
             .map_err(|e| {
                 invalid(format!(
-                    "Auth via SSH key gagal untuk {} ({expanded}): {e}",
+                    "SSH key authentication failed for {} ({expanded}): {e}",
                     host.username
                 ))
             })
@@ -252,7 +252,7 @@ fn authenticate(
             let priv_pem = crate::keys::get_private_key(id)?;
             let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
             std::fs::write(&temp_path, priv_pem.as_bytes()).map_err(|e| {
-                invalid(format!("Gagal menyiapkan kunci sementara untuk auth: {e}"))
+                invalid(format!("Failed to prepare temporary key for authentication: {e}"))
             })?;
             let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
             // Best-effort shred: the key must not outlive the auth attempt on disk.
@@ -260,7 +260,7 @@ fn authenticate(
             std::fs::remove_file(&temp_path).ok();
             auth_res.map_err(|e| {
                 invalid(format!(
-                    "Auth via Vault Key ID gagal untuk {}: {e}",
+                    "Vault Key ID authentication failed for {}: {e}",
                     host.username
                 ))
             })
@@ -379,7 +379,6 @@ fn drain_utf8(buf: &mut Vec<u8>) -> String {
 /// otherwise flushed the moment the stream goes quiet, so interactive echo is never delayed;
 /// this only bounds a continuous firehose (`cat` on a large file, `tail -f` on a busy log),
 /// which would otherwise emit one IPC event per 4 KiB read and flood the webview.
-const PTY_FLUSH_THRESHOLD: usize = 16 * 1024;
 
 /// Takes bytes off the wire: decoded into `pending` for push delivery, or appended to the
 /// session's buffer when no sink is installed.
@@ -479,22 +478,21 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                     if is_eof {
                         break;
                     }
-                    thread::sleep(Duration::from_millis(10));
+                    thread::sleep(Duration::from_millis(1));
                 }
                 Ok(n) => {
                     if let Some(chunk) = buf.get(..n) {
                         absorb_pty_bytes(chunk, push, &mut carry, &mut pending, &buffer_read);
                     }
-                    if pending.len() >= PTY_FLUSH_THRESHOLD {
-                        flush_pty_output(&reader_session_id, &mut pending);
-                    }
+                    // Instant flush on any read for zero-delay typing feedback
+                    flush_pty_output(&reader_session_id, &mut pending);
                 }
                 Err(e) => {
                     if e.kind() == std::io::ErrorKind::WouldBlock
                         || e.kind() == std::io::ErrorKind::Interrupted
                     {
                         flush_pty_output(&reader_session_id, &mut pending);
-                        thread::sleep(Duration::from_millis(10));
+                        thread::sleep(Duration::from_millis(1));
                     } else {
                         break;
                     }
@@ -532,7 +530,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                         if is_eof {
                             break;
                         }
-                        thread::sleep(Duration::from_millis(10));
+                        thread::sleep(Duration::from_millis(1));
                     }
                     Ok(n) => {
                         written += n;
@@ -541,7 +539,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                         if e.kind() == std::io::ErrorKind::WouldBlock
                             || e.kind() == std::io::ErrorKind::Interrupted
                         {
-                            thread::sleep(Duration::from_millis(10));
+                            thread::sleep(Duration::from_millis(1));
                         } else {
                             break;
                         }

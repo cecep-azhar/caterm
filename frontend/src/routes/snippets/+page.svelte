@@ -80,24 +80,24 @@
   function injectSnippet(cmd: string) {
     const injected = injectIntoActiveSession(cmd);
     injectNotice = injected
-      ? 'Snippet dikirim ke sesi terminal aktif.'
-      : 'Tidak ada sesi terminal aktif — buka sebuah sesi di tab Session dulu.';
+      ? 'Snippet sent to active terminal session.'
+      : 'No active terminal session — open an SSH session in Session tab first.';
     setTimeout(() => (injectNotice = ''), 3000);
   }
 </script>
 
 <div class="max-w-5xl mx-auto space-y-6">
-  <div class="flex justify-between items-center">
+  <div class="flex justify-between items-center pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
     <div>
-      <h1 class="text-2xl font-bold text-white tracking-tight">Command Snippets</h1>
-      <p class="text-neutral-400 text-sm mt-1">Save reusable commands to inject instantly into active terminal sessions.</p>
+      <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Command Snippets</h1>
+      <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">Save reusable commands to inject instantly into active terminal sessions.</p>
       {#if !backendAvailable}
         <p class="text-amber-500 text-xs mt-1">Tauri backend not detected — changes won't be saved to disk.</p>
       {/if}
     </div>
     <button 
       onclick={() => { resetModal(); isAddModalOpen = true; }}
-      class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-md transition-colors flex items-center gap-2">
+      class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-2 shadow shadow-sky-600/20">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
       Add Snippet
     </button>

@@ -5,6 +5,7 @@
   import Logo from '$lib/components/Logo.svelte';
   import WorkspaceMenu from '$lib/components/WorkspaceMenu.svelte';
   import AiChatPanel from '$lib/components/AiChatPanel.svelte';
+  import SessionViewport from '$lib/components/SessionViewport.svelte';
   import { getAiChatState, toggleAiChat, closeAiChat } from '$lib/stores/aiChat.svelte';
   import { page } from '$app/state';
   import { getTabs, closeTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
@@ -294,7 +295,7 @@
         <div class="flex items-center gap-2">
           <Logo size={22} mode="brand" />
           <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide">CATerm</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.5</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.6</span>
         </div>
         <button
           onclick={() => mobileDrawerOpen = false}
@@ -388,7 +389,7 @@
           <div class="flex items-center gap-2 overflow-hidden min-w-0">
             <Logo size={22} mode="brand" />
             <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate">CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.5</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.6</span>
           </div>
           <button
             type="button"
@@ -656,8 +657,14 @@
     <!-- Content Area (Screen Real Estate Optimized). The AI panel is a docked column beside
          the page rather than an overlay, so it behaves like the Files panel: the content
          narrows instead of being covered. Both never show at once — see handleAiToggle. -->
-    <div class="flex-1 flex min-h-0 overflow-hidden">
-      <div class="flex-1 min-w-0 overflow-auto bg-neutral-100 dark:bg-[#0a0a0a] text-neutral-900 dark:text-neutral-100 relative transition-colors duration-150 {isSessionActive ? 'p-0 md:p-1' : 'p-3 md:p-6'}">
+    <div class="flex-1 flex min-h-0 overflow-hidden relative">
+      <!-- Session Viewport: Persisted across routes so SSH terminals are never unmounted -->
+      <div class="absolute inset-0 z-0 {page.url.pathname.startsWith('/session') ? 'visible' : 'invisible pointer-events-none'}">
+        <SessionViewport />
+      </div>
+
+      <!-- Other pages routed via SvelteKit children -->
+      <div class="flex-1 min-w-0 overflow-auto bg-neutral-100 dark:bg-[#0a0a0a] text-neutral-900 dark:text-neutral-100 relative transition-colors duration-150 {isSessionActive ? 'p-0 md:p-1' : 'p-3 md:p-6'} {page.url.pathname.startsWith('/session') ? 'invisible pointer-events-none' : 'z-10'}">
         {@render children()}
       </div>
 

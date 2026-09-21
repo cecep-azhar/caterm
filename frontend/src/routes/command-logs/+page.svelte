@@ -53,7 +53,7 @@
       });
     } catch (e) {
       console.error('Failed to fetch logs', e);
-      showToast('Gagal memuat log audit.', 'error');
+      showToast('Failed to load audit logs.', 'error');
     } finally {
       isLoading = false;
     }
@@ -166,7 +166,7 @@
         if (filePath) {
           await writeTextFile(filePath, csvContent);
           saved = true;
-          showToast('Audit log berhasil diekspor!', 'success');
+          showToast('Audit logs exported successfully!', 'success');
         }
       } catch {
         // Fallback to standard web download
@@ -180,11 +180,11 @@
         a.download = `caterm-audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast('Audit log berhasil diunduh!', 'success');
+        showToast('Audit logs downloaded successfully!', 'success');
       }
     } catch (e) {
       console.error('Export failed', e);
-      showToast('Gagal mengekspor audit log.', 'error');
+      showToast('Failed to export audit logs.', 'error');
     }
   }
 
@@ -193,20 +193,26 @@
   }
 </script>
 
-<div class="h-full flex flex-col bg-white dark:bg-[#1E1E1E] text-neutral-900 dark:text-white rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 md:p-6 shadow-sm">
-  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight">Command Logs (Audit)</h1>
-      <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
-        Pencatatan riwayat perintah terminal PTY, eksekusi AI otomatis, dan audit sistem E2EE.
-      </p>
+<div class="max-w-5xl mx-auto space-y-6">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-sky-500/10 text-sky-400 rounded-lg border border-sky-500/20">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Command Logs (Audit)</h1>
+        <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
+          Audit trail of PTY terminal commands, automated AI actions, and system security events.
+        </p>
+      </div>
     </div>
     <div class="flex items-center gap-2">
       <button
         onclick={fetchLogs}
         disabled={isLoading}
         class="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg text-sm transition-colors flex items-center gap-1.5"
-        title="Muat ulang log"
+        title="Reload audit logs"
       >
         <svg class="w-4 h-4 {isLoading ? 'animate-spin' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -215,7 +221,7 @@
       </button>
       <button
         onclick={exportLogs}
-        class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm rounded-lg transition-colors shadow flex items-center gap-1.5"
+        class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-lg transition-colors shadow flex items-center gap-1.5"
       >
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

@@ -90,7 +90,7 @@ pub(crate) fn save_group_in(
     for host_id in &input.host_ids {
         if !known_ids.contains(host_id) {
             return Err(CatermError::Validation(ValidationError::Generic(format!(
-                "host dengan id {host_id} tidak ditemukan"
+                "host with id {host_id} not found"
             ))));
         }
     }
@@ -149,7 +149,7 @@ fn delete_group_in(conn: &Connection, id: &str) -> Result<(), CatermError> {
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal hapus group: {e}"))))?;
     if affected == 0 {
         return Err(CatermError::Db(DbError::Generic(format!(
-            "group dengan id {id} tidak ditemukan"
+            "group with id {id} not found"
         ))));
     }
     crate::teams::strip_group_from_teams(conn, id)

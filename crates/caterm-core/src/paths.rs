@@ -67,7 +67,7 @@ fn resolve_data_dir_with(env_override: Option<&str>) -> Result<DataDirInfo, Cate
 
     let base = directories::BaseDirs::new().ok_or_else(|| {
         CatermError::Io(IoError::Generic(
-            "tidak bisa menentukan direktori data OS (HOME/APPDATA tidak terbaca)".into(),
+            "unable to determine OS data directory (HOME/APPDATA unreadable)".into(),
         ))
     })?;
     Ok(DataDirInfo {

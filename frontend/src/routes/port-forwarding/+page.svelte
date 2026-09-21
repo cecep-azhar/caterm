@@ -19,13 +19,28 @@
   let formTargetPort = 80;
   let isSaving = false;
 
+  function errorMessage(e: unknown): string {
+    if (!e) return '';
+    if (typeof e === 'string') return e;
+    if (typeof e === 'object') {
+      if ('message' in e && typeof (e as any).message === 'string') return (e as any).message;
+      return JSON.stringify(e);
+    }
+    return String(e);
+  }
+
   async function loadData() {
     isLoading = true;
     errorMsg = '';
     try {
       [tunnels, hosts] = await Promise.all([listTunnels(), listHosts()]);
     } catch (e: any) {
-      errorMsg = String(e);
+      const msg = errorMessage(e);
+      if (msg.toLowerCase().includes('vault') || msg.toLowerCase().includes('database') || msg.toLowerCase().includes('kunci') || msg.includes('locked') || msg.includes('KeyError')) {
+        errorMsg = 'Vault is locked. Please unlock the vault from settings or restart.';
+      } else {
+        errorMsg = msg;
+      }
     } finally {
       isLoading = false;
     }
@@ -61,7 +76,7 @@
       showAddModal = false;
       await loadData();
     } catch (e: any) {
-      errorMsg = String(e);
+      errorMsg = errorMessage(e);
     } finally {
       isSaving = false;
     }
@@ -77,32 +92,34 @@
       }
       await loadData();
     } catch (e: any) {
-      errorMsg = String(e);
+      errorMsg = errorMessage(e);
     }
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Hapus konfigurasi port forwarding ini?')) return;
+    if (!confirm('Delete this port forwarding tunnel rule?')) return;
     errorMsg = '';
     try {
       await deleteTunnel(id);
       await loadData();
     } catch (e: any) {
-      errorMsg = String(e);
+      errorMsg = errorMessage(e);
     }
   }
 </script>
 
-<div class="max-w-4xl mx-auto space-y-6">
-  <div class="flex items-center gap-3">
-    <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex items-center justify-between gap-3 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-amber-500/10 text-amber-400 rounded-lg border border-amber-500/20">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Port Forwarding</h1>
+        <p class="text-sm text-neutral-500 dark:text-neutral-400">Manage Local, Remote, and Dynamic SSH tunnels.</p>
+      </div>
     </div>
-    <div class="flex-1">
-      <h1 class="text-2xl font-bold text-white">Port Forwarding</h1>
-      <p class="text-sm text-neutral-400">Manage Local, Remote, and Dynamic SSH tunnels.</p>
-    </div>
-    <button on:click={openAddModal} class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm transition-colors shadow shadow-sky-600/20">
+    <button on:click={openAddModal} class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm font-medium transition-colors shadow shadow-sky-600/20">
       Add Tunnel
     </button>
   </div>

@@ -42,7 +42,7 @@
     isSaving = true;
     try {
       await saveAiSettings(settings);
-      showToast('Pengaturan AI tersimpan.', 'success');
+      showToast('AI settings saved.', 'success');
       onSaved?.(settings);
     } catch (err) {
       showToast(errorText(err), 'error');
@@ -63,8 +63,8 @@
     try {
       await saveAiSettings(settings);
       const reply = await aiChat([{ role: 'user', content: 'ping' }]);
-      const preview = reply.reply.trim().slice(0, 120) || '(balasan kosong)';
-      testResult = { ok: true, text: `Terhubung. Model menjawab: ${preview}` };
+      const preview = reply.reply.trim().slice(0, 120) || '(empty response)';
+      testResult = { ok: true, text: `Connected. Model replied: ${preview}` };
     } catch (err) {
       testResult = { ok: false, text: errorText(err) };
     } finally {
@@ -140,7 +140,7 @@
       </button>
     </div>
     <p class="text-[11px] text-neutral-500 mt-1">
-      Disimpan di vault SQLite terenkripsi lokal dan dikirim langsung dari proses aplikasi.
+      Stored in local encrypted SQLite vault and sent directly from application process.
     </p>
   </div>
 
@@ -164,7 +164,7 @@
         ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300'
         : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'}"
     >
-      <p class="font-semibold mb-0.5">{testResult.ok ? 'Koneksi berhasil' : 'Koneksi gagal'}</p>
+      <p class="font-semibold mb-0.5">{testResult.ok ? 'Connection Succeeded' : 'Connection Failed'}</p>
       <p class="break-words">{testResult.text}</p>
     </div>
   {/if}
@@ -175,7 +175,7 @@
       onclick={handleReset}
       class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors shrink-0"
     >
-      Reset ke Default
+      Reset to Default
     </button>
     <div class="flex items-center gap-2">
       <button
@@ -184,14 +184,14 @@
         disabled={isTesting || isLoading}
         class="px-4 py-2 rounded-lg text-xs font-semibold border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
       >
-        {isTesting ? 'Menguji...' : 'Uji Koneksi'}
+        {isTesting ? 'Testing...' : 'Test Connection'}
       </button>
       <button
         type="submit"
         disabled={isSaving || isLoading}
         class="px-5 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white shadow transition-colors"
       >
-        {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan'}
+        {isSaving ? 'Saving...' : 'Save Settings'}
       </button>
     </div>
   </div>

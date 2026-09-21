@@ -358,8 +358,8 @@ pub async fn ssh_connect(host_id: String) -> Result<ssh::SshSession, CatermError
 }
 
 #[tauri::command]
-pub async fn ssh_write(session_id: String, data: String) -> Result<String, CatermError> {
-    run_blocking(move || ssh::write(&session_id, &data)).await
+pub fn ssh_write(session_id: String, data: String) -> Result<String, CatermError> {
+    ssh::write(&session_id, &data)
 }
 
 #[tauri::command]

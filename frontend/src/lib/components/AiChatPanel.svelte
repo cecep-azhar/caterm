@@ -110,11 +110,11 @@
     if (isExecuting || proposedSteps.length === 0) return;
 
     if (execMode === 'ssh' && !targetHostId) {
-      showToast('Pilih host tujuan terlebih dahulu.', 'error');
+      showToast('Please select a target host first.', 'error');
       return;
     }
     if (execMode === 'terminal' && !activeSession) {
-      showToast('Tidak ada terminal aktif — buka sesi dulu atau pakai mode SSH exec.', 'error');
+      showToast('No active terminal — open a session first or use SSH exec mode.', 'error');
       return;
     }
 
@@ -127,7 +127,7 @@
         if (execMode === 'terminal') {
           // Fire-and-forget: the shell shows the result, we cannot read it back.
           injectIntoActiveSession(step.command);
-          runs[i] = { status: 'ok', output: 'Dikirim ke terminal aktif.' };
+          runs[i] = { status: 'ok', output: 'Sent to active terminal.' };
           continue;
         }
 
@@ -137,11 +137,11 @@
           const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
           runs[i] = {
             status: result.success ? 'ok' : 'failed',
-            output: output || '(tidak ada output)',
+            output: output || '(no output)',
             exitCode: result.exit_code
           };
           if (!result.success) {
-            showToast(`Langkah ${i + 1} gagal (exit ${result.exit_code ?? '?'}). Eksekusi dihentikan.`, 'error');
+            showToast(`Step ${i + 1} failed (exit ${result.exit_code ?? '?'}). Execution aborted.`, 'error');
             break;
           }
         } catch (err) {
@@ -176,7 +176,7 @@
       </div>
       <div class="min-w-0">
         <h2 class="text-sm font-bold text-neutral-900 dark:text-white truncate">AI Assistant</h2>
-        <p class="text-[11px] text-neutral-500 truncate">Diskusi dulu, baru dikerjakan</p>
+        <p class="text-[11px] text-neutral-500 truncate">Discuss first, execute safely</p>
       </div>
     </div>
     <div class="flex items-center gap-1 shrink-0">
@@ -184,8 +184,8 @@
         <button
           onclick={resetConversation}
           class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          title="Mulai percakapan baru"
-          aria-label="Mulai percakapan baru"
+          title="Start new conversation"
+          aria-label="Start new conversation"
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -223,21 +223,21 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <span class="text-[11px] font-semibold text-neutral-500 shrink-0">Jalankan via</span>
+      <span class="text-[11px] font-semibold text-neutral-500 shrink-0">Execute via</span>
       <div class="flex items-center gap-0.5 p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-800">
         <button
           onclick={() => (execMode = 'ssh')}
           class="px-2 py-0.5 rounded text-[11px] font-medium transition-colors {execMode === 'ssh' ? 'bg-violet-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
-          title="Channel SSH non-interaktif: output dan exit code ditangkap, semua tercatat di audit log"
+          title="Non-interactive SSH channel: output and exit code captured, all audited"
         >
           SSH exec
         </button>
         <button
           onclick={() => (execMode = 'terminal')}
           class="px-2 py-0.5 rounded text-[11px] font-medium transition-colors {execMode === 'terminal' ? 'bg-violet-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
-          title="Ketik ke terminal yang sedang aktif — terlihat langsung, tapi hasilnya tidak bisa dibaca AI"
+          title="Type into active terminal pane directly"
         >
-          Terminal aktif
+          Active terminal
         </button>
       </div>
     </div>
@@ -245,8 +245,8 @@
     {#if execMode === 'terminal'}
       <p class="text-[11px] {activeSession ? 'text-neutral-500' : 'text-amber-600 dark:text-amber-400'}">
         {activeSession
-          ? `Akan diketik ke terminal: ${activeSession.label}`
-          : 'Belum ada terminal aktif. Buka sesi SSH dulu.'}
+          ? `Will type into terminal: ${activeSession.label}`
+          : 'No active terminal pane. Open an SSH session first.'}
       </p>
     {/if}
   </div>
@@ -256,10 +256,10 @@
     {#if messages.length === 0}
       <div class="text-center py-8 space-y-3">
         <p class="text-sm text-neutral-500 dark:text-neutral-400">
-          Ceritakan apa yang ingin dikerjakan di server.
+          Tell AI what you want to achieve on this server.
         </p>
         <div class="flex flex-wrap gap-1.5 justify-center">
-          {#each ['Bantu setup Docker', 'Install Node.js untuk produksi', 'Hardening SSH & firewall'] as suggestion}
+          {#each ['Setup Docker & Compose', 'Install Node.js LTS for production', 'Hardening SSH & firewall'] as suggestion}
             <button
               onclick={() => {
                 draft = suggestion;
@@ -272,7 +272,7 @@
           {/each}
         </div>
         <p class="text-[11px] text-neutral-400 dark:text-neutral-500 max-w-xs mx-auto">
-          AI akan bertanya dulu (versi, distro, sudo) sebelum mengusulkan perintah apa pun.
+          AI will ask questions first (version, distro, sudo) before proposing any commands.
         </p>
       </div>
     {/if}
@@ -292,7 +292,7 @@
     {#if isSending}
       <div class="flex justify-start">
         <div class="rounded-xl px-3 py-2 text-xs bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-500">
-          AI sedang berpikir...
+          AI is thinking...
         </div>
       </div>
     {/if}
@@ -372,10 +372,10 @@
           class="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white transition-colors"
         >
           {isExecuting
-            ? 'Menjalankan...'
+            ? 'Executing...'
             : execMode === 'ssh'
-              ? `Jalankan ${acceptedCount} langkah di ${targetHost?.label ?? 'host'}`
-              : `Kirim ${acceptedCount} langkah ke terminal aktif`}
+              ? `Run ${acceptedCount} steps on ${targetHost?.label ?? 'host'}`
+              : `Send ${acceptedCount} steps to active terminal`}
         </button>
       </div>
     {/if}
@@ -388,15 +388,15 @@
         bind:value={draft}
         onkeydown={handleKeydown}
         rows="2"
-        placeholder="Misal: bantu setup Docker di server ini"
-        aria-label="Pesan untuk AI"
+        placeholder="e.g. Help me setup Docker on this server"
+        aria-label="Message for AI"
         class="flex-1 resize-none bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2.5 py-2 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-violet-500"
       ></textarea>
       <button
         onclick={send}
         disabled={isSending || draft.trim().length === 0}
         class="px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white transition-colors shrink-0"
-        aria-label="Kirim"
+        aria-label="Send"
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

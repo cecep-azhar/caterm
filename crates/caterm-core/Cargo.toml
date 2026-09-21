@@ -18,7 +18,7 @@ serde_json.workspace = true
 directories.workspace = true
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
 rand = "0.8"
-ssh2 = "0.9.6"
+ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 argon2 = "0.5"
 secrecy = "0.8"
 zeroize = "1.8"

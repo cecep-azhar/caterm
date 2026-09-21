@@ -142,7 +142,7 @@ fn delete_snippet_in(conn: &Connection, id: &str) -> Result<(), CatermError> {
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal hapus snippet: {e}"))))?;
     if affected == 0 {
         return Err(CatermError::Db(DbError::Generic(format!(
-            "snippet dengan id {id} tidak ditemukan"
+            "snippet with id {id} not found"
         ))));
     }
     Ok(())

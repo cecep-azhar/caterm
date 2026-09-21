@@ -213,7 +213,7 @@ fn post_chat_completion(
 
     let mut response = request
         .send_json(&payload)
-        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Gagal menghubungi {url}: {e}"))))?;
+        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Failed to connect to {url}: {e}"))))?;
 
     let body = response
         .body_mut()

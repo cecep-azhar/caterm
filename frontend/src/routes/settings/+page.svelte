@@ -22,12 +22,12 @@
   async function handleExport(e: Event) {
     e.preventDefault();
     if (backupPassphrase.length < 8) {
-      showToast('Passphrase minimal 8 karakter.', 'error');
+      showToast('Passphrase must be at least 8 characters.', 'error');
       return;
     }
 
     try {
-      showToast('Membuat backup terenkripsi...', 'info');
+      showToast('Creating encrypted backup...', 'info');
       const b64 = await exportEncryptedBackup(backupPassphrase);
       
       const blob = new Blob([b64], { type: 'text/plain' });
@@ -38,17 +38,17 @@
       a.click();
       URL.revokeObjectURL(url);
 
-      showToast('Backup berhasil disimpan!', 'success');
+      showToast('Backup saved successfully!', 'success');
       backupPassphrase = '';
     } catch (err: any) {
-      showToast(err?.message || 'Gagal export backup', 'error');
+      showToast(err?.message || 'Failed to export backup', 'error');
     }
   }
 
   async function handleImport(e: Event) {
     e.preventDefault();
     if (restorePassphrase.length < 8) {
-      showToast('Passphrase minimal 8 karakter.', 'error');
+      showToast('Passphrase must be at least 8 characters.', 'error');
       return;
     }
 
@@ -60,24 +60,24 @@
         const file = input.files?.[0];
         if (!file) return;
         
-        showToast('Mendekripsi dan mengimpor backup...', 'info');
+        showToast('Decrypting and importing backup...', 'info');
         
         const reader = new FileReader();
         reader.onload = async (event) => {
           try {
             const b64 = event.target?.result as string;
             const importedCount = await importEncryptedBackup(b64, restorePassphrase);
-            showToast(`Restore berhasil! Memulihkan ${importedCount} data.`, 'success');
+            showToast(`Restore successful! Restored ${importedCount} items.`, 'success');
             restorePassphrase = '';
           } catch (err: any) {
-            showToast(err?.message || 'Gagal restore backup', 'error');
+            showToast(err?.message || 'Failed to restore backup', 'error');
           }
         };
         reader.readAsText(file);
       };
       input.click();
     } catch (err: any) {
-      showToast(err?.message || 'Gagal restore backup', 'error');
+      showToast(err?.message || 'Failed to restore backup', 'error');
     }
   }
 
@@ -85,21 +85,21 @@
     e.preventDefault();
     try {
       await validateVaultPassword(vaultPassword);
-      showToast('Master password valid dan tersimpan.', 'success');
+      showToast('Master password verified and saved.', 'success');
       vaultPassword = '';
     } catch (err) {
       const msg =
         (err as { message?: string })?.message ??
-        `Password vault minimal ${MIN_VAULT_PASSWORD_LEN} karakter.`;
+        `Vault password must be at least ${MIN_VAULT_PASSWORD_LEN} characters.`;
       showToast(msg, 'error');
     }
   }
 </script>
 
 <div class="max-w-4xl mx-auto space-y-6">
-  <div>
-    <h1 class="text-2xl font-bold text-white tracking-tight">Settings</h1>
-    <p class="text-neutral-400 text-sm mt-1">Configure global preferences, system updates, and zero-knowledge local security.</p>
+  <div class="pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
+    <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Settings</h1>
+    <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">Configure global preferences, system updates, and zero-knowledge local security.</p>
   </div>
 
   <!-- Settings Tabs -->
@@ -146,7 +146,7 @@
       <div class="flex justify-between items-center">
         <div>
           <h2 class="text-lg font-semibold text-white">Application Updates</h2>
-          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v2.1.5</span></p>
+          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v2.1.6</span></p>
         </div>
         <button class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">
           Check for Updates

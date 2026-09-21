@@ -104,7 +104,7 @@ pub(crate) fn save_team_in(conn: &Connection, input: TeamInput) -> Result<TeamRe
     for host_id in &input.host_ids {
         if !known_host_ids.contains(host_id) {
             return Err(CatermError::Validation(ValidationError::Generic(format!(
-                "host dengan id {host_id} tidak ditemukan"
+                "host with id {host_id} not found"
             ))));
         }
     }
@@ -116,7 +116,7 @@ pub(crate) fn save_team_in(conn: &Connection, input: TeamInput) -> Result<TeamRe
     for group_id in &input.group_ids {
         if !known_group_ids.contains(group_id) {
             return Err(CatermError::Validation(ValidationError::Generic(format!(
-                "group dengan id {group_id} tidak ditemukan"
+                "group with id {group_id} not found"
             ))));
         }
     }
@@ -182,7 +182,7 @@ fn delete_team_in(conn: &Connection, id: &str) -> Result<(), CatermError> {
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal hapus team: {e}"))))?;
     if affected == 0 {
         return Err(CatermError::Db(DbError::Generic(format!(
-            "team dengan id {id} tidak ditemukan"
+            "team with id {id} not found"
         ))));
     }
     Ok(())

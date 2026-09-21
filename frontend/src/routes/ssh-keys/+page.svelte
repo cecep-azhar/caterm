@@ -81,7 +81,7 @@
   }
 
   async function handleDelete(id: string, name: string) {
-    if (!confirm(`Hapus kunci "${name}"?\n(Pastikan tidak sedang digunakan oleh Host)`)) return;
+    if (!confirm(`Delete key "${name}"?\n(Make sure it is not currently used by any Host)`)) return;
     errorMsg = '';
     successMsg = '';
     try {
@@ -109,7 +109,7 @@
       await deployPublicKey(deployHostId, deployKeyId);
       showDeployModal = false;
       const targetHost = hosts.find(h => h.id === deployHostId);
-      successMsg = `Kunci public berhasil di-deploy ke server ${targetHost?.label || deployHostId}!`;
+      successMsg = `Public key deployed successfully to server ${targetHost?.label || deployHostId}!`;
     } catch (e: any) {
       errorMsg = String(e);
     } finally {
@@ -118,23 +118,27 @@
   }
 </script>
 
-<div class="max-w-4xl mx-auto space-y-6">
-  <div class="flex items-center gap-3">
-    <div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg border border-rose-500/20">
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
-      </svg>
+<div class="max-w-5xl mx-auto space-y-6">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-rose-500/10 text-rose-400 rounded-lg border border-rose-500/20">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">SSH Keys</h1>
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage, generate, import, and deploy SSH keypairs (RSA / ED25519) securely stored in the local vault.</p>
+      </div>
     </div>
-    <div class="flex-1">
-      <h1 class="text-2xl font-bold text-white">SSH Keys</h1>
-      <p class="text-sm text-neutral-400">Manage, generate, import, and deploy SSH keypairs (RSA / ED25519) securely stored in the local vault.</p>
+    <div class="flex items-center gap-2">
+      <button on:click={() => showImportModal = true} class="px-3.5 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg text-sm font-medium transition-colors border border-neutral-200 dark:border-neutral-700">
+        Import
+      </button>
+      <button on:click={() => showGenerateModal = true} class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm font-medium transition-colors shadow shadow-sky-600/20">
+        Generate
+      </button>
     </div>
-    <button on:click={() => showImportModal = true} class="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors border border-neutral-700">
-      Import
-    </button>
-    <button on:click={() => showGenerateModal = true} class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-sm transition-colors shadow shadow-sky-600/20">
-      Generate
-    </button>
   </div>
 
   {#if errorMsg}
