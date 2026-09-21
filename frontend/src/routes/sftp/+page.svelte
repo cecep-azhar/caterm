@@ -5,6 +5,7 @@
     listRemoteDir,
     readRemoteFile,
     writeRemoteFile,
+    mkdirRemoteDir,
     deleteRemoteFile,
     renameRemoteFile,
     copyRemoteFile,
@@ -20,6 +21,9 @@
   let errorMsg = $state('');
   let successMsg = $state('');
 
+  // Multi-selection state
+  let selectedPaths = $state<Set<string>>(new Set());
+
   // Selected file for single operations
   let selectedFile = $state<SftpFileEntry | null>(null);
 
@@ -31,11 +35,18 @@
   } | null>(null);
 
   // Modals state
+  let showNewFileModal = $state(false);
+  let newFileName = $state('');
+
+  let showNewFolderModal = $state(false);
+  let newFolderName = $state('');
+
   let showRenameModal = $state(false);
   let renameNewName = $state('');
 
   let showDeleteModal = $state(false);
   let fileToDelete = $state<SftpFileEntry | null>(null);
+  let isBatchDeleting = $state(false);
 
   let showEditorModal = $state(false);
   let editorFilePath = $state('');
@@ -52,6 +63,70 @@
   let isLoadingDiff = $state(false);
 
   let uploadInputRef: HTMLInputElement;
+
+  function toggleSelect(path: string) {
+    const next = new Set(selectedPaths);
+    if (next.has(path)) {
+      next.delete(path);
+    } else {
+      next.add(path);
+    }
+    selectedPaths = next;
+  }
+
+  function toggleSelectAll() {
+    if (selectedPaths.size === files.length && files.length > 0) {
+      selectedPaths = new Set();
+    } else {
+      selectedPaths = new Set(files.map(f => f.path));
+    }
+  }
+
+  async function handleCreateFile() {
+    if (!newFileName.trim()) return;
+    const dest = joinPath(currentPath, newFileName.trim());
+    try {
+      await writeRemoteFile(currentHostId, dest, []);
+      notifySuccess(`Created file "${newFileName.trim()}"`);
+      showNewFileModal = false;
+      newFileName = '';
+      await fetchFiles();
+    } catch (e: any) {
+      errorMsg = String(e?.message || e || 'Failed to create file');
+    }
+  }
+
+  async function handleCreateFolder() {
+    if (!newFolderName.trim()) return;
+    const dest = joinPath(currentPath, newFolderName.trim());
+    try {
+      await mkdirRemoteDir(currentHostId, dest);
+      notifySuccess(`Created folder "${newFolderName.trim()}"`);
+      showNewFolderModal = false;
+      newFolderName = '';
+      await fetchFiles();
+    } catch (e: any) {
+      errorMsg = String(e?.message || e || 'Failed to create folder');
+    }
+  }
+
+  async function handleBatchDelete() {
+    if (selectedPaths.size === 0) return;
+    isLoading = true;
+    errorMsg = '';
+    try {
+      for (const path of selectedPaths) {
+        await deleteRemoteFile(currentHostId, path);
+      }
+      notifySuccess(`Deleted ${selectedPaths.size} item(s)`);
+      selectedPaths = new Set();
+      await fetchFiles();
+    } catch (e: any) {
+      errorMsg = String(e?.message || e || 'Failed to delete some items');
+    } finally {
+      isLoading = false;
+    }
+  }
 
   async function loadHosts() {
     try {
@@ -350,6 +425,28 @@
         </a>
       {/if}
       <button
+        onclick={() => (showNewFileModal = true)}
+        disabled={!currentHostId || isLoading}
+        class="px-3 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 text-neutral-800 dark:text-neutral-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+        title="Create New File"
+      >
+        <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+        </svg>
+        <span>New File</span>
+      </button>
+      <button
+        onclick={() => (showNewFolderModal = true)}
+        disabled={!currentHostId || isLoading}
+        class="px-3 py-1.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 text-neutral-800 dark:text-neutral-200 rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+        title="Create New Folder"
+      >
+        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+        </svg>
+        <span>New Folder</span>
+      </button>
+      <button
         onclick={openUploadDialog}
         disabled={!currentHostId || isLoading}
         class="px-3.5 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
@@ -420,6 +517,96 @@
     </div>
   </div>
 
+  <!-- Selection & Multi-Action Toolbar -->
+  <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded-lg">
+    <div class="flex items-center gap-2">
+      <button
+        onclick={toggleSelectAll}
+        disabled={files.length === 0}
+        class="px-2.5 py-1 text-xs font-semibold rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-sm disabled:opacity-50"
+      >
+        {selectedPaths.size === files.length && files.length > 0 ? 'Deselect All' : 'Select All'}
+      </button>
+      {#if selectedPaths.size > 0}
+        <span class="text-xs font-medium text-sky-600 dark:text-sky-400">
+          {selectedPaths.size} selected
+        </span>
+        <button
+          onclick={handleBatchDelete}
+          disabled={isLoading}
+          class="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors"
+          title="Delete all selected items"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+          <span>Batch Delete</span>
+        </button>
+      {/if}
+    </div>
+
+    <div class="flex items-center gap-2">
+      {#if selectedFile && !selectedFile.is_dir}
+        <button
+          onclick={() => openTextEditor(selectedFile!)}
+          class="px-2.5 py-1 text-xs font-semibold rounded border border-sky-300 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 flex items-center gap-1 shadow-sm transition-colors"
+          title="Edit Text"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+          </svg>
+          <span>Open Text</span>
+        </button>
+        <button
+          onclick={() => openDiffSelect(selectedFile!)}
+          class="px-2.5 py-1 text-xs font-semibold rounded border border-indigo-300 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 flex items-center gap-1 shadow-sm transition-colors"
+          title="Compare with another file"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+          </svg>
+          <span>Compare Files</span>
+        </button>
+      {/if}
+
+      {#if selectedFile}
+        <button
+          onclick={() => triggerCopy(selectedFile!)}
+          class="px-2.5 py-1 text-xs font-semibold rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1 shadow-sm transition-colors"
+          title="Copy"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+          </svg>
+          <span>Copy</span>
+        </button>
+        <button
+          onclick={() => triggerCut(selectedFile!)}
+          class="px-2.5 py-1 text-xs font-semibold rounded border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 flex items-center gap-1 shadow-sm transition-colors"
+          title="Cut"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879a3 3 0 11-4.242-4.242 3 3 0 014.242 0L12 12zm0 0l-2.879-2.879a3 3 0 10-4.242 4.242 3 3 0 004.242 0L12 12z"></path>
+          </svg>
+          <span>Cut</span>
+        </button>
+      {/if}
+
+      {#if clipboard}
+        <button
+          onclick={triggerPaste}
+          class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded text-xs font-semibold flex items-center gap-1 shadow-sm transition-colors animate-pulse"
+          title="Paste '{clipboard.file.name}'"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+          </svg>
+          <span>Paste ({clipboard.action})</span>
+        </button>
+      {/if}
+    </div>
+  </div>
+
   <!-- Messages -->
   {#if errorMsg}
     <div class="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center justify-between">
@@ -450,6 +637,14 @@
       <table class="w-full text-left text-sm text-neutral-600 dark:text-neutral-400">
         <thead class="bg-neutral-50 dark:bg-neutral-950/60 text-xs uppercase text-neutral-500 border-b border-neutral-200 dark:border-neutral-800">
           <tr>
+            <th class="px-3 py-3 w-10 text-center">
+              <input
+                type="checkbox"
+                checked={selectedPaths.size === files.length && files.length > 0}
+                onchange={toggleSelectAll}
+                class="rounded border-neutral-300 dark:border-neutral-700 text-sky-600 focus:ring-0"
+              />
+            </th>
             <th class="px-4 py-3 font-semibold">Name</th>
             <th class="px-4 py-3 font-semibold w-24">Size</th>
             <th class="px-4 py-3 font-semibold w-36">Modified</th>
@@ -459,7 +654,7 @@
         <tbody class="divide-y divide-neutral-100 dark:divide-neutral-800/60">
           {#if isLoading}
             <tr>
-              <td colspan="4" class="px-4 py-12 text-center text-neutral-500">
+              <td colspan="5" class="px-4 py-12 text-center text-neutral-500">
                 <div class="inline-flex items-center gap-2">
                   <div class="w-4 h-4 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
                   <span>Loading directory contents...</span>
@@ -468,7 +663,7 @@
             </tr>
           {:else if files.length === 0}
             <tr>
-              <td colspan="4" class="px-4 py-12 text-center text-neutral-500">
+              <td colspan="5" class="px-4 py-12 text-center text-neutral-500">
                 This directory is empty.
               </td>
             </tr>
@@ -478,6 +673,14 @@
                 class="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors group {selectedFile?.path === file.path ? 'bg-sky-50/50 dark:bg-sky-950/20' : ''}"
                 onclick={() => (selectedFile = file)}
               >
+                <td class="px-3 py-2.5 text-center" onclick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selectedPaths.has(file.path)}
+                    onchange={() => toggleSelect(file.path)}
+                    class="rounded border-neutral-300 dark:border-neutral-700 text-sky-600 focus:ring-0"
+                  />
+                </td>
                 <td class="px-4 py-2.5 flex items-center gap-3">
                   {#if file.is_dir}
                     <button
@@ -572,6 +775,76 @@
     </div>
   </div>
 </div>
+
+<!-- NEW FILE MODAL -->
+{#if showNewFileModal}
+  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
+      <h3 class="text-base font-semibold text-neutral-900 dark:text-white">Create New File</h3>
+      <div>
+        <label class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1" for="new-file-name">File Name</label>
+        <input
+          id="new-file-name"
+          type="text"
+          bind:value={newFileName}
+          placeholder="config.json or script.sh"
+          onkeydown={(e) => e.key === 'Enter' && handleCreateFile()}
+          class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
+        />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button
+          onclick={() => { showNewFileModal = false; newFileName = ''; }}
+          class="px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-lg"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleCreateFile}
+          disabled={!newFileName.trim()}
+          class="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
+        >
+          Create File
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- NEW FOLDER MODAL -->
+{#if showNewFolderModal}
+  <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
+      <h3 class="text-base font-semibold text-neutral-900 dark:text-white">Create New Folder</h3>
+      <div>
+        <label class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1" for="new-folder-name">Folder Name</label>
+        <input
+          id="new-folder-name"
+          type="text"
+          bind:value={newFolderName}
+          placeholder="my-project or logs"
+          onkeydown={(e) => e.key === 'Enter' && handleCreateFolder()}
+          class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 font-mono"
+        />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button
+          onclick={() => { showNewFolderModal = false; newFolderName = ''; }}
+          class="px-3 py-1.5 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-semibold rounded-lg"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleCreateFolder}
+          disabled={!newFolderName.trim()}
+          class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg"
+        >
+          Create Folder
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- RENAME MODAL -->
 {#if showRenameModal}

@@ -88,7 +88,7 @@ pub async fn write_remote_file(
     host_id: String,
     remote_path: String,
     data: Vec<u8>,
-)| -> Result<(), CatermError> {
+) -> Result<(), CatermError> {
     run_blocking(move || sftp::write_remote_file(&host_id, &remote_path, &data)).await
 }
 

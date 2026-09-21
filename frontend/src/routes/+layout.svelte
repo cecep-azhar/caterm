@@ -288,7 +288,7 @@
         <div class="flex items-center gap-2">
           <Logo size={22} mode="brand" />
           <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide">CATerm</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.1</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.2</span>
         </div>
         <button
           onclick={() => mobileDrawerOpen = false}
@@ -382,7 +382,7 @@
           <div class="flex items-center gap-2 overflow-hidden min-w-0">
             <Logo size={22} mode="brand" />
             <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate">CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.1</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.2</span>
           </div>
           <button
             type="button"

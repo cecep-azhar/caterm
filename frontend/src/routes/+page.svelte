@@ -315,20 +315,21 @@
             </button>
             <button
               onclick={() => openSession(host.id)}
-              class="flex-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-medium shadow-lg shadow-sky-600/20 transition-all flex items-center justify-center gap-1.5"
+              class="flex-1 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5"
               title="Open new session (can open multiple for the same host)">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-              Connect
+              <span>Connect</span>
             </button>
             <button
               onclick={() => handleClone(host)}
-              class="px-2.5 py-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-md text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all flex items-center justify-center"
+              class="px-2.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 rounded-md text-xs font-semibold border border-neutral-300 dark:border-neutral-700 transition-all flex items-center justify-center gap-1 shadow-sm"
               title="Clone / Duplicate Host"
               aria-label="Clone Host"
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg class="w-4 h-4 text-sky-600 dark:text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
+              <span class="hidden sm:inline">Clone</span>
             </button>
             <a
               href="/sftp?host={host.id}"
