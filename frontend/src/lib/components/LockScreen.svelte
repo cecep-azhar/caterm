@@ -146,7 +146,7 @@
   <div data-tauri-drag-region class="absolute top-0 left-0 right-0 h-9 z-50 flex items-center justify-between px-3">
     <div class="flex items-center gap-2 pointer-events-none opacity-80">
       <span class="text-[11px] font-mono text-neutral-400 font-semibold tracking-wider">CATERM</span>
-      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono">v2.1.6</span>
+      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono">v2.1.7</span>
     </div>
     <div class="flex items-center no-drag">
       <button
@@ -184,7 +184,7 @@
     <div class="relative z-10 flex items-center gap-3">
       <Logo size={40} mode="brand" />
       <div>
-        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.1.6</span></h1>
+        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.1.7</span></h1>
         <p class="text-xs text-neutral-400">Enterprise SSH Manager & Prompt Studio</p>
       </div>
     </div>

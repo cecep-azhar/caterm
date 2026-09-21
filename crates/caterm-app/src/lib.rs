@@ -65,7 +65,11 @@ fn install_ssh_event_bridge(app: &tauri::AppHandle) {
 /// "cold start -> jendela unlock". `T2-BOOT-06` evidence documents this scope honestly;
 /// the harness will be repointed at a real frontend-ready signal once Fase 3 ships one.
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run(start: std::time::Instant) {
+pub fn run() {
+    run_with_start(std::time::Instant::now());
+}
+
+pub fn run_with_start(start: std::time::Instant) {
     // Unrecoverable: if the Tauri runtime itself fails to start, the process has no
     // useful state to continue in. This is the one sanctioned exception to the
     // zero-panic policy (REQ-04) outside #[cfg(test)] — see ledger-v2.md KA-05.
@@ -162,6 +166,7 @@ pub fn run(start: std::time::Instant) {
             commands::window_minimize,
             commands::window_maximize,
             commands::window_close,
+            commands::open_external_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

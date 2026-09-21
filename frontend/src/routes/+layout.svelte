@@ -26,6 +26,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
+  import { openExternalUrl } from '$lib/utils/url';
 
   let timeAgo = $state('never');
   
@@ -50,6 +51,23 @@
   onMount(() => {
     startMonitoring();
     initTheme();
+
+    const handleGlobalClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement)?.closest('a');
+      if (target && target.href) {
+        const href = target.href;
+        if (href.startsWith('http://') || href.startsWith('https://')) {
+          e.preventDefault();
+          e.stopPropagation();
+          openExternalUrl(href);
+        }
+      }
+    };
+    window.addEventListener('click', handleGlobalClick, true);
+
+    return () => {
+      window.removeEventListener('click', handleGlobalClick, true);
+    };
   });
 
   onDestroy(() => {
@@ -295,7 +313,7 @@
         <div class="flex items-center gap-2">
           <Logo size={22} mode="brand" />
           <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide">CATerm</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.6</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.7</span>
         </div>
         <button
           onclick={() => mobileDrawerOpen = false}
@@ -389,7 +407,7 @@
           <div class="flex items-center gap-2 overflow-hidden min-w-0">
             <Logo size={22} mode="brand" />
             <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate">CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.6</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.7</span>
           </div>
           <button
             type="button"
@@ -659,12 +677,12 @@
          narrows instead of being covered. Both never show at once — see handleAiToggle. -->
     <div class="flex-1 flex min-h-0 overflow-hidden relative">
       <!-- Session Viewport: Persisted across routes so SSH terminals are never unmounted -->
-      <div class="absolute inset-0 z-0 {page.url.pathname.startsWith('/session') ? 'visible' : 'invisible pointer-events-none'}">
+      <div class="flex-1 min-w-0 h-full relative {page.url.pathname.startsWith('/session') ? 'flex' : 'hidden'}">
         <SessionViewport />
       </div>
 
       <!-- Other pages routed via SvelteKit children -->
-      <div class="flex-1 min-w-0 overflow-auto bg-neutral-100 dark:bg-[#0a0a0a] text-neutral-900 dark:text-neutral-100 relative transition-colors duration-150 {isSessionActive ? 'p-0 md:p-1' : 'p-3 md:p-6'} {page.url.pathname.startsWith('/session') ? 'invisible pointer-events-none' : 'z-10'}">
+      <div class="flex-1 min-w-0 overflow-auto bg-neutral-100 dark:bg-[#0a0a0a] text-neutral-900 dark:text-neutral-100 relative transition-colors duration-150 {isSessionActive ? 'p-0 md:p-1' : 'p-3 md:p-6'} {page.url.pathname.startsWith('/session') ? 'hidden' : 'z-10'}">
         {@render children()}
       </div>
 

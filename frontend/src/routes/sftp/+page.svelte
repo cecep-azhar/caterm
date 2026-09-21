@@ -668,16 +668,16 @@
   });
 </script>
 
-<div class="h-full flex flex-col space-y-3">
+<div class="h-full flex flex-col space-y-3 text-neutral-800 dark:text-neutral-200">
   <!-- Top Bar: Host Selector & Controls -->
-  <div class="flex flex-wrap items-center justify-between gap-3 bg-[#1e232a] p-3 rounded-lg border border-slate-800">
+  <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#181c22] p-3 rounded-lg border border-neutral-200 dark:border-slate-800 shadow-xs">
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2">
-        <span class="text-xs font-semibold uppercase text-slate-400">Remote Host:</span>
+        <span class="text-xs font-semibold uppercase text-neutral-500 dark:text-slate-400">Remote Host:</span>
         <select
           bind:value={currentHostId}
           onchange={() => fetchRemoteFiles()}
-          class="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-sm text-slate-200 focus:outline-none focus:border-cyan-500"
+          class="bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-sm text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
         >
           {#each hosts as h}
             <option value={h.id}>{h.label} ({h.username}@{h.address}:{h.port})</option>
@@ -685,11 +685,11 @@
         </select>
       </div>
 
-      <div class="flex items-center border border-slate-700 rounded bg-slate-900 p-0.5 text-xs">
+      <div class="flex items-center border border-neutral-300 dark:border-slate-700 rounded bg-neutral-100 dark:bg-slate-900 p-0.5 text-xs">
         <button
           onclick={() => (viewMode = 'dual')}
           class={`px-2.5 py-1 rounded font-medium transition ${
-            viewMode === 'dual' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
+            viewMode === 'dual' ? 'bg-cyan-600 text-white' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
           }`}
         >
           Dual Pane
@@ -697,7 +697,7 @@
         <button
           onclick={() => (viewMode = 'single')}
           class={`px-2.5 py-1 rounded font-medium transition ${
-            viewMode === 'single' ? 'bg-cyan-600 text-white' : 'text-slate-400 hover:text-white'
+            viewMode === 'single' ? 'bg-cyan-600 text-white' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
           }`}
         >
           Remote Only
@@ -706,18 +706,18 @@
     </div>
 
     <!-- Quick Action Hotkeys Reference -->
-    <div class="hidden lg:flex items-center gap-2 text-xs text-slate-400">
-      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F5</span> Copy
-      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F7</span> New Folder
-      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F8</span> Delete
-      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F2</span> Rename
-      <span class="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-slate-300 font-mono">F4</span> Edit
+    <div class="hidden lg:flex items-center gap-2 text-xs text-neutral-500 dark:text-slate-400">
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F5</span> Copy
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F7</span> New Folder
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F8</span> Delete
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F2</span> Rename
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F4</span> Edit
     </div>
 
     {#if currentHostId}
       <a
         href={`/session?host=${currentHostId}`}
-        class="flex items-center gap-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-cyan-400 px-2.5 py-1.5 rounded border border-slate-700 transition"
+        class="flex items-center gap-1.5 text-xs bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 text-cyan-600 dark:text-cyan-400 px-2.5 py-1.5 rounded border border-neutral-300 dark:border-slate-700 transition"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -747,8 +747,8 @@
     {#if viewMode === 'dual'}
       <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
       <div
-        class={`flex flex-col bg-[#181c22] rounded-lg border overflow-hidden transition ${
-          activePane === 'local' ? 'border-cyan-500/80 ring-1 ring-cyan-500/40' : 'border-slate-800'
+        class={`flex flex-col bg-white dark:bg-[#181c22] rounded-lg border overflow-hidden transition ${
+          activePane === 'local' ? 'border-cyan-500/80 ring-1 ring-cyan-500/40' : 'border-neutral-200 dark:border-slate-800'
         }`}
         onclick={() => (activePane = 'local')}
         role="region"
@@ -757,12 +757,12 @@
         ondrop={(e) => onDrop(e, 'local')}
       >
         <!-- Local Toolbar & Path -->
-        <div class="p-2 bg-[#1e232a] border-b border-slate-800 flex items-center justify-between gap-2">
+        <div class="p-2 bg-neutral-50 dark:bg-[#1e232a] border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between gap-2">
           <div class="flex items-center gap-1.5">
-            <span class="text-xs font-bold text-amber-400">Local:</span>
+            <span class="text-xs font-bold text-amber-600 dark:text-amber-400">Local:</span>
             <button
               onclick={goUpLocal}
-              class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs flex items-center gap-1"
+              class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs flex items-center gap-1"
               title="Parent Directory"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -771,7 +771,7 @@
             </button>
             <button
               onclick={() => navigateLocal('~')}
-              class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs"
+              class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs"
               title="Home Directory (~)"
             >
               ~
@@ -781,11 +781,11 @@
             type="text"
             bind:value={localPath}
             onkeydown={(e) => e.key === 'Enter' && fetchLocalFiles()}
-            class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+            class="flex-1 bg-neutral-100 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2 py-0.5 text-xs text-neutral-800 dark:text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
           />
           <button
             onclick={() => openNewFolderModal('local')}
-            class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 flex items-center gap-1"
+            class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
             title="New Folder"
           >
             +Dir
@@ -795,29 +795,29 @@
         <!-- Local File Table -->
         <div class="flex-1 overflow-auto text-xs font-mono">
           <table class="w-full border-collapse">
-            <thead class="sticky top-0 bg-slate-900/95 text-slate-400 border-b border-slate-800 select-none">
+            <thead class="sticky top-0 bg-neutral-100/95 dark:bg-slate-900/95 text-neutral-600 dark:text-slate-400 border-b border-neutral-200 dark:border-slate-800 select-none">
               <tr>
                 <th class="text-left py-1.5 px-3">Name</th>
                 <th class="text-right py-1.5 px-3">Size</th>
                 <th class="text-right py-1.5 px-3">Modified</th>
               </tr>
             </thead>
-            <tbody class="divide-y divide-slate-800/40">
+            <tbody class="divide-y divide-neutral-200 dark:divide-slate-800/40">
               {#if localLoading}
                 <tr>
-                  <td colspan="3" class="text-center py-6 text-slate-500">Loading local directory...</td>
+                  <td colspan="3" class="text-center py-6 text-neutral-400 dark:text-slate-500">Loading local directory...</td>
                 </tr>
               {:else if localFiles.length === 0}
                 <tr>
-                  <td colspan="3" class="text-center py-6 text-slate-500">Empty directory</td>
+                  <td colspan="3" class="text-center py-6 text-neutral-400 dark:text-slate-500">Empty directory</td>
                 </tr>
               {:else}
                 {#each localFiles as item}
                   <tr
                     class={`cursor-pointer select-none transition ${
                       localSelectedPaths.has(item.path) || localLastSelected?.path === item.path
-                        ? 'bg-cyan-950/60 text-cyan-200'
-                        : 'hover:bg-slate-800/40 text-slate-300'
+                        ? 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-200'
+                        : 'hover:bg-neutral-100 dark:hover:bg-slate-800/40 text-neutral-700 dark:text-slate-300'
                     }`}
                     onclick={() => toggleLocalSelect(item)}
                     ondblclick={() => item.is_dir ? navigateLocal(item.path) : openEditorModal()}
@@ -826,16 +826,16 @@
                   >
                     <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
                       {#if item.is_dir}
-                        <span class="text-amber-400">📁</span>
+                        <span class="text-amber-500 dark:text-amber-400">📁</span>
                       {:else}
-                        <span class="text-slate-400">📄</span>
+                        <span class="text-neutral-400 dark:text-slate-400">📄</span>
                       {/if}
                       <span class="truncate">{item.name}</span>
                     </td>
-                    <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                    <td class="py-1.5 px-3 text-right text-neutral-500 dark:text-slate-400 whitespace-nowrap">
                       {item.is_dir ? '<DIR>' : formatSize(item.size)}
                     </td>
-                    <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                    <td class="py-1.5 px-3 text-right text-neutral-500 dark:text-slate-400 whitespace-nowrap">
                       {formatMtime(item.mtime)}
                     </td>
                   </tr>
@@ -850,9 +850,9 @@
     <!-- RIGHT PANE: Remote SFTP Server -->
     <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
     <div
-      class={`flex flex-col bg-[#181c22] rounded-lg border overflow-hidden transition ${
+      class={`flex flex-col bg-white dark:bg-[#181c22] rounded-lg border overflow-hidden transition ${
         viewMode === 'single' ? 'col-span-1 md:col-span-2' : ''
-      } ${activePane === 'remote' ? 'border-cyan-500/80 ring-1 ring-cyan-500/40' : 'border-slate-800'}`}
+      } ${activePane === 'remote' ? 'border-cyan-500/80 ring-1 ring-cyan-500/40' : 'border-neutral-200 dark:border-slate-800'}`}
       onclick={() => (activePane = 'remote')}
       role="region"
       aria-label="Remote SFTP Server"
@@ -860,12 +860,12 @@
       ondrop={(e) => onDrop(e, 'remote')}
     >
       <!-- Remote Toolbar & Path -->
-      <div class="p-2 bg-[#1e232a] border-b border-slate-800 flex items-center justify-between gap-2">
+      <div class="p-2 bg-neutral-50 dark:bg-[#1e232a] border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between gap-2">
         <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold text-cyan-400">Remote:</span>
+          <span class="text-xs font-bold text-cyan-600 dark:text-cyan-400">Remote:</span>
           <button
             onclick={goUpRemote}
-            class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs flex items-center gap-1"
+            class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs flex items-center gap-1"
             title="Parent Directory"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -874,7 +874,7 @@
           </button>
           <button
             onclick={() => navigateRemote('/')}
-            class="p-1 hover:bg-slate-700 rounded text-slate-300 text-xs"
+            class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs"
             title="Root Directory (/)"
           >
             /
@@ -884,11 +884,11 @@
           type="text"
           bind:value={remotePath}
           onkeydown={(e) => e.key === 'Enter' && fetchRemoteFiles()}
-          class="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-0.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+          class="flex-1 bg-neutral-100 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2 py-0.5 text-xs text-neutral-800 dark:text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
         />
         <button
           onclick={() => openNewFolderModal('remote')}
-          class="px-2 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 flex items-center gap-1"
+          class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
           title="New Folder"
         >
           +Dir
@@ -898,7 +898,7 @@
       <!-- Remote File Table -->
       <div class="flex-1 overflow-auto text-xs font-mono">
         <table class="w-full border-collapse">
-          <thead class="sticky top-0 bg-slate-900/95 text-slate-400 border-b border-slate-800 select-none">
+          <thead class="sticky top-0 bg-neutral-100/95 dark:bg-slate-900/95 text-neutral-600 dark:text-slate-400 border-b border-neutral-200 dark:border-slate-800 select-none">
             <tr>
               <th class="text-left py-1.5 px-3">Name</th>
               <th class="text-right py-1.5 px-3">Size</th>
@@ -906,22 +906,22 @@
               <th class="text-right py-1.5 px-3">Modified</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-800/40">
+          <tbody class="divide-y divide-neutral-200 dark:divide-slate-800/40">
             {#if remoteLoading}
               <tr>
-                <td colspan="4" class="text-center py-6 text-slate-500">Loading remote directory...</td>
+                <td colspan="4" class="text-center py-6 text-neutral-400 dark:text-slate-500">Loading remote directory...</td>
               </tr>
             {:else if remoteFiles.length === 0}
               <tr>
-                <td colspan="4" class="text-center py-6 text-slate-500">Empty directory</td>
+                <td colspan="4" class="text-center py-6 text-neutral-400 dark:text-slate-500">Empty directory</td>
               </tr>
             {:else}
               {#each remoteFiles as item}
                 <tr
                   class={`cursor-pointer select-none transition ${
                     remoteSelectedPaths.has(item.path) || remoteLastSelected?.path === item.path
-                      ? 'bg-cyan-950/60 text-cyan-200'
-                      : 'hover:bg-slate-800/40 text-slate-300'
+                      ? 'bg-cyan-50 dark:bg-cyan-950/60 text-cyan-800 dark:text-cyan-200'
+                      : 'hover:bg-neutral-100 dark:hover:bg-slate-800/40 text-neutral-700 dark:text-slate-300'
                   }`}
                   onclick={() => toggleRemoteSelect(item)}
                   ondblclick={() => item.is_dir ? navigateRemote(item.path) : openEditorModal()}
@@ -930,22 +930,22 @@
                 >
                   <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
                     {#if item.is_dir}
-                      <span class="text-amber-400">📁</span>
+                      <span class="text-amber-500 dark:text-amber-400">📁</span>
                     {:else}
-                      <span class="text-slate-400">📄</span>
+                      <span class="text-neutral-400 dark:text-slate-400">📄</span>
                     {/if}
                     <span class="truncate">{item.name}</span>
                   </td>
-                  <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                  <td class="py-1.5 px-3 text-right text-neutral-500 dark:text-slate-400 whitespace-nowrap">
                     {item.is_dir ? '<DIR>' : formatSize(item.size)}
                   </td>
                   <td
-                    class="py-1.5 px-3 text-center text-slate-400 hover:text-cyan-300 cursor-pointer whitespace-nowrap"
+                    class="py-1.5 px-3 text-center text-neutral-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-300 cursor-pointer whitespace-nowrap"
                     onclick={(e) => { e.stopPropagation(); openChmodModal(item); }}
                   >
                     {formatPermissions(item.mode)}
                   </td>
-                  <td class="py-1.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                  <td class="py-1.5 px-3 text-right text-neutral-500 dark:text-slate-400 whitespace-nowrap">
                     {formatMtime(item.mtime)}
                   </td>
                 </tr>
@@ -958,43 +958,43 @@
   </div>
 
   <!-- Bottom Panel: Transfer Queue Manager -->
-  <div class="h-36 bg-[#181c22] rounded-lg border border-slate-800 flex flex-col overflow-hidden text-xs">
-    <div class="bg-[#1e232a] px-3 py-1.5 border-b border-slate-800 flex items-center justify-between">
+  <div class="h-36 bg-white dark:bg-[#181c22] rounded-lg border border-neutral-200 dark:border-slate-800 flex flex-col overflow-hidden text-xs shadow-xs">
+    <div class="bg-neutral-50 dark:bg-[#1e232a] px-3 py-1.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-slate-300">Transfer Queue</span>
-        <span class="text-slate-500">
+        <span class="font-bold text-neutral-700 dark:text-slate-300">Transfer Queue</span>
+        <span class="text-neutral-500 dark:text-slate-500">
           ({transfers.filter((t) => t.status === 'active').length} active, {transfers.filter((t) => t.status === 'queued').length} queued)
         </span>
       </div>
       <div class="flex items-center gap-2">
         <button
           onclick={clearCompletedTransfers}
-          class="text-slate-400 hover:text-slate-200 px-2 py-0.5 rounded hover:bg-slate-800 transition"
+          class="text-neutral-600 hover:text-neutral-800 dark:text-slate-400 dark:hover:text-slate-200 px-2 py-0.5 rounded hover:bg-neutral-200 dark:hover:bg-slate-800 transition"
         >
           Clear Finished
         </button>
       </div>
     </div>
 
-    <div class="flex-1 overflow-auto divide-y divide-slate-800/40 font-mono">
+    <div class="flex-1 overflow-auto divide-y divide-neutral-200 dark:divide-slate-800/40 font-mono">
       {#if transfers.length === 0}
-        <div class="text-center py-6 text-slate-500">No active or queued transfers</div>
+        <div class="text-center py-6 text-neutral-400 dark:text-slate-500">No active or queued transfers</div>
       {:else}
         {#each transfers as item}
-          <div class="p-2 flex items-center justify-between gap-3 hover:bg-slate-800/30">
+          <div class="p-2 flex items-center justify-between gap-3 hover:bg-neutral-50 dark:hover:bg-slate-800/30">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 truncate">
-                <span class={`font-bold ${item.direction === 'upload' ? 'text-cyan-400' : 'text-emerald-400'}`}>
+                <span class={`font-bold ${item.direction === 'upload' ? 'text-cyan-600 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {item.direction === 'upload' ? '▲ UPLOAD' : '▼ DOWNLOAD'}
                 </span>
-                <span class="text-slate-300 truncate">{item.source.split('/').pop()}</span>
-                <span class="text-slate-500">→</span>
-                <span class="text-slate-400 truncate">{item.target}</span>
+                <span class="text-neutral-700 dark:text-slate-300 truncate">{item.source.split('/').pop()}</span>
+                <span class="text-neutral-400 dark:text-slate-500">→</span>
+                <span class="text-neutral-500 dark:text-slate-400 truncate">{item.target}</span>
               </div>
 
               <!-- Progress Bar -->
               <div class="mt-1 flex items-center gap-2">
-                <div class="flex-1 bg-slate-900 rounded-full h-1.5 overflow-hidden">
+                <div class="flex-1 bg-neutral-200 dark:bg-slate-900 rounded-full h-1.5 overflow-hidden">
                   <div
                     class={`h-full transition-all duration-150 ${
                       item.status === 'completed'
@@ -1002,7 +1002,7 @@
                         : item.status === 'failed'
                         ? 'bg-red-500'
                         : item.status === 'cancelled'
-                        ? 'bg-slate-600'
+                        ? 'bg-neutral-400 dark:bg-slate-600'
                         : 'bg-cyan-500'
                     }`}
                     style={`width: ${
@@ -1012,11 +1012,11 @@
                     }%`}
                   ></div>
                 </div>
-                <span class="text-[10px] text-slate-400 whitespace-nowrap">
+                <span class="text-[10px] text-neutral-500 dark:text-slate-400 whitespace-nowrap">
                   {formatSize(item.bytesTransferred)} / {formatSize(item.totalBytes)}
                 </span>
                 {#if item.status === 'active' && item.speedBps > 0}
-                  <span class="text-[10px] text-cyan-400 whitespace-nowrap">
+                  <span class="text-[10px] text-cyan-600 dark:text-cyan-400 whitespace-nowrap">
                     ({formatSpeed(item.speedBps)})
                   </span>
                 {/if}
@@ -1027,12 +1027,12 @@
               <span
                 class={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${
                   item.status === 'completed'
-                    ? 'bg-emerald-950 text-emerald-300'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                     : item.status === 'failed'
-                    ? 'bg-red-950 text-red-300'
+                    ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
                     : item.status === 'active'
-                    ? 'bg-cyan-950 text-cyan-300'
-                    : 'bg-slate-800 text-slate-400'
+                    ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300'
+                    : 'bg-neutral-200 text-neutral-700 dark:bg-slate-800 dark:text-slate-400'
                 }`}
               >
                 {item.status}
@@ -1040,7 +1040,7 @@
               {#if item.status === 'active'}
                 <button
                   onclick={() => cancelQueueItem(item.id)}
-                  class="text-red-400 hover:text-red-200 text-xs px-1.5 py-0.5 rounded bg-red-950/40 hover:bg-red-900/60"
+                  class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 text-xs px-1.5 py-0.5 rounded bg-red-100 hover:bg-red-200 dark:bg-red-950/40 dark:hover:bg-red-900/60"
                   title="Cancel Transfer"
                 >
                   ✕
@@ -1057,8 +1057,8 @@
 <!-- MODAL: NEW FOLDER -->
 {#if showNewFolderModal}
   <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <div class="bg-[#1e232a] border border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
-      <h3 class="text-sm font-bold text-slate-200">
+    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
         New Folder ({newFolderTargetPane === 'local' ? 'Local' : 'Remote'})
       </h3>
       <input
@@ -1066,12 +1066,12 @@
         bind:value={newFolderName}
         placeholder="Folder name"
         onkeydown={(e) => e.key === 'Enter' && confirmNewFolder()}
-        class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+        class="w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
       />
       <div class="flex justify-end gap-2 pt-2">
         <button
           onclick={() => (showNewFolderModal = false)}
-          class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
+          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
           Cancel
         </button>
@@ -1089,18 +1089,18 @@
 <!-- MODAL: RENAME -->
 {#if showRenameModal && renameItem}
   <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <div class="bg-[#1e232a] border border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
-      <h3 class="text-sm font-bold text-slate-200">Rename Item</h3>
+    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">Rename Item</h3>
       <input
         type="text"
         bind:value={renameNewName}
         onkeydown={(e) => e.key === 'Enter' && confirmRename()}
-        class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+        class="w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
       />
       <div class="flex justify-end gap-2 pt-2">
         <button
           onclick={() => (showRenameModal = false)}
-          class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
+          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
           Cancel
         </button>
@@ -1118,15 +1118,15 @@
 <!-- MODAL: DELETE CONFIRMATION -->
 {#if showDeleteModal && deleteTarget}
   <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <div class="bg-[#1e232a] border border-red-900/60 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
-      <h3 class="text-sm font-bold text-red-400">Confirm Deletion</h3>
-      <p class="text-xs text-slate-300">
+    <div class="bg-white dark:bg-[#1e232a] border border-red-200 dark:border-red-900/60 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-red-600 dark:text-red-400">Confirm Deletion</h3>
+      <p class="text-xs text-neutral-600 dark:text-slate-300">
         Are you sure you want to permanently delete {deleteTarget.paths.length} item(s) from {deleteTarget.pane === 'local' ? 'Local FS' : 'Remote SFTP'}?
       </p>
       <div class="flex justify-end gap-2 pt-2">
         <button
           onclick={() => (showDeleteModal = false)}
-          class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
+          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
           Cancel
         </button>
@@ -1144,12 +1144,12 @@
 <!-- MODAL: TEXT EDITOR -->
 {#if showEditorModal && editorItem}
   <div class="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <div class="bg-[#1e232a] border border-slate-700 rounded-lg w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
-      <div class="bg-slate-900 px-4 py-2.5 border-b border-slate-800 flex items-center justify-between">
+    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="bg-neutral-100 dark:bg-slate-900 px-4 py-2.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-bold text-cyan-400">Editor:</span>
-          <span class="text-xs text-slate-200 font-mono">{editorItem.name}</span>
-          <span class="text-xs text-slate-500">({editorItem.pane})</span>
+          <span class="text-xs font-bold text-cyan-600 dark:text-cyan-400">Editor:</span>
+          <span class="text-xs text-neutral-800 dark:text-slate-200 font-mono">{editorItem.name}</span>
+          <span class="text-xs text-neutral-500 dark:text-slate-500">({editorItem.pane})</span>
         </div>
         <div class="flex items-center gap-2">
           <button
@@ -1161,22 +1161,22 @@
           </button>
           <button
             onclick={() => (showEditorModal = false)}
-            class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-xs"
+            class="px-3 py-1 bg-neutral-200 hover:bg-neutral-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
           >
             Close
           </button>
         </div>
       </div>
 
-      <div class="flex-1 p-2 bg-[#12161b] relative overflow-hidden flex flex-col">
+      <div class="flex-1 p-2 bg-neutral-50 dark:bg-[#12161b] relative overflow-hidden flex flex-col">
         {#if isEditorLoading}
-          <div class="absolute inset-0 flex items-center justify-center bg-black/40 text-xs text-slate-400">
+          <div class="absolute inset-0 flex items-center justify-center bg-black/20 dark:bg-black/40 text-xs text-neutral-600 dark:text-slate-400">
             Loading file contents...
           </div>
         {/if}
         <textarea
           bind:value={editorContent}
-          class="w-full h-full bg-transparent text-slate-200 font-mono text-xs p-2 resize-none focus:outline-none"
+          class="w-full h-full bg-transparent text-neutral-900 dark:text-slate-200 font-mono text-xs p-2 resize-none focus:outline-none"
           spellcheck="false"
         ></textarea>
       </div>
@@ -1187,50 +1187,50 @@
 <!-- MODAL: CHMOD PERMISSIONS -->
 {#if showChmodModal && chmodTarget}
   <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <div class="bg-[#1e232a] border border-slate-700 rounded-lg max-w-md w-full p-4 space-y-4 shadow-xl text-xs">
-      <h3 class="text-sm font-bold text-slate-200">
-        Permissions for <span class="text-cyan-400">{chmodTarget.name}</span>
+    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-md w-full p-4 space-y-4 shadow-xl text-xs">
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
+        Permissions for <span class="text-cyan-600 dark:text-cyan-400">{chmodTarget.name}</span>
       </h3>
 
-      <div class="grid grid-cols-3 gap-3 bg-slate-900 p-3 rounded border border-slate-800">
+      <div class="grid grid-cols-3 gap-3 bg-neutral-50 dark:bg-slate-900 p-3 rounded border border-neutral-200 dark:border-slate-800">
         <!-- User -->
         <div class="space-y-1.5">
-          <span class="font-bold text-slate-400">Owner</span>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <span class="font-bold text-neutral-700 dark:text-slate-400">Owner</span>
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodUserR} onchange={updateChmodOctalFromCheckboxes} /> Read
           </label>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodUserW} onchange={updateChmodOctalFromCheckboxes} /> Write
           </label>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodUserX} onchange={updateChmodOctalFromCheckboxes} /> Execute
           </label>
         </div>
 
         <!-- Group -->
         <div class="space-y-1.5">
-          <span class="font-bold text-slate-400">Group</span>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <span class="font-bold text-neutral-700 dark:text-slate-400">Group</span>
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodGroupR} onchange={updateChmodOctalFromCheckboxes} /> Read
           </label>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodGroupW} onchange={updateChmodOctalFromCheckboxes} /> Write
           </label>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodGroupX} onchange={updateChmodOctalFromCheckboxes} /> Execute
           </label>
         </div>
 
         <!-- Others -->
         <div class="space-y-1.5">
-          <span class="font-bold text-slate-400">Others</span>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <span class="font-bold text-neutral-700 dark:text-slate-400">Others</span>
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodOtherR} onchange={updateChmodOctalFromCheckboxes} /> Read
           </label>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodOtherW} onchange={updateChmodOctalFromCheckboxes} /> Write
           </label>
-          <label class="flex items-center gap-1.5 text-slate-300 cursor-pointer">
+          <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
             <input type="checkbox" bind:checked={chmodOtherX} onchange={updateChmodOctalFromCheckboxes} /> Execute
           </label>
         </div>
@@ -1238,19 +1238,19 @@
 
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-slate-400">Octal:</span>
+          <span class="font-bold text-neutral-700 dark:text-slate-400">Octal:</span>
           <input
             type="text"
             bind:value={chmodOctal}
             oninput={() => updateChmodCheckboxesFromOctal(chmodOctal)}
             maxlength="4"
-            class="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-center font-mono text-cyan-400 focus:outline-none"
+            class="w-20 bg-neutral-100 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1 text-center font-mono text-cyan-600 dark:text-cyan-400 focus:outline-none"
           />
         </div>
         <div class="flex gap-2">
           <button
             onclick={() => (showChmodModal = false)}
-            class="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded"
+            class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded"
           >
             Cancel
           </button>

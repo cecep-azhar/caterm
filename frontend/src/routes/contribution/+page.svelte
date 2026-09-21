@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { openExternalUrl } from '$lib/utils/url';
   let copied = $state(false);
 
   function copyPaypal() {
@@ -25,11 +26,11 @@
   </div>
 
   <!-- Main Support Banner -->
-  <div class="p-6 rounded-2xl bg-gradient-to-br from-neutral-900 to-neutral-950 border border-neutral-800 shadow-xl space-y-6 text-white">
+  <div class="p-6 rounded-2xl bg-gradient-to-br from-sky-50 to-white dark:from-neutral-900 dark:to-neutral-950 border border-neutral-200 dark:border-neutral-800 shadow-xl space-y-6 text-neutral-900 dark:text-white">
     <div class="space-y-2">
-      <span class="text-xs uppercase tracking-wider font-semibold text-sky-400">Direct Donation</span>
+      <span class="text-xs uppercase tracking-wider font-semibold text-sky-600 dark:text-sky-400">Direct Donation</span>
       <h2 class="text-xl font-bold">Help Keep CATerm Independent, Fast, and Free of Ads &amp; Paywalls</h2>
-      <p class="text-neutral-300 text-sm leading-relaxed">
+      <p class="text-neutral-600 dark:text-neutral-300 text-sm leading-relaxed">
         CATerm is engineered with native Rust and modern Svelte without hidden analytics, tracking servers, or subscription paywalls for essential terminal &amp; SFTP workflows. Every donation directly supports open-source maintenance, multi-platform builds, and upcoming innovations like local AI agents.
       </p>
     </div>
@@ -50,7 +51,7 @@
 
       <button
         onclick={copyPaypal}
-        class="px-4 py-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-sm font-medium border border-neutral-700 transition-colors"
+        class="px-4 py-3 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-xl text-sm font-medium border border-neutral-300 dark:border-neutral-700 transition-colors"
       >
         {copied ? '✓ Copied Link' : 'Copy PayPal URL'}
       </button>
@@ -96,6 +97,20 @@
         <h4 class="font-bold text-neutral-900 dark:text-white text-sm">Share with Community</h4>
         <p class="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">Recommend CATerm to sysadmins, developers, and cloud engineers on your team.</p>
       </div>
+
+      <a
+        href="https://caterm.fathforce.com"
+        target="_blank"
+        rel="noreferrer"
+        class="p-5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2 hover:border-violet-500/50 hover:bg-neutral-50 dark:hover:bg-neutral-850 transition-all block group md:col-span-3"
+      >
+        <div class="text-violet-500 flex items-center justify-between">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+          <span class="text-xs text-neutral-400 group-hover:text-violet-400 font-mono flex items-center gap-1">Visit ↗</span>
+        </div>
+        <h4 class="font-bold text-neutral-900 dark:text-white text-sm">Official Website</h4>
+        <p class="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">Visit https://caterm.fathforce.com for documentation, release notes, and updates.</p>
+      </a>
     </div>
   </div>
 </div>

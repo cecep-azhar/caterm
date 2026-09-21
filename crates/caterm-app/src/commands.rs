@@ -19,25 +19,29 @@ where
 }
 
 #[tauri::command]
-pub async fn window_minimize(window: tauri::Window) {
+pub async fn window_minimize(#[allow(unused_variables)] window: tauri::Window) {
+    #[cfg(not(target_os = "android"))]
     let _ = window.minimize();
 }
 
 #[tauri::command]
-pub async fn window_maximize(window: tauri::Window) {
-    if let Ok(max) = window.is_maximized() {
-        if max {
-            let _ = window.unmaximize();
+pub async fn window_maximize(#[allow(unused_variables)] window: tauri::Window) {
+    #[cfg(not(target_os = "android"))]
+    {
+        if let Ok(max) = window.is_maximized() {
+            if max {
+                let _ = window.unmaximize();
+            } else {
+                let _ = window.maximize();
+            }
         } else {
             let _ = window.maximize();
         }
-    } else {
-        let _ = window.maximize();
     }
 }
 
 #[tauri::command]
-pub async fn window_close(window: tauri::Window) {
+pub async fn window_close(#[allow(unused_variables)] window: tauri::Window) {
     let _ = window.close();
 }
 
@@ -440,6 +444,34 @@ pub async fn ai_chat(
     host_label: Option<String>,
 ) -> Result<ai::AiChatReply, CatermError> {
     run_blocking(move || ai::chat(messages, host_label.as_deref())).await
+}
+
+#[tauri::command]
+pub async fn open_external_url(url: String) -> Result<(), CatermError> {
+    run_blocking(move || {
+        #[cfg(target_os = "linux")]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(&url)
+                .spawn()
+                .map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")))?;
+        }
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("cmd")
+                .args(["/C", "start", "", &url])
+                .spawn()
+                .map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")))?;
+        }
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg(&url)
+                .spawn()
+                .map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")))?;
+        }
+        Ok(())
+    }).await
 }
 
 #[tauri::command]

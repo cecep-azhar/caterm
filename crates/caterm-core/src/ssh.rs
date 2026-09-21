@@ -76,7 +76,7 @@ fn emit(event: SshEvent) {
 }
 
 pub(crate) struct SessionHandle {
-    pub(crate) tx: tokio::sync::mpsc::Sender<Vec<u8>>,
+    pub(crate) tx: std::sync::mpsc::Sender<Vec<u8>>,
     pub(crate) output_buffer: Arc<Mutex<Vec<u8>>>,
     pub(crate) input_buffer: Arc<Mutex<String>>,
     pub(crate) channel: Arc<Mutex<ssh2::Channel>>,
@@ -428,7 +428,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         .shell()
         .map_err(|e| invalid(format!("Shell request failed: {e}")))?;
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(100);
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
 
     // Set session to non-blocking so our reader loop doesn't hold the lock forever. The
@@ -511,7 +511,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     // Spawn writer background thread
     let channel_write = Arc::clone(&channel_arc);
     thread::spawn(move || {
-        while let Some(bytes) = rx.blocking_recv() {
+        while let Ok(bytes) = rx.recv() {
             let mut written = 0;
             while written < bytes.len() {
                 let (res, is_eof) = {
@@ -603,7 +603,7 @@ pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
                 buf.push_str(data);
             }
         }
-        let _ = tx.blocking_send(data.as_bytes().to_vec());
+        let _ = tx.send(data.as_bytes().to_vec());
     }
 
     Ok(String::new())

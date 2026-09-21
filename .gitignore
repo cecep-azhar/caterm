@@ -36,9 +36,11 @@ Thumbs.db
 *.log
 
 # Packaging output
+dist/
 *.exe
 *.msi
 *.dmg
 *.deb
 *.rpm
 *.AppImage
+*.apk
