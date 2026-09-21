@@ -242,23 +242,32 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     thread::spawn(move || {
         let mut buf = [0u8; 4096];
         loop {
-            let read_res = {
+            let (read_res, is_eof) = {
                 if let Ok(mut ch) = channel_read.lock() {
-                    ch.read(&mut buf)
+                    let res = ch.read(&mut buf);
+                    let eof = ch.eof();
+                    (res, eof)
                 } else {
                     break;
                 }
             };
 
             match read_res {
-                Ok(0) => break, // EOF
+                Ok(0) => {
+                    if is_eof {
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(10));
+                }
                 Ok(n) => {
                     if let (Ok(mut out), Some(chunk)) = (buffer_read.lock(), buf.get(..n)) {
                         out.extend_from_slice(chunk);
                     }
                 }
                 Err(e) => {
-                    if e.kind() == std::io::ErrorKind::WouldBlock {
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::Interrupted
+                    {
                         thread::sleep(Duration::from_millis(10));
                     } else {
                         break;
@@ -272,8 +281,40 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     let channel_write = Arc::clone(&channel_arc);
     thread::spawn(move || {
         while let Some(bytes) = rx.blocking_recv() {
+            let mut written = 0;
+            while written < bytes.len() {
+                let (res, is_eof) = {
+                    if let Ok(mut ch) = channel_write.lock() {
+                        let r = ch.write(&bytes[written..]);
+                        let eof = ch.eof();
+                        (r, eof)
+                    } else {
+                        return;
+                    }
+                };
+
+                match res {
+                    Ok(0) => {
+                        if is_eof {
+                            break;
+                        }
+                        thread::sleep(Duration::from_millis(10));
+                    }
+                    Ok(n) => {
+                        written += n;
+                    }
+                    Err(e) => {
+                        if e.kind() == std::io::ErrorKind::WouldBlock
+                            || e.kind() == std::io::ErrorKind::Interrupted
+                        {
+                            thread::sleep(Duration::from_millis(10));
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
             if let Ok(mut ch) = channel_write.lock() {
-                let _ = ch.write_all(&bytes);
                 let _ = ch.flush();
             }
         }
@@ -298,11 +339,11 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     })
 }
 
-/// Write data to active SSH channel and read available output.
+/// Write data to active SSH channel.
 pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
     require_non_empty("session_id", session_id)?;
 
-    let (tx, output_buffer, input_buffer, host_id) = {
+    let (tx, input_buffer, host_id) = {
         let sessions = SESSIONS.lock().map_err(|_| {
             CatermError::Validation(ValidationError::Generic("Lock failure".into()))
         })?;
@@ -313,7 +354,6 @@ pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
         })?;
         (
             handle.tx.clone(),
-            Arc::clone(&handle.output_buffer),
             Arc::clone(&handle.input_buffer),
             handle.host_id.clone(),
         )
@@ -337,15 +377,7 @@ pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
         let _ = tx.blocking_send(data.as_bytes().to_vec());
     }
 
-    // Give a brief window for response output
-    thread::sleep(Duration::from_millis(20));
-
-    let mut out_bytes = Vec::new();
-    if let Ok(mut buf) = output_buffer.lock() {
-        out_bytes = std::mem::take(&mut *buf);
-    }
-
-    Ok(String::from_utf8_lossy(&out_bytes).to_string())
+    Ok(String::new())
 }
 
 /// Read available output from active SSH channel without writing.
@@ -365,7 +397,21 @@ pub fn read(session_id: &str) -> Result<String, CatermError> {
 
     let mut out_bytes = Vec::new();
     if let Ok(mut buf) = output_buffer.lock() {
-        out_bytes = std::mem::take(&mut *buf);
+        if !buf.is_empty() {
+            match std::str::from_utf8(&buf) {
+                Ok(_) => {
+                    out_bytes = std::mem::take(&mut *buf);
+                }
+                Err(e) => {
+                    let valid_len = e.valid_up_to();
+                    if e.error_len().is_none() {
+                        out_bytes = buf.drain(..valid_len).collect();
+                    } else {
+                        out_bytes = std::mem::take(&mut *buf);
+                    }
+                }
+            }
+        }
     }
     Ok(String::from_utf8_lossy(&out_bytes).to_string())
 }
@@ -414,5 +460,20 @@ mod tests {
     #[test]
     fn write_rejects_empty_session_id() {
         assert!(write("", "ls").is_err());
+    }
+
+    #[test]
+    fn read_rejects_empty_session_id() {
+        assert!(read("").is_err());
+    }
+
+    #[test]
+    fn resize_rejects_empty_session_id() {
+        assert!(resize("", 80, 24).is_err());
+    }
+
+    #[test]
+    fn disconnect_rejects_empty_session_id() {
+        assert!(disconnect("").is_err());
     }
 }

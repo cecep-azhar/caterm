@@ -1,12 +1,15 @@
 <script lang="ts">
   import { page } from '$app/state';
   import TerminalPane from '$lib/components/TerminalPane.svelte';
+  import SessionFileManager from '$lib/components/SessionFileManager.svelte';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { getTabs, openTab, closeTab } from '$lib/stores/sessionTabs.svelte';
 
   // 1 = single, 2 = split horizontal, 3 = split vertical, 4 = grid 2x2
   let layout = $state(1);
   let loadError = $state('');
+  let showFiles = $state(true);
+  let selectedHostId = $state<string>('');
 
   // Opens a tab for every host named in `?host=<id>` or `?hosts=<id1>,<id2>,...` — this is
   // the ONLY way a session tab gets created. No fallback/demo hosts: with no matching query
@@ -38,15 +41,42 @@
   const tabs = $derived(getTabs());
   const pane = (i: number): HostRecord | undefined => tabs[i]?.id !== undefined ? tabs[i].host : undefined;
 
+  const activeHost = $derived.by(() => {
+    if (tabs.length === 0) return undefined;
+    if (selectedHostId) {
+      const found = tabs.find((t) => t.host.id === selectedHostId);
+      if (found) return found.host;
+    }
+    return tabs[0]?.host;
+  });
+
   function close(host: HostRecord) {
     closeTab(host.id);
     if (getTabs().length === 0) layout = 1;
+    if (selectedHostId === host.id) {
+      selectedHostId = tabs[0]?.host.id || '';
+    }
   }
 </script>
 
 <div class="h-full flex flex-col space-y-2">
   <div class="flex justify-between items-center bg-neutral-900 border border-neutral-800 rounded px-4 py-2 shrink-0">
-    <h1 class="text-sm font-bold text-white tracking-tight">Active Sessions</h1>
+    <div class="flex items-center gap-3">
+      <h1 class="text-sm font-bold text-white tracking-tight">Active Sessions</h1>
+      {#if tabs.length > 0}
+        <button
+          onclick={() => showFiles = !showFiles}
+          class="px-2.5 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {showFiles ? 'bg-sky-600/20 text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-neutral-950 text-neutral-400 border-neutral-800 hover:text-white hover:border-neutral-700'}"
+          title={showFiles ? 'Hide Remote Files' : 'Show Remote Files'}
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+          </svg>
+          <span>Files</span>
+        </button>
+      {/if}
+    </div>
+
     {#if tabs.length > 0}
       <div class="flex gap-1 bg-neutral-950 p-1 rounded border border-neutral-800">
         <button onclick={() => layout = 1} class="p-1 rounded {layout === 1 ? 'bg-sky-600/20 text-sky-400' : 'text-neutral-500 hover:text-neutral-300'}" title="Single">
@@ -74,26 +104,45 @@
         <p class="text-neutral-500 text-sm max-w-sm">Pilih host dari halaman Hosts (atau Launch All dari sebuah Group) untuk membuka sesi SSH di sini.</p>
         <a href="/" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">Ke halaman Hosts</a>
       </div>
-    {:else if layout === 1 || tabs.length === 1}
-      {@const h = pane(0)}
-      {#if h}<TerminalPane host={h} onSplitRight={tabs.length > 1 ? () => layout = 3 : undefined} onSplitDown={tabs.length > 1 ? () => layout = 2 : undefined} onClose={() => close(h)} />{/if}
-    {:else if layout === 2}
-      <div class="flex flex-col h-full gap-2">
-        {#each tabs as tab (tab.id)}
-          <div class="flex-1 min-h-0"><TerminalPane host={tab.host} onClose={() => close(tab.host)} /></div>
-        {/each}
-      </div>
-    {:else if layout === 3}
-      <div class="flex h-full gap-2">
-        {#each tabs as tab (tab.id)}
-          <div class="flex-1 min-w-0"><TerminalPane host={tab.host} onClose={() => close(tab.host)} /></div>
-        {/each}
-      </div>
-    {:else if layout === 4}
-      <div class="grid grid-cols-2 grid-rows-2 h-full gap-2">
-        {#each tabs.slice(0, 4) as tab (tab.id)}
-          <div class="min-h-0 min-w-0"><TerminalPane host={tab.host} onClose={() => close(tab.host)} /></div>
-        {/each}
+    {:else}
+      <div class="flex h-full gap-2 overflow-hidden">
+        <!-- Terminal Panes -->
+        <div class="flex-1 min-w-0 h-full overflow-hidden">
+          {#if layout === 1 || tabs.length === 1}
+            {@const h = pane(0)}
+            {#if h}<TerminalPane host={h} onSplitRight={tabs.length > 1 ? () => layout = 3 : undefined} onSplitDown={tabs.length > 1 ? () => layout = 2 : undefined} onClose={() => close(h)} />{/if}
+          {:else if layout === 2}
+            <div class="flex flex-col h-full gap-2">
+              {#each tabs as tab (tab.id)}
+                <div class="flex-1 min-h-0"><TerminalPane host={tab.host} onClose={() => close(tab.host)} /></div>
+              {/each}
+            </div>
+          {:else if layout === 3}
+            <div class="flex h-full gap-2">
+              {#each tabs as tab (tab.id)}
+                <div class="flex-1 min-w-0"><TerminalPane host={tab.host} onClose={() => close(tab.host)} /></div>
+              {/each}
+            </div>
+          {:else if layout === 4}
+            <div class="grid grid-cols-2 grid-rows-2 h-full gap-2">
+              {#each tabs.slice(0, 4) as tab (tab.id)}
+                <div class="min-h-0 min-w-0"><TerminalPane host={tab.host} onClose={() => close(tab.host)} /></div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <!-- Collapsible Remote File Explorer Panel -->
+        {#if showFiles && activeHost}
+          <div class="w-80 lg:w-96 shrink-0 h-full overflow-hidden">
+            <SessionFileManager
+              host={activeHost}
+              availableHosts={tabs.map(t => t.host)}
+              onSelectHost={(h) => selectedHostId = h.id}
+              onClose={() => showFiles = false}
+            />
+          </div>
+        {/if}
       </div>
     {/if}
   </div>
