@@ -188,14 +188,18 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
             })?;
         }
         AuthMethod::KeyId { id } => {
+            
             let priv_pem = crate::keys::get_private_key(id)?;
-            sess.userauth_pubkey_memory(&host.username, None, &priv_pem, None)
-                .map_err(|e| {
-                    CatermError::Validation(ValidationError::Generic(format!(
-                        "Auth via Vault Key ID gagal untuk {}: {e}",
-                        host.username
-                    )))
-                })?;
+            let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+            std::fs::write(&temp_path, priv_pem.as_bytes()).unwrap();
+            let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
+            std::fs::remove_file(&temp_path).ok();
+            auth_res.map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Auth via Vault Key ID gagal untuk {}: {e}", host.username
+                )))
+            })?;
+
         }
     }
 

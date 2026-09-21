@@ -74,10 +74,10 @@
     <div>
       <div class="h-12 border-b border-neutral-800 flex items-center justify-between px-4">
         <div class="flex items-center gap-2">
-          <Logo size={24} mode="dark" />
+          <Logo size={24} mode="brand" />
           <span class="font-bold text-white text-lg tracking-wide hidden md:block">CATerm</span>
         </div>
-        <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono hidden md:block">v2.0.4</span>
+        <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono hidden md:block">v2.0.9</span>
       </div>
       
       

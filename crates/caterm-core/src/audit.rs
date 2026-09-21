@@ -14,7 +14,7 @@ pub struct CommandLog {
 
 static SECRET_REGEX: OnceLock<Regex> = OnceLock::new();
 
-pub fn mask_secrets(text: &str) -> String {
+pub(crate) fn mask_secrets(text: &str) -> String {
     let re = SECRET_REGEX.get_or_init(|| {
         Regex::new(r#"(?i)(password|pass|secret|token|key)\s*(=|:|\s)\s*['"]?([^'"\s]+)['"]?"#)
             .unwrap()

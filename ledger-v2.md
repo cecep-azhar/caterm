@@ -27,3 +27,10 @@
 
 - [x] **`T2-CORE-02` — Command Logs (Audit)**: Implemented full-stack audit logs for PTY terminal commands, tunnel start/stop, vault lock/unlock, and SSH key deploy. Logs are saved in `caterm.db` and masked for secrets using regex. SvelteKit UI in `/command-logs` with filtering, search, and CSV export.
 - [x] **Investigations Feature (21 Sep 2026)**: Added full-stack Investigations feature (Model in `caterm-core/src/investigations.rs` with `id, title, host_id, status, notes, evidence`). Persisted to `caterm.db`. Built UI timeline in `frontend/src/routes/investigations/+page.svelte` aligned with Agent 4's Audit log design.
+
+## Final Release Status (21 Sep 2026)
+- [x] **Quality Gates**: `npm run check` in `frontend/` passed cleanly (0 errors). Core Rust workspace binaries (`caterm-core`, `caterm-app`, `catermctl`) compiled cleanly under MSVC + OpenSSL release targets.
+- [x] **Installer Build**: Successfully generated Windows installation packages via `cargo tauri build`:
+  - **NSIS Installer (.exe)**: `D:\Project\caterm\target\release\bundle\nsis\CATerm_2.0.9_x64-setup.exe`
+  - **MSI Installer (.msi)**: `D:\Project\caterm\target\release\bundle\msi\CATerm_2.0.9_x64_en-US.msi`
+- [x] **Release Status**: `SELESAI` (v2.0.9 final release ready for deployment).

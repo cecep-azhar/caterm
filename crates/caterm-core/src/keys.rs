@@ -68,7 +68,7 @@ pub fn init_table(conn: &rusqlite::Connection) -> Result<(), CatermError> {
 pub fn list_keys() -> Result<Vec<KeyRecord>, CatermError> {
     let data_info = crate::paths::resolve_data_dir()?;
     let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     let mut stmt = conn
@@ -141,9 +141,7 @@ pub fn generate_key(input: KeyInput) -> Result<KeyRecord, CatermError> {
     let id = generate_id();
     let created_at = chrono::Utc::now().to_rfc3339();
 
-    let data_info = crate::paths::resolve_data_dir()?;
-    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     conn.execute(
@@ -222,9 +220,7 @@ pub fn import_key(
     let id = generate_id();
     let created_at = chrono::Utc::now().to_rfc3339();
 
-    let data_info = crate::paths::resolve_data_dir()?;
-    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     conn.execute(
@@ -269,9 +265,7 @@ pub fn delete_key(id: &str) -> Result<(), CatermError> {
         }
     }
 
-    let data_info = crate::paths::resolve_data_dir()?;
-    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     let affected = conn
@@ -293,7 +287,7 @@ pub fn get_private_key(id: &str) -> Result<String, CatermError> {
 
     let data_info = crate::paths::resolve_data_dir()?;
     let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     let mut stmt = conn
@@ -383,13 +377,18 @@ pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError>
             })?;
         }
         crate::store::AuthMethod::KeyId { id } => {
+            
             let priv_pem = get_private_key(id)?;
-            sess.userauth_pubkey_memory(&host.username, None, &priv_pem, None)
-                .map_err(|e| {
-                    CatermError::Validation(ValidationError::Generic(format!(
-                        "Auth via key id failed: {e}"
-                    )))
-                })?;
+            let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+            std::fs::write(&temp_path, priv_pem.as_bytes()).unwrap();
+            let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
+            std::fs::remove_file(&temp_path).ok();
+            auth_res.map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Auth via key id failed: {e}"
+                )))
+            })?;
+
         }
     }
 
@@ -435,7 +434,14 @@ mod tests {
 
     #[test]
     fn generate_and_list_ed25519_key() {
-        let input = KeyInput {
+        let dir = std::env::temp_dir().join(format!("caterm_keys_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        unsafe { std::env::set_var("CATERM_DATA_DIR", &dir); }
+crate::vault::unlock_vault("12345678").unwrap();
+
+        
+        
+                let input = KeyInput {
             name: "Test Key".to_string(),
             algorithm: "Ed25519".to_string(),
         };

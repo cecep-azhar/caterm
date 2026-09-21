@@ -102,8 +102,10 @@ pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
             .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
     }
 
-    let mut guard = ACTIVE_VAULT_KEY.write();
-    *guard = Some(derived_key);
+    {
+        let mut guard = ACTIVE_VAULT_KEY.write();
+        *guard = Some(derived_key);
+    }
 
     let _ = crate::audit::log_event("VAULT_UNLOCK", None, "Vault unlocked");
 

@@ -254,13 +254,18 @@ fn connect_host_session(host_id: &str) -> Result<ssh2::Session, CatermError> {
             })?;
         }
         crate::store::AuthMethod::KeyId { id } => {
+            
             let priv_pem = crate::keys::get_private_key(id)?;
-            sess.userauth_pubkey_memory(&host.username, None, &priv_pem, None)
-                .map_err(|e| {
-                    CatermError::Validation(ValidationError::Generic(format!(
-                        "Auth via key id failed: {e}"
-                    )))
-                })?;
+            let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
+            std::fs::write(&temp_path, priv_pem.as_bytes()).unwrap();
+            let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
+            std::fs::remove_file(&temp_path).ok();
+            auth_res.map_err(|e| {
+                CatermError::Validation(ValidationError::Generic(format!(
+                    "Auth via key id failed: {e}"
+                )))
+            })?;
+
         }
     }
 
@@ -279,18 +284,7 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
         return Ok(()); // Already running
     }
 
-    let tunnel = get_tunnel(id)?;
-
-    // Log audit event
-    let _ = crate::audit::log_event(
-        "TUNNEL_START",
-        Some(&tunnel.host_id),
-        &format!(
-            "Started tunnel {} ({}) on port {}",
-            tunnel.name, tunnel.tunnel_type, tunnel.local_port
-        ),
-    );
-
+    let tunnels = list_tunnels()?;
     let tun = tunnels
         .iter()
         .find(|t| t.id == id)
@@ -298,6 +292,15 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
             CatermError::Validation(ValidationError::Generic(format!("Tunnel '{id}' not found")))
         })?
         .clone();
+
+    let _ = crate::audit::log_event(
+        "TUNNEL_START",
+        Some(&tun.host_id),
+        &format!(
+            "Started tunnel ({:?}) on port {}",
+            tun.forward_type, tun.bind_port
+        ),
+    );
 
     let shutdown_signal = Arc::new(AtomicBool::new(false));
     let shutdown_clone = Arc::clone(&shutdown_signal);
@@ -404,7 +407,7 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
 
             thread::spawn(move || {
                 while !shutdown_clone.load(Ordering::Relaxed) {
-                    if let Ok(mut remote_stream) = listener_channel.accept() {
+                    if let Ok(mut remote_stream) = listener_channel.0.accept() {
                         let t_addr = target_addr.clone();
                         let shutdown_worker = Arc::clone(&shutdown_clone);
                         thread::spawn(move || {
@@ -594,15 +597,17 @@ pub fn stop_tunnel(id: &str) -> Result<(), CatermError> {
     if let Some(active) = ACTIVE_TUNNELS.lock().remove(id) {
         active.shutdown_signal.store(true, Ordering::Relaxed);
 
-        if let Ok(tunnel) = get_tunnel(id) {
-            let _ = crate::audit::log_event(
-                "TUNNEL_STOP",
-                Some(&tunnel.host_id),
-                &format!(
-                    "Stopped tunnel {} ({}) on port {}",
-                    tunnel.name, tunnel.tunnel_type, tunnel.local_port
-                ),
-            );
+        if let Ok(tunnels) = list_tunnels() {
+            if let Some(tun) = tunnels.iter().find(|t| t.id == id) {
+                let _ = crate::audit::log_event(
+                    "TUNNEL_STOP",
+                    Some(&tun.host_id),
+                    &format!(
+                        "Stopped tunnel ({:?}) on port {}",
+                        tun.forward_type, tun.bind_port
+                    ),
+                );
+            }
         }
     }
     Ok(())
