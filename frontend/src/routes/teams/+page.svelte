@@ -206,6 +206,28 @@
         </div>
 
         <div>
+          <div class="flex items-center justify-between mb-1">
+            <label for="team-cloud-account" class="block text-xs font-medium text-neutral-400 uppercase">Account Username</label>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-medium flex items-center gap-1">
+              <svg class="w-3 h-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+              Pro Available
+            </span>
+          </div>
+          <div class="relative">
+            <input 
+              id="team-cloud-account" 
+              disabled 
+              placeholder="e.g. @cecep, @developer (Upgrade to Pro for real-time team account sync)" 
+              class="w-full px-3 py-2 bg-neutral-900/50 border border-neutral-800/80 rounded text-sm text-neutral-500 cursor-not-allowed select-none" 
+            />
+          </div>
+          <p class="text-[11px] text-neutral-500 mt-1 flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 text-amber-500/80 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Multi-user cloud account sync &amp; team access control is available in CATerm Pro ($1/mo). Free plan uses local member tags.
+          </p>
+        </div>
+
+        <div>
           <span class="block text-xs font-medium text-neutral-400 uppercase mb-2">Color Swatch</span>
           <div class="flex gap-2">
             {#each colors as c}

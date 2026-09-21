@@ -146,7 +146,7 @@
       <div class="flex justify-between items-center">
         <div>
           <h2 class="text-lg font-semibold text-white">Application Updates</h2>
-          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v2.1.4</span></p>
+          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v2.1.5</span></p>
         </div>
         <button class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">
           Check for Updates
