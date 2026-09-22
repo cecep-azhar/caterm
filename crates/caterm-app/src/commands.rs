@@ -245,6 +245,33 @@ pub async fn sftp_copy(
 ) -> Result<(), CatermError> {
     run_blocking(move || sftp::copy_remote_file(&host_id, &src_path, &dst_path)).await
 }
+
+#[tauri::command]
+pub async fn calculate_remote_checksum(
+    host_id: String,
+    path: String,
+    algorithm: String,
+) -> Result<String, CatermError> {
+    run_blocking(move || sftp::calculate_remote_checksum(&host_id, &path, &algorithm)).await
+}
+
+#[tauri::command]
+pub async fn calculate_local_checksum(path: String, algorithm: String) -> Result<String, CatermError> {
+    run_blocking(move || {
+        caterm_core::local_fs::calculate_local_checksum(std::path::Path::new(&path), &algorithm)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn compare_file_checksums(
+    host_id: String,
+    remote_path: String,
+    local_path: String,
+    algorithm: String,
+) -> Result<sftp::ChecksumComparison, CatermError> {
+    run_blocking(move || sftp::compare_file_checksums(&host_id, &remote_path, &local_path, &algorithm)).await
+}
 #[tauri::command]
 pub async fn export_encrypted_backup(passphrase: String) -> Result<String, CatermError> {
     run_blocking(move || backup::export_encrypted_backup(&passphrase)).await
