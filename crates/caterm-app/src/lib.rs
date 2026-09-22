@@ -146,6 +146,8 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::sftp_cancel,
             commands::sftp_rename,
             commands::sftp_copy,
+            commands::sftp_compress,
+            commands::sftp_extract,
             commands::calculate_remote_checksum,
             commands::calculate_local_checksum,
             commands::compare_file_checksums,

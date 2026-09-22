@@ -92,6 +92,23 @@ export function sftpCancel(transferId: string): Promise<void> {
   return invoke('sftp_cancel', { transferId });
 }
 
+export function sftpCompress(
+  hostId: string,
+  parentDir: string,
+  items: string[],
+  archiveName: string
+): Promise<void> {
+  return invoke('sftp_compress', { hostId, parentDir, items, archiveName });
+}
+
+export function sftpExtract(
+  hostId: string,
+  archivePath: string,
+  destDir: string
+): Promise<void> {
+  return invoke('sftp_extract', { hostId, archivePath, destDir });
+}
+
 export interface RemoteSearchItem {
   path: string;
   name: string;
@@ -132,6 +149,13 @@ export function calculateRemoteChecksum(
   return invoke('calculate_remote_checksum', { hostId, path, algorithm });
 }
 
+export function calculateLocalChecksum(
+  path: string,
+  algorithm: 'sha256' | 'md5'
+): Promise<string> {
+  return invoke('calculate_local_checksum', { path, algorithm });
+}
+
 export function compareFileChecksums(
   hostId: string,
   remotePath: string,
@@ -140,4 +164,3 @@ export function compareFileChecksums(
 ): Promise<ChecksumComparison> {
   return invoke('compare_file_checksums', { hostId, remotePath, localPath, algorithm });
 }
-

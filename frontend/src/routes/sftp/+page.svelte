@@ -14,10 +14,12 @@
     sftpUpload,
     sftpDownload,
     sftpCancel,
+    sftpCompress,
+    sftpExtract,
     searchRemoteFiles,
+    type RemoteSearchItem,
     type SftpFileEntry,
-    type SftpProgressPayload,
-    type RemoteSearchItem
+    type SftpProgressPayload
   } from '$lib/api/sftp';
   import {
     localListDir,
@@ -63,14 +65,6 @@
   let remoteSelectedPaths = $state<Set<string>>(new Set());
   let remoteLastSelected = $state<SftpFileEntry | null>(null);
 
-  // Remote Search State
-  let remoteSearchQuery = $state('');
-  let isSearchingRemote = $state(false);
-  let remoteSearchResults = $state<RemoteSearchItem[]>([]);
-  let showRemoteSearch = $state(false);
-  let searchMinSizeKB = $state<string>('');
-  let searchMaxSizeKB = $state<string>('');
-
   // Notifications
   let errorMsg = $state('');
   let successMsg = $state('');
@@ -110,6 +104,135 @@
   let chmodOtherR = $state(true);
   let chmodOtherW = $state(false);
   let chmodOtherX = $state(true);
+
+  // Archive modals
+  let showCompressModal = $state(false);
+  let compressItems = $state<string[]>([]);
+  let compressParentDir = $state('');
+  let compressArchiveName = $state('archive.tar.gz');
+  let isCompressing = $state(false);
+
+  let showExtractModal = $state(false);
+  let extractArchivePath = $state('');
+  let extractDestDir = $state('');
+  let isExtracting = $state(false);
+
+  // Remote Search State
+  let remoteSearchQuery = $state("");
+  let isSearchingRemote = $state(false);
+  let remoteSearchResults = $state<RemoteSearchItem[]>([]);
+  let showRemoteSearch = $state(false);
+  let searchMinSizeKB = $state<string>("");
+  let searchMaxSizeKB = $state<string>("");
+
+  async function executeRemoteSearch() {
+    if (!currentHostId) return;
+    const q = remoteSearchQuery.trim();
+    if (!q) return;
+    isSearchingRemote = true;
+    try {
+      const minBytes = searchMinSizeKB ? Number(searchMinSizeKB) * 1024 : undefined;
+      const maxBytes = searchMaxSizeKB ? Number(searchMaxSizeKB) * 1024 : undefined;
+      remoteSearchResults = await searchRemoteFiles(
+        currentHostId,
+        remotePath,
+        q.includes("*") || q.includes("?") ? q : `*${q}*`,
+        100,
+        minBytes,
+        maxBytes
+      );
+    } catch (e: unknown) {
+      errorMsg = String(e);
+    } finally {
+      isSearchingRemote = false;
+    }
+  }
+
+  function jumpToSearchResult(item: RemoteSearchItem) {
+    if (item.is_dir) {
+      showRemoteSearch = false;
+      navigateRemote(item.path);
+    } else {
+      const parent = item.path.substring(0, item.path.lastIndexOf("/")) || "/";
+      showRemoteSearch = false;
+      remotePath = parent;
+      fetchRemoteFiles().then(() => {
+        remoteLastSelected = remoteFiles.find((f) => f.path === item.path) ?? null;
+        if (remoteLastSelected) {
+          remoteSelectedPaths = new Set([remoteLastSelected.path]);
+        }
+      });
+    }
+  }
+
+
+  // Context menu
+  let ctxMenu = $state<{ x: number; y: number; item: SftpFileEntry } | null>(null);
+
+  function openCompressModal() {
+    const selected = [...remoteSelectedPaths];
+    if (selected.length === 0 && remoteLastSelected) selected.push(remoteLastSelected.path);
+    if (selected.length === 0) { errorMsg = 'Select items to compress.'; return; }
+    compressItems = selected.map((p) => p.split('/').pop() ?? p);
+    compressParentDir = remotePath;
+    compressArchiveName = 'archive.tar.gz';
+    showCompressModal = true;
+  }
+
+  async function confirmCompress() {
+    if (!currentHostId || compressItems.length === 0) return;
+    isCompressing = true;
+    try {
+      await sftpCompress(currentHostId, compressParentDir, compressItems, compressArchiveName);
+      showCompressModal = false;
+      notifySuccess(`Compressed → ${compressArchiveName}`);
+      await fetchRemoteFiles();
+    } catch (e: unknown) {
+      errorMsg = String(e);
+    } finally {
+      isCompressing = false;
+    }
+  }
+
+  function openExtractHere(item: SftpFileEntry) {
+    extractArchivePath = item.path;
+    extractDestDir = remotePath;
+    showExtractModal = true;
+  }
+
+  function openExtractTo(item: SftpFileEntry) {
+    extractArchivePath = item.path;
+    const base = item.name.replace(/\.(tar\.gz|tar\.bz2|tar\.xz|tgz|tar|zip)$/i, '');
+    extractDestDir = `${remotePath}/${base}`;
+    showExtractModal = true;
+  }
+
+  async function confirmExtract() {
+    if (!currentHostId) return;
+    isExtracting = true;
+    try {
+      await sftpExtract(currentHostId, extractArchivePath, extractDestDir);
+      showExtractModal = false;
+      notifySuccess(`Extracted → ${extractDestDir}`);
+      await fetchRemoteFiles();
+    } catch (e: unknown) {
+      errorMsg = String(e);
+    } finally {
+      isExtracting = false;
+    }
+  }
+
+  function isArchive(name: string): boolean {
+    return /\.(tar\.gz|tgz|tar\.bz2|tar\.xz|tar|zip)$/i.test(name);
+  }
+
+  function openCtxMenu(e: MouseEvent, item: SftpFileEntry) {
+    e.preventDefault();
+    e.stopPropagation();
+    ctxMenu = { x: e.clientX, y: e.clientY, item };
+  }
+
+  function closeCtxMenu() { ctxMenu = null; }
 
   function notifySuccess(msg: string) {
     successMsg = msg;
@@ -160,48 +283,6 @@
   function joinPath(dir: string, name: string): string {
     if (dir === '/' || dir === '.' || !dir) return `/${name}`;
     return `${dir.replace(/\/+$/, '')}/${name}`;
-  }
-
-  // --- REMOTE SEARCH ---
-  async function executeRemoteSearch() {
-    if (!currentHostId || !remoteSearchQuery.trim()) return;
-    isSearchingRemote = true;
-    remoteSearchResults = [];
-    const query = remoteSearchQuery.trim();
-    const pat = query.includes('*') || query.includes('?') ? query : `*${query}*`;
-    const minSizeBytes = searchMinSizeKB ? Math.round(parseFloat(searchMinSizeKB) * 1024) : undefined;
-    const maxSizeBytes = searchMaxSizeKB ? Math.round(parseFloat(searchMaxSizeKB) * 1024) : undefined;
-    try {
-      remoteSearchResults = await searchRemoteFiles(
-        currentHostId,
-        remotePath,
-        pat,
-        100,
-        minSizeBytes,
-        maxSizeBytes
-      );
-    } catch (e: any) {
-      errorMsg = `Search failed: ${e?.message || e}`;
-    } finally {
-      isSearchingRemote = false;
-    }
-  }
-
-  function jumpToSearchResult(item: RemoteSearchItem) {
-    if (item.is_dir) {
-      showRemoteSearch = false;
-      navigateRemote(item.path);
-    } else {
-      const parent = item.path.substring(0, item.path.lastIndexOf('/')) || '/';
-      showRemoteSearch = false;
-      remotePath = parent;
-      fetchRemoteFiles().then(() => {
-        remoteLastSelected = remoteFiles.find((f) => f.path === item.path) ?? null;
-        if (remoteLastSelected) {
-          remoteSelectedPaths = new Set([remoteLastSelected.path]);
-        }
-      });
-    }
   }
 
   // --- LOCAL FS LOGIC ---
@@ -658,7 +739,9 @@
       showRenameModal ||
       showDeleteModal ||
       showEditorModal ||
-      showChmodModal
+      showChmodModal ||
+      showCompressModal ||
+      showExtractModal
     ) {
       return;
     }
@@ -946,11 +1029,18 @@
           +Dir
         </button>
         <button
+          onclick={openCompressModal}
+          class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
+          title="Compress Selected"
+        >
+          🗜️ Zip
+        </button>
+        <button
           onclick={() => (showRemoteSearch = !showRemoteSearch)}
           class={`px-2 py-1 rounded text-xs border flex items-center gap-1 transition ${
             showRemoteSearch
-              ? 'bg-cyan-600 text-white border-cyan-500'
-              : 'bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 border-neutral-300 dark:border-slate-700'
+              ? "bg-cyan-600 text-white border-cyan-500"
+              : "bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 border-neutral-300 dark:border-slate-700"
           }`}
           title="Search remote files"
         >
@@ -969,7 +1059,7 @@
               type="text"
               placeholder="Search pattern (e.g. *.log, config*)"
               bind:value={remoteSearchQuery}
-              onkeydown={(e) => e.key === 'Enter' && executeRemoteSearch()}
+              onkeydown={(e) => e.key === "Enter" && executeRemoteSearch()}
               class="flex-1 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
             />
             <button
@@ -1016,7 +1106,6 @@
             <span class="text-[10px] text-neutral-400 dark:text-slate-500 ml-auto">Under {remotePath}</span>
           </div>
 
-          <!-- Search Results List -->
           {#if remoteSearchResults.length > 0}
             <div class="max-h-48 overflow-auto border border-neutral-200 dark:border-slate-800 rounded bg-white dark:bg-slate-900 divide-y divide-neutral-100 dark:divide-slate-800/60 font-mono text-[11px]">
               {#each remoteSearchResults as result}
@@ -1024,16 +1113,16 @@
                   role="button"
                   tabindex="0"
                   onclick={() => jumpToSearchResult(result)}
-                  onkeydown={(e) => e.key === 'Enter' && jumpToSearchResult(result)}
+                  onkeydown={(e) => e.key === "Enter" && jumpToSearchResult(result)}
                   class="p-1.5 px-2 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 cursor-pointer flex items-center justify-between gap-2"
                 >
                   <div class="flex items-center gap-1.5 truncate">
-                    <span>{result.is_dir ? '📁' : '📄'}</span>
+                    <span>{result.is_dir ? "📁" : "📄"}</span>
                     <span class="font-medium text-neutral-800 dark:text-slate-200 truncate">{result.name}</span>
                     <span class="text-neutral-400 dark:text-slate-500 text-[10px] truncate">({result.path})</span>
                   </div>
                   <div class="shrink-0 text-neutral-500 dark:text-slate-400 text-[10px]">
-                    {result.is_dir ? '<DIR>' : formatSize(result.size)}
+                    {result.is_dir ? "<DIR>" : formatSize(result.size)}
                   </div>
                 </div>
               {/each}
@@ -1076,6 +1165,7 @@
                   ondblclick={() => item.is_dir ? navigateRemote(item.path) : openEditorModal()}
                   draggable="true"
                   ondragstart={(e) => onDragStart(e, 'remote', item)}
+                  oncontextmenu={(e) => openCtxMenu(e, item)}
                 >
                   <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
                     {#if item.is_dir}
@@ -1410,6 +1500,142 @@
             Apply
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- CONTEXT MENU -->
+{#if ctxMenu}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div
+    class="fixed inset-0 z-50"
+    onclick={closeCtxMenu}
+    role="presentation"
+  >
+    <div
+      class="fixed bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded shadow-xl py-1 z-50 text-xs min-w-[140px]"
+      style={`top: ${ctxMenu.y}px; left: ${ctxMenu.x}px;`}
+      onclick={(e) => e.stopPropagation()}
+      role="menu"
+    >
+      <button
+        class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-700/60 flex items-center gap-2"
+        onclick={() => {
+          const item = ctxMenu!.item;
+          closeCtxMenu();
+          if (!remoteSelectedPaths.has(item.path)) {
+            remoteSelectedPaths.clear();
+            remoteSelectedPaths.add(item.path);
+            remoteLastSelected = item;
+          }
+          openCompressModal();
+        }}
+      >
+        <span>🗜️</span> Compress...
+      </button>
+
+      {#if isArchive(ctxMenu.item.name)}
+        <div class="my-1 border-t border-neutral-200 dark:border-slate-700"></div>
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-700/60 flex items-center gap-2"
+          onclick={() => {
+            const item = ctxMenu!.item;
+            closeCtxMenu();
+            openExtractHere(item);
+          }}
+        >
+          <span>📦</span> Extract Here
+        </button>
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-700/60 flex items-center gap-2"
+          onclick={() => {
+            const item = ctxMenu!.item;
+            closeCtxMenu();
+            openExtractTo(item);
+          }}
+        >
+          <span>📂</span> Extract to...
+        </button>
+      {/if}
+    </div>
+  </div>
+{/if}
+
+<!-- MODAL: COMPRESS -->
+{#if showCompressModal}
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
+        Compress {compressItems.length} item(s)
+      </h3>
+      <p class="text-xs text-neutral-500 dark:text-slate-400">
+        Items: {compressItems.slice(0, 3).join(', ')}{compressItems.length > 3 ? '...' : ''}
+      </p>
+      <div class="space-y-1">
+        <label for="archive-name-input" class="text-xs text-neutral-600 dark:text-slate-400">Archive Name:</label>
+        <input
+          id="archive-name-input"
+          type="text"
+          bind:value={compressArchiveName}
+          placeholder="archive.tar.gz"
+          onkeydown={(e) => e.key === 'Enter' && confirmCompress()}
+          class="w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+        />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button
+          onclick={() => (showCompressModal = false)}
+          disabled={isCompressing}
+          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={confirmCompress}
+          disabled={isCompressing || !compressArchiveName.trim()}
+          class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-xs font-medium"
+        >
+          {isCompressing ? 'Compressing...' : 'Compress'}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- MODAL: EXTRACT -->
+{#if showExtractModal}
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-md w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">Extract Archive</h3>
+      <p class="text-xs text-neutral-500 dark:text-slate-400 truncate">
+        Source: <span class="font-mono text-cyan-600 dark:text-cyan-400">{extractArchivePath.split('/').pop()}</span>
+      </p>
+      <div class="space-y-1">
+        <label for="extract-dest-input" class="text-xs text-neutral-600 dark:text-slate-400">Destination Directory:</label>
+        <input
+          id="extract-dest-input"
+          type="text"
+          bind:value={extractDestDir}
+          onkeydown={(e) => e.key === 'Enter' && confirmExtract()}
+          class="w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+        />
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button
+          onclick={() => (showExtractModal = false)}
+          disabled={isExtracting}
+          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={confirmExtract}
+          disabled={isExtracting || !extractDestDir.trim()}
+          class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-xs font-medium"
+        >
+          {isExtracting ? 'Extracting...' : 'Extract'}
+        </button>
       </div>
     </div>
   </div>

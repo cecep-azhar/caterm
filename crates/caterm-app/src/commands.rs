@@ -201,6 +201,25 @@ pub async fn sftp_cancel(transfer_id: String) -> Result<(), CatermError> {
 }
 
 #[tauri::command]
+pub async fn sftp_compress(
+    host_id: String,
+    parent_dir: String,
+    items: Vec<String>,
+    archive_name: String,
+) -> Result<(), CatermError> {
+    run_blocking(move || sftp::compress_remote(&host_id, &parent_dir, items, &archive_name)).await
+}
+
+#[tauri::command]
+pub async fn sftp_extract(
+    host_id: String,
+    archive_path: String,
+    dest_dir: String,
+) -> Result<(), CatermError> {
+    run_blocking(move || sftp::extract_remote(&host_id, &archive_path, &dest_dir)).await
+}
+
+#[tauri::command]
 pub async fn local_list_dir(
     path: String,
 ) -> Result<Vec<caterm_core::local_fs::LocalFileEntry>, CatermError> {
