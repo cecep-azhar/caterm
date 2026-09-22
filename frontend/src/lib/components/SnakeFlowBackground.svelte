@@ -12,82 +12,151 @@
   let height = 0;
   let isVisible = true;
 
-  interface Snake {
+  interface Streamer {
     id: number;
     x: number;
     y: number;
+    dirX: number; // -1, 0, 1
+    dirY: number; // -1, 0, 1
+    distTraveled: number;
+    segmentDist: number;
     history: { x: number; y: number }[];
     length: number;
     speed: number;
-    waveFreq: number;
-    waveAmp: number;
-    phase: number;
     baseAlpha: number;
     lineWidth: number;
-    curlOffset: number;
-    curlSpeed: number;
     fade: number; // 0 to 1
   }
 
-  let snakes: Snake[] = [];
+  let streamers: Streamer[] = [];
 
-  function createSnake(id: number, randomStart = false): Snake {
-    // Spawn mostly from bottom, right edge, and bottom-right corner
+  function stepStreamer(s: Streamer) {
+    const nearTargetX = Math.abs(s.x - targetX) < Math.max(s.speed, 2.5);
+    const nearTargetY = Math.abs(s.y - targetY) < Math.max(s.speed, 2.5);
+
+    let shouldTurn = s.distTraveled >= s.segmentDist;
+    if (!shouldTurn && s.distTraveled > 20) {
+      if (s.dirX !== 0 && nearTargetX) {
+        shouldTurn = true;
+        s.x = targetX;
+      } else if (s.dirY !== 0 && nearTargetY) {
+        shouldTurn = true;
+        s.y = targetY;
+      }
+    }
+
+    if (shouldTurn) {
+      if (s.dirX !== 0) {
+        // Was moving horizontally, turn vertically (90 degrees)
+        s.dirX = 0;
+        const towards = s.y > targetY ? -1 : (s.y < targetY ? 1 : (Math.random() < 0.5 ? -1 : 1));
+        // 85% towards target, 15% orthogonal branch away
+        s.dirY = Math.random() < 0.85 ? towards : -towards;
+      } else {
+        // Was moving vertically, turn horizontally (90 degrees)
+        s.dirY = 0;
+        const towards = s.x > targetX ? -1 : (s.x < targetX ? 1 : (Math.random() < 0.5 ? -1 : 1));
+        // 85% towards target, 15% orthogonal branch away
+        s.dirX = Math.random() < 0.85 ? towards : -towards;
+      }
+      s.distTraveled = 0;
+      s.segmentDist = 30 + Math.random() * 55;
+    }
+
+    s.x += s.dirX * s.speed;
+    s.y += s.dirY * s.speed;
+    s.distTraveled += s.speed;
+
+    s.history.unshift({ x: s.x, y: s.y });
+    if (s.history.length > s.length) {
+      s.history.pop();
+    }
+  }
+
+  function createStreamer(id: number, randomStart = false): Streamer {
     let x: number, y: number;
-    const edge = Math.random();
+    let dirX = 0;
+    let dirY = 0;
 
     if (randomStart) {
-      // Scatter initially across canvas for instant presence
       x = Math.random() * (width || 600);
       y = Math.random() * (height || 800);
-      // Avoid starting too close to the target logo
       if (Math.hypot(x - targetX, y - targetY) < 120) {
         x += 200;
         y += 200;
       }
-    } else if (edge < 0.45) {
-      // Bottom edge
-      x = Math.random() * width;
-      y = height + 20 + Math.random() * 40;
-    } else if (edge < 0.85) {
-      // Right edge
-      x = width + 20 + Math.random() * 40;
-      y = Math.random() * height;
+      if (Math.random() < 0.5) {
+        dirX = x > targetX ? -1 : 1;
+        dirY = 0;
+      } else {
+        dirX = 0;
+        dirY = y > targetY ? -1 : 1;
+      }
     } else {
-      // Lower middle / bottom left
-      x = Math.random() * (width * 0.7);
-      y = height + 10;
+      const edge = Math.random();
+      if (edge < 0.45) {
+        // Bottom edge: move up
+        x = Math.random() * (width || 600);
+        y = (height || 800) + 15 + Math.random() * 30;
+        dirX = 0;
+        dirY = -1;
+      } else if (edge < 0.85) {
+        // Right edge: move left
+        x = (width || 600) + 15 + Math.random() * 30;
+        y = Math.random() * (height || 800);
+        dirX = -1;
+        dirY = 0;
+      } else {
+        // Bottom-right corner: 50% up, 50% left
+        x = (width || 600) - Math.random() * 120;
+        y = (height || 800) + 15 + Math.random() * 20;
+        if (Math.random() < 0.5) {
+          dirX = 0;
+          dirY = -1;
+        } else {
+          dirX = -1;
+          dirY = 0;
+        }
+      }
     }
 
-    const speed = 0.9 + Math.random() * 2.2; // Different speeds (0.9 to 3.1 px/frame)
-    const length = 22 + Math.floor(Math.random() * 24); // 22 to 46 segments
-    const waveFreq = 0.06 + Math.random() * 0.08;
-    const waveAmp = 10 + Math.random() * 18;
-    const baseAlpha = 0.25 + Math.random() * 0.45; // Subtle, elegant glow
+    const speed = 1.2 + Math.random() * 2.0; // 1.2 to 3.2 px/frame
+    const length = 60 + Math.floor(Math.random() * 40); // 60 to 100 segments (2x longer)
+    const segmentDist = 30 + Math.random() * 55; // 30 to 85 px
+    const baseAlpha = 0.25 + Math.random() * 0.45;
     const lineWidth = 1.0 + Math.random() * 1.5;
 
-    return {
+    const streamer: Streamer = {
       id,
       x,
       y,
+      dirX,
+      dirY,
+      distTraveled: 0,
+      segmentDist,
       history: [{ x, y }],
       length,
       speed,
-      waveFreq,
-      waveAmp,
-      phase: Math.random() * Math.PI * 2,
       baseAlpha,
       lineWidth,
-      curlOffset: Math.random() * Math.PI * 2,
-      curlSpeed: (Math.random() - 0.5) * 0.015,
-      fade: 0,
+      fade: randomStart ? 0.7 + Math.random() * 0.3 : 0,
     };
+
+    if (randomStart) {
+      const preWarmSteps = Math.floor(length * 0.8);
+      for (let step = 0; step < preWarmSteps; step++) {
+        if (Math.hypot(streamer.x - targetX, streamer.y - targetY) < 45) break;
+        stepStreamer(streamer);
+      }
+    }
+
+    return streamer;
   }
 
-  function initSnakes() {
-    snakes = [];
+  function initStreamers() {
+    streamers = [];
     for (let i = 0; i < count; i++) {
-      snakes.push(createSnake(i, true));
+      streamers.push(createStreamer(i, true));
     }
   }
 
@@ -114,91 +183,77 @@
 
     ctx.clearRect(0, 0, width, height);
 
-    for (let i = 0; i < snakes.length; i++) {
-      const s = snakes[i];
+    for (let i = 0; i < streamers.length; i++) {
+      const s = streamers[i];
 
-      // Fade in smoothly when spawning
       if (s.fade < 1) {
-        s.fade = Math.min(1, s.fade + 0.02);
+        s.fade = Math.min(1, s.fade + 0.025);
       }
 
       const dx = targetX - s.x;
       const dy = targetY - s.y;
       const dist = Math.hypot(dx, dy);
 
-      // Check if snake has reached near the CATerm logo
+      // Fade out and respawn when reaching near target logo
       if (dist < 38) {
         s.fade -= 0.06;
         if (s.fade <= 0) {
-          snakes[i] = createSnake(s.id, false);
+          streamers[i] = createStreamer(s.id, false);
           continue;
         }
       }
 
-      // Base heading towards target logo
-      const baseAngle = Math.atan2(dy, dx);
-
-      // Organic gentle curl
-      s.curlOffset += s.curlSpeed;
-      const curl = Math.sin(s.curlOffset) * 0.25;
-
-      // Slithering sinusoidal wave perpendicular to movement
-      s.phase += s.waveFreq * (s.speed * 0.8);
-      const wave = Math.sin(s.phase) * s.waveAmp;
-      const perpAngle = baseAngle + Math.PI / 2;
-
-      // Forward step with slither offset
-      const stepX = Math.cos(baseAngle + curl) * s.speed;
-      const stepY = Math.sin(baseAngle + curl) * s.speed;
-      const slitherX = Math.cos(perpAngle) * (wave * 0.08);
-      const slitherY = Math.sin(perpAngle) * (wave * 0.08);
-
-      s.x += stepX + slitherX;
-      s.y += stepY + slitherY;
-
-      s.history.unshift({ x: s.x, y: s.y });
-      if (s.history.length > s.length) {
-        s.history.pop();
+      // Respawn if streamer wandered far out of bounds
+      if (s.x < -60 || s.y < -60 || s.x > width + 60 || s.y > height + 60) {
+        streamers[i] = createStreamer(s.id, false);
+        continue;
       }
 
-      // Draw the snake trail
+      stepStreamer(s);
+
       if (s.history.length < 2) continue;
 
       ctx.save();
       ctx.beginPath();
       ctx.moveTo(s.history[0].x, s.history[0].y);
 
-      // Draw smooth curve along segments
-      for (let j = 1; j < s.history.length - 1; j++) {
-        const xc = (s.history[j].x + s.history[j + 1].x) / 2;
-        const yc = (s.history[j].y + s.history[j + 1].y) / 2;
-        ctx.quadraticCurveTo(s.history[j].x, s.history[j].y, xc, yc);
+      for (let j = 1; j < s.history.length; j++) {
+        ctx.lineTo(s.history[j].x, s.history[j].y);
       }
-      ctx.lineTo(s.history[s.history.length - 1].x, s.history[s.history.length - 1].y);
 
-      // Create gradient along the snake body (head glowing bright, tail tapering)
       const head = s.history[0];
       const tail = s.history[s.history.length - 1];
-      const grad = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
+      const gDist = Math.hypot(head.x - tail.x, head.y - tail.y);
+      let grad: CanvasGradient;
+      if (gDist > 4) {
+        grad = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
+      } else {
+        grad = ctx.createLinearGradient(
+          head.x,
+          head.y,
+          head.x + (s.dirX !== 0 ? s.dirX : 1) * 30,
+          head.y + (s.dirY !== 0 ? s.dirY : 1) * 30
+        );
+      }
 
       const effectiveAlpha = s.baseAlpha * s.fade;
       grad.addColorStop(0, `rgba(255, 255, 255, ${effectiveAlpha.toFixed(3)})`);
-      grad.addColorStop(0.3, `rgba(240, 248, 255, ${(effectiveAlpha * 0.75).toFixed(3)})`);
-      grad.addColorStop(0.7, `rgba(220, 235, 255, ${(effectiveAlpha * 0.35).toFixed(3)})`);
+      grad.addColorStop(0.25, `rgba(230, 245, 255, ${(effectiveAlpha * 0.85).toFixed(3)})`);
+      grad.addColorStop(0.65, `rgba(180, 220, 255, ${(effectiveAlpha * 0.4).toFixed(3)})`);
       grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
       ctx.strokeStyle = grad;
       ctx.lineWidth = s.lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.shadowColor = 'rgba(255, 255, 255, 0.4)';
+      ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
       ctx.shadowBlur = 6;
       ctx.stroke();
 
-      // Subtle glowing dot at the head of the snake
-      const headAlpha = effectiveAlpha * 0.9;
+      // Glowing dot at the head of the streamer
+      const headAlpha = effectiveAlpha * 0.95;
       ctx.beginPath();
-      ctx.arc(head.x, head.y, s.lineWidth * 0.8, 0, Math.PI * 2);
+      ctx.arc(head.x, head.y, Math.max(s.lineWidth * 0.9, 1.2), 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255, 255, 255, ${headAlpha.toFixed(3)})`;
       ctx.shadowBlur = 8;
       ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
@@ -227,7 +282,7 @@
   onMount(() => {
     ctx = canvas.getContext('2d');
     resize();
-    initSnakes();
+    initStreamers();
     animId = requestAnimationFrame(updateAndDraw);
 
     const ro = new ResizeObserver(() => {
