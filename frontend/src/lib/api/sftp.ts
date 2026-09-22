@@ -91,3 +91,26 @@ export function sftpDownload(
 export function sftpCancel(transferId: string): Promise<void> {
   return invoke('sftp_cancel', { transferId });
 }
+
+export interface ChecksumComparison {
+  local_checksum: string;
+  remote_checksum: string;
+  matches: boolean;
+}
+
+export function calculateRemoteChecksum(
+  hostId: string,
+  path: string,
+  algorithm: 'sha256' | 'md5'
+): Promise<string> {
+  return invoke('calculate_remote_checksum', { hostId, path, algorithm });
+}
+
+export function compareFileChecksums(
+  hostId: string,
+  remotePath: string,
+  localPath: string,
+  algorithm: 'sha256' | 'md5'
+): Promise<ChecksumComparison> {
+  return invoke('compare_file_checksums', { hostId, remotePath, localPath, algorithm });
+}

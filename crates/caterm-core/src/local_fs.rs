@@ -196,6 +196,45 @@ pub fn local_write_file(path: &str, data: &[u8]) -> Result<(), CatermError> {
         .map_err(|e| io_err(format!("Failed to write file '{}': {e}", resolved.display())))
 }
 
+/// Compute SHA-256 or MD5 checksum of a local file.
+pub fn calculate_local_checksum(path: &Path, algorithm: &str) -> Result<String, CatermError> {
+    use sha2::{Digest, Sha256};
+    use md5::Md5;
+    use std::io::Read;
+
+    let algo = algorithm.to_lowercase();
+    if algo != "sha256" && algo != "md5" {
+        return Err(io_err(format!("unsupported algorithm '{algorithm}'; use sha256 or md5")));
+    }
+
+    let mut file = fs::File::open(path)
+        .map_err(|e| io_err(format!("Cannot open local file '{}': {e}", path.display())))?;
+
+    let mut buf = vec![0u8; 64 * 1024];
+
+    if algo == "sha256" {
+        let mut hasher = Sha256::new();
+        loop {
+            let n = file
+                .read(&mut buf)
+                .map_err(|e| io_err(format!("Failed reading local file '{}': {e}", path.display())))?;
+            if n == 0 { break; }
+            hasher.update(&buf[..n]);
+        }
+        Ok(hex::encode(hasher.finalize()))
+    } else {
+        let mut hasher = Md5::new();
+        loop {
+            let n = file
+                .read(&mut buf)
+                .map_err(|e| io_err(format!("Failed reading local file '{}': {e}", path.display())))?;
+            if n == 0 { break; }
+            hasher.update(&buf[..n]);
+        }
+        Ok(hex::encode(hasher.finalize()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,6 +255,14 @@ mod tests {
         let stat = local_stat(file_path.to_str().unwrap()).unwrap();
         assert_eq!(stat.name, "hello.txt");
         assert_eq!(stat.size, 5);
+
+        let sha = calculate_local_checksum(&file_path, "sha256").unwrap();
+        // sha256 of "world" is 486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7
+        assert_eq!(sha, "486ea46224d1bb4fb680f34f7c9ad96a8f24ec88be73ea8e5a6c65260e9cb8a7");
+
+        let md5 = calculate_local_checksum(&file_path, "md5").unwrap();
+        // md5 of "world" is 7d793037a0760186574b0282f2f435e7
+        assert_eq!(md5, "7d793037a0760186574b0282f2f435e7");
 
         local_delete(file_path.to_str().unwrap(), false, false).unwrap();
         assert!(!file_path.exists());

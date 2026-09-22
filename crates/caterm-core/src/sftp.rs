@@ -467,6 +467,120 @@ where
     })
 }
 
+/// Compute SHA-256 or MD5 checksum of a remote file.
+///
+/// Tries `sha256sum`/`md5sum` command first (fast, no data transfer).
+/// Falls back to streaming the file over SFTP and hashing locally if the command fails.
+pub fn calculate_remote_checksum(
+    host_id: &str,
+    path: &str,
+    algorithm: &str,
+) -> Result<String, CatermError> {
+    use sha2::{Digest, Sha256};
+    use md5::Md5;
+
+    if host_id.is_empty() {
+        return Err(sftp_err("host_id must not be empty".to_string()));
+    }
+    let algo = algorithm.to_lowercase();
+    if algo != "sha256" && algo != "md5" {
+        return Err(sftp_err(format!("unsupported algorithm '{algorithm}'; use sha256 or md5")));
+    }
+
+    let remote_path = path.to_string();
+    let algo_clone = algo.clone();
+
+    // Try remote command first (zero-copy, fast).
+    let cmd_result: Result<String, CatermError> = crate::ssh::with_exec_session(host_id, move |sess| {
+        let escaped = remote_path.replace('\'', "'\\''");
+        let cmd = if algo_clone == "sha256" {
+            format!("sha256sum '{escaped}'")
+        } else {
+            format!("md5sum '{escaped}'")
+        };
+
+        let mut channel = sess
+            .channel_session()
+            .map_err(|e| sftp_err(format!("Failed to open channel for checksum: {e}")))?;
+        channel
+            .exec(&cmd)
+            .map_err(|e| sftp_err(format!("Failed to exec checksum command: {e}")))?;
+        let mut out = String::new();
+        channel.read_to_string(&mut out).unwrap_or_default();
+        channel.wait_close().unwrap_or_default();
+        let exit_status = channel.exit_status().unwrap_or(1);
+        if exit_status != 0 || out.trim().is_empty() {
+            return Err(sftp_err("remote checksum command failed".to_string()));
+        }
+        // Output format: "<hash>  <filename>"
+        let hash = out.split_whitespace().next().unwrap_or("").to_string();
+        if hash.is_empty() {
+            return Err(sftp_err("empty checksum output from remote".to_string()));
+        }
+        Ok(hash)
+    });
+
+    if let Ok(hash) = cmd_result {
+        return Ok(hash);
+    }
+
+    // Fallback: stream file over SFTP and hash locally.
+    let remote_path2 = path.to_string();
+    crate::ssh::with_exec_session(host_id, move |sess| {
+        let sftp = open_sftp(sess)?;
+        let mut remote_file = sftp
+            .open(Path::new(&remote_path2))
+            .map_err(|e| sftp_err(format!("Failed to open remote file for checksum: {e}")))?;
+
+        let mut buf = vec![0u8; 64 * 1024];
+        if algo == "sha256" {
+            let mut hasher = Sha256::new();
+            loop {
+                let n = remote_file
+                    .read(&mut buf)
+                    .map_err(|e| sftp_err(format!("Failed to read remote chunk: {e}")))?;
+                if n == 0 { break; }
+                hasher.update(&buf[..n]);
+            }
+            Ok(hex::encode(hasher.finalize()))
+        } else {
+            let mut hasher = Md5::new();
+            loop {
+                let n = remote_file
+                    .read(&mut buf)
+                    .map_err(|e| sftp_err(format!("Failed to read remote chunk: {e}")))?;
+                if n == 0 { break; }
+                hasher.update(&buf[..n]);
+            }
+            Ok(hex::encode(hasher.finalize()))
+        }
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChecksumComparison {
+    pub local_checksum: String,
+    pub remote_checksum: String,
+    pub matches: bool,
+}
+
+/// Compare checksum between a local file and a remote file.
+pub fn compare_file_checksums(
+    host_id: &str,
+    remote_path: &str,
+    local_path: &str,
+    algorithm: &str,
+) -> Result<ChecksumComparison, CatermError> {
+    let local_hash = crate::local_fs::calculate_local_checksum(Path::new(local_path), algorithm)?;
+    let remote_hash = calculate_remote_checksum(host_id, remote_path, algorithm)?;
+    let matches = local_hash.eq_ignore_ascii_case(&remote_hash);
+    Ok(ChecksumComparison {
+        local_checksum: local_hash,
+        remote_checksum: remote_hash,
+        matches,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -479,6 +593,7 @@ mod tests {
         assert!(delete_remote_file("", "/tmp/x", false, false).is_err());
         assert!(chmod_remote_file("", "/tmp/x", 0o755).is_err());
         assert!(stat_remote("", "/tmp/x").is_err());
+        assert!(calculate_remote_checksum("", "/tmp/x", "sha256").is_err());
     }
 
     #[test]

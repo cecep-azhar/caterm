@@ -41,3 +41,7 @@ export function localReadFile(path: string): Promise<number[]> {
 export function localWriteFile(path: string, data: number[]): Promise<void> {
   return invoke('local_write_file', { path, data });
 }
+
+export function calculateLocalChecksum(path: string, algorithm: 'sha256' | 'md5'): Promise<string> {
+  return invoke('calculate_local_checksum', { path, algorithm });
+}

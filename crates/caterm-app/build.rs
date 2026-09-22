@@ -48,6 +48,9 @@ const COMMANDS: &[&str] = &[
     "sftp_cancel",
     "sftp_rename",
     "sftp_copy",
+    "calculate_remote_checksum",
+    "calculate_local_checksum",
+    "compare_file_checksums",
     // Local FS
     "local_list_dir",
     "local_stat",
