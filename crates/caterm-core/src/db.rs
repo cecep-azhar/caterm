@@ -104,6 +104,19 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             api_key TEXT NOT NULL,
             base_url TEXT NOT NULL,
             model TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS transfer_resumable (
+            id TEXT PRIMARY KEY,
+            host_id TEXT NOT NULL,
+            direction TEXT NOT NULL,
+            remote_path TEXT NOT NULL,
+            local_path TEXT NOT NULL,
+            resume_offset INTEGER NOT NULL DEFAULT 0,
+            total_bytes INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'Queued',
+            speed_limit_bps INTEGER,
+            priority INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
          );",
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal inisialisasi skema: {e}"))))
