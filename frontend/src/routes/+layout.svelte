@@ -413,7 +413,17 @@
   >
     <div>
       <!-- Sidebar Header -->
-      <div class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center {isCollapsed ? 'justify-center px-2' : 'justify-between px-3'} transition-all">
+      <div
+        data-tauri-drag-region
+        class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center {isCollapsed ? 'justify-center px-2' : 'justify-between px-3'} transition-all cursor-default select-none"
+        onmousedown={startDragging}
+        ondblclick={(e) => {
+          const target = e.target as HTMLElement | null;
+          if (!target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) {
+            maximizeWindow();
+          }
+        }}
+      >
         {#if isCollapsed}
           <button
             type="button"
@@ -425,17 +435,17 @@
             <Logo size={22} mode="brand" />
           </button>
         {:else}
-          <div class="flex items-center gap-2 overflow-hidden min-w-0">
+          <div class="flex items-center gap-2 overflow-hidden min-w-0" data-tauri-drag-region>
             <Logo size={22} mode="brand" />
-            <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate">CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0">v2.1.7</span>
+            <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate" data-tauri-drag-region>CATerm</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0" data-tauri-drag-region>v2.1.7</span>
           </div>
           <button
             type="button"
             onclick={toggleSidebar}
             title="Collapse sidebar"
             aria-label="Collapse sidebar"
-            class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+            class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors shrink-0"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -562,7 +572,7 @@
         </button>
 
         <!-- Sessions Tab System -->
-        <div class="flex gap-1 text-xs items-center overflow-x-auto scrollbar-none min-w-0">
+        <div class="flex gap-1 text-xs items-center overflow-x-auto scrollbar-none min-w-0" data-tauri-drag-region>
           <a
             href="/"
             class="px-2.5 py-1 rounded text-xs font-medium shrink-0 transition-colors {isActive('/') ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 hover:text-neutral-900 dark:hover:text-white'}"
@@ -612,7 +622,7 @@
         <div class="flex-1 h-full min-w-[20px]" data-tauri-drag-region></div>
       </div>
 
-      <div class="flex items-center gap-1 md:gap-2 text-neutral-500 dark:text-neutral-400 shrink-0">
+      <div class="flex items-center gap-1 md:gap-2 text-neutral-500 dark:text-neutral-400 shrink-0" data-tauri-drag-region>
         <!-- Session view controls: only meaningful while terminals are open -->
         {#if sessionTabs.length > 0}
           <button
@@ -669,7 +679,7 @@
         <WorkspaceMenu />
 
         <!-- Live Status Indicator -->
-        <div class="flex items-center gap-1.5 text-xs">
+        <div class="flex items-center gap-1.5 text-xs" data-tauri-drag-region>
           <span class="text-green-500 animate-pulse text-[10px]" class:opacity-50={monitorState.isPolling}>●</span>
           <span class="font-mono text-neutral-700 dark:text-neutral-300 hidden lg:inline">{timeAgo}</span>
         </div>
@@ -692,7 +702,7 @@
         </button>
 
         <!-- Custom Window Controls -->
-        <div class="hidden sm:flex items-center">
+        <div class="hidden sm:flex items-center no-drag">
           <button onclick={() => minimizeWindow()} class="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors" title="Minimize" aria-label="Minimize">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
           </button>
