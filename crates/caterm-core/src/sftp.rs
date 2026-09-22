@@ -467,6 +467,230 @@ where
     })
 }
 
+/// A file match returned by [`search_remote_files`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RemoteSearchItem {
+    pub path: String,
+    pub name: String,
+    pub size: u64,
+    pub mtime: u64,
+    pub is_dir: bool,
+}
+
+/// Shell-quote a single token for POSIX `sh -c`: wrap in single quotes, escaping embedded `'`.
+/// Prevents path / pattern injection into the remote `find` invocation.
+fn shell_single_quote(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 2);
+    out.push('\'');
+    for ch in s.chars() {
+        if ch == '\'' {
+            // end quote, escaped quote, re-open quote
+            out.push_str("'\\''");
+        } else {
+            out.push(ch);
+        }
+    }
+    out.push('\'');
+    out
+}
+
+/// Search remote files on the host connected by `host_id`.
+///
+/// * On Unix-like remotes: runs `find <base_path> -maxdepth 8 \( -type f -o -type d \) -name <pattern>`
+///   via [`crate::ssh::with_exec_session`], with shell-safe single-quoting on both arguments.
+/// * Fallback (Windows or exec failure): walks `base_path` recursively via SFTP `readdir`.
+///
+/// Results are capped at `max_results`. Optional `min_size`/`max_size` filters apply to files
+/// (directories always pass the size gate).
+pub fn search_remote_files(
+    host_id: &str,
+    base_path: &str,
+    pattern: &str,
+    max_results: usize,
+    min_size: Option<u64>,
+    max_size: Option<u64>,
+) -> Result<Vec<RemoteSearchItem>, CatermError> {
+    if host_id.is_empty() {
+        return Err(sftp_err("host_id must not be empty".to_string()));
+    }
+    let base = if base_path.trim().is_empty() { "/" } else { base_path };
+
+    // Detect OS; default to Unix if detection fails.
+    let is_unix = crate::ssh::detect_host_os(host_id)
+        .map(|os| !os.to_lowercase().contains("windows"))
+        .unwrap_or(true);
+
+    if is_unix {
+        search_via_find(host_id, base, pattern, max_results, min_size, max_size)
+            .or_else(|_| search_via_sftp_walk(host_id, base, pattern, max_results, min_size, max_size))
+    } else {
+        search_via_sftp_walk(host_id, base, pattern, max_results, min_size, max_size)
+    }
+}
+
+fn search_via_find(
+    host_id: &str,
+    base: &str,
+    pattern: &str,
+    max_results: usize,
+    min_size: Option<u64>,
+    max_size: Option<u64>,
+) -> Result<Vec<RemoteSearchItem>, CatermError> {
+    let qbase = shell_single_quote(base);
+    let qpat = shell_single_quote(pattern);
+    // ponytail: -maxdepth 8 guards runaway deep trees; make configurable when needed.
+    let cmd = format!(
+        "find {qbase} -maxdepth 8 \\( -type f -o -type d \\) -name {qpat} -printf '%p\\t%s\\t%T@\\t%y\\n' 2>/dev/null"
+    );
+
+    let output = crate::ssh::with_exec_session(host_id, move |sess| {
+        let mut channel = sess
+            .channel_session()
+            .map_err(|e| sftp_err(format!("Failed to open exec channel: {e}")))?;
+        channel
+            .exec(&cmd)
+            .map_err(|e| sftp_err(format!("Failed to exec find: {e}")))?;
+        let mut buf = String::new();
+        use std::io::Read;
+        channel
+            .read_to_string(&mut buf)
+            .map_err(|e| sftp_err(format!("Failed to read find output: {e}")))?;
+        let _ = channel.wait_close();
+        Ok(buf)
+    })?;
+
+    let mut results = Vec::new();
+    for line in output.lines() {
+        if results.len() >= max_results {
+            break;
+        }
+        let parts: Vec<&str> = line.splitn(4, '\t').collect();
+        if parts.len() < 4 {
+            continue;
+        }
+        let path = parts[0].to_string();
+        let size: u64 = parts[1].parse().unwrap_or(0);
+        let mtime: u64 = parts[2].split('.').next().unwrap_or("0").parse().unwrap_or(0);
+        let is_dir = parts[3].trim() == "d";
+
+        if !is_dir {
+            if let Some(min) = min_size {
+                if size < min {
+                    continue;
+                }
+            }
+            if let Some(max) = max_size {
+                if size > max {
+                    continue;
+                }
+            }
+        }
+
+        let name = path.split('/').next_back().unwrap_or(&path).to_string();
+        results.push(RemoteSearchItem { path, name, size, mtime, is_dir });
+    }
+    Ok(results)
+}
+
+fn search_via_sftp_walk(
+    host_id: &str,
+    base: &str,
+    pattern: &str,
+    max_results: usize,
+    min_size: Option<u64>,
+    max_size: Option<u64>,
+) -> Result<Vec<RemoteSearchItem>, CatermError> {
+    let base = base.to_string();
+    let pattern = pattern.to_string();
+    crate::ssh::with_exec_session(host_id, move |sess| {
+        let sftp = open_sftp(sess)?;
+        let mut results = Vec::new();
+        sftp_walk(&sftp, &base, &pattern, max_results, min_size, max_size, &mut results)?;
+        Ok(results)
+    })
+}
+
+fn sftp_walk(
+    sftp: &ssh2::Sftp,
+    dir: &str,
+    pattern: &str,
+    max_results: usize,
+    min_size: Option<u64>,
+    max_size: Option<u64>,
+    acc: &mut Vec<RemoteSearchItem>,
+) -> Result<(), CatermError> {
+    if acc.len() >= max_results {
+        return Ok(());
+    }
+    let mut handle = match sftp.opendir(std::path::Path::new(dir)) {
+        Ok(h) => h,
+        Err(_) => return Ok(()), // inaccessible dir — skip silently
+    };
+
+    // ponytail: no depth cap here; add a depth counter when needed.
+    while let Ok((entry_path, stat)) = handle.readdir() {
+        if acc.len() >= max_results {
+            break;
+        }
+        let name = match entry_path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+        if name == "." || name == ".." {
+            continue;
+        }
+        let full_path = if dir == "/" {
+            format!("/{name}")
+        } else {
+            format!("{}/{name}", dir.trim_end_matches('/'))
+        };
+        let is_dir = stat.is_dir();
+        let size = stat.size.unwrap_or(0);
+        let mtime = stat.mtime.unwrap_or(0);
+
+        if glob_match(&pattern, &name) {
+            if !is_dir {
+                let mut pass = true;
+                if let Some(min) = min_size { if size < min { pass = false; } }
+                if let Some(max) = max_size { if size > max { pass = false; } }
+                if pass {
+                    acc.push(RemoteSearchItem { path: full_path.clone(), name, size, mtime, is_dir });
+                }
+            } else {
+                acc.push(RemoteSearchItem { path: full_path.clone(), name, size, mtime, is_dir });
+            }
+        }
+
+        if is_dir {
+            sftp_walk(sftp, &full_path, pattern, max_results, min_size, max_size, acc)?;
+        }
+    }
+    Ok(())
+}
+
+/// Minimal glob: supports `*` (any chars) and `?` (single char). Case-insensitive on match.
+/// ponytail: no `**` support; upgrade to the `glob` crate when needed.
+fn glob_match(pattern: &str, name: &str) -> bool {
+    let p: Vec<char> = pattern.chars().collect();
+    let s: Vec<char> = name.chars().collect();
+    glob_match_inner(&p, &s)
+}
+
+fn glob_match_inner(p: &[char], s: &[char]) -> bool {
+    match (p.first(), s.first()) {
+        (None, None) => true,
+        (Some(&'*'), _) => {
+            // star can match zero or more chars
+            glob_match_inner(&p[1..], s) || (!s.is_empty() && glob_match_inner(p, &s[1..]))
+        }
+        (Some(&'?'), Some(_)) => glob_match_inner(&p[1..], &s[1..]),
+        (Some(pc), Some(sc)) => {
+            pc.to_lowercase().eq(sc.to_lowercase()) && glob_match_inner(&p[1..], &s[1..])
+        }
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -497,5 +721,40 @@ mod tests {
         assert!(is_cancelled(id));
         clear_cancel_token(id);
         assert!(!is_cancelled(id));
+    }
+
+    #[test]
+    fn shell_single_quote_plain() {
+        assert_eq!(shell_single_quote("/home/user"), "'/home/user'");
+    }
+
+    #[test]
+    fn shell_single_quote_with_embedded_single_quote() {
+        // O'Brien  ->  'O'\''Brien'
+        assert_eq!(shell_single_quote("O'Brien"), "'O'\\''Brien'");
+    }
+
+    #[test]
+    fn glob_match_star() {
+        assert!(glob_match("*.rs", "main.rs"));
+        assert!(!glob_match("*.rs", "main.py"));
+        assert!(glob_match("*", "anything"));
+        assert!(glob_match("*", ""));
+    }
+
+    #[test]
+    fn glob_match_question_mark() {
+        assert!(glob_match("?.rs", "a.rs"));
+        assert!(!glob_match("?.rs", "ab.rs"));
+    }
+
+    #[test]
+    fn glob_match_case_insensitive() {
+        assert!(glob_match("*.TXT", "readme.txt"));
+    }
+
+    #[test]
+    fn search_remote_files_rejects_empty_host_id() {
+        assert!(search_remote_files("", "/", "*", 10, None, None).is_err());
     }
 }

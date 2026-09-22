@@ -14,8 +14,10 @@
     sftpUpload,
     sftpDownload,
     sftpCancel,
+    searchRemoteFiles,
     type SftpFileEntry,
-    type SftpProgressPayload
+    type SftpProgressPayload,
+    type RemoteSearchItem
   } from '$lib/api/sftp';
   import {
     localListDir,
@@ -60,6 +62,14 @@
   let remoteLoading = $state(false);
   let remoteSelectedPaths = $state<Set<string>>(new Set());
   let remoteLastSelected = $state<SftpFileEntry | null>(null);
+
+  // Remote Search State
+  let remoteSearchQuery = $state('');
+  let isSearchingRemote = $state(false);
+  let remoteSearchResults = $state<RemoteSearchItem[]>([]);
+  let showRemoteSearch = $state(false);
+  let searchMinSizeKB = $state<string>('');
+  let searchMaxSizeKB = $state<string>('');
 
   // Notifications
   let errorMsg = $state('');
@@ -150,6 +160,48 @@
   function joinPath(dir: string, name: string): string {
     if (dir === '/' || dir === '.' || !dir) return `/${name}`;
     return `${dir.replace(/\/+$/, '')}/${name}`;
+  }
+
+  // --- REMOTE SEARCH ---
+  async function executeRemoteSearch() {
+    if (!currentHostId || !remoteSearchQuery.trim()) return;
+    isSearchingRemote = true;
+    remoteSearchResults = [];
+    const query = remoteSearchQuery.trim();
+    const pat = query.includes('*') || query.includes('?') ? query : `*${query}*`;
+    const minSizeBytes = searchMinSizeKB ? Math.round(parseFloat(searchMinSizeKB) * 1024) : undefined;
+    const maxSizeBytes = searchMaxSizeKB ? Math.round(parseFloat(searchMaxSizeKB) * 1024) : undefined;
+    try {
+      remoteSearchResults = await searchRemoteFiles(
+        currentHostId,
+        remotePath,
+        pat,
+        100,
+        minSizeBytes,
+        maxSizeBytes
+      );
+    } catch (e: any) {
+      errorMsg = `Search failed: ${e?.message || e}`;
+    } finally {
+      isSearchingRemote = false;
+    }
+  }
+
+  function jumpToSearchResult(item: RemoteSearchItem) {
+    if (item.is_dir) {
+      showRemoteSearch = false;
+      navigateRemote(item.path);
+    } else {
+      const parent = item.path.substring(0, item.path.lastIndexOf('/')) || '/';
+      showRemoteSearch = false;
+      remotePath = parent;
+      fetchRemoteFiles().then(() => {
+        remoteLastSelected = remoteFiles.find((f) => f.path === item.path) ?? null;
+        if (remoteLastSelected) {
+          remoteSelectedPaths = new Set([remoteLastSelected.path]);
+        }
+      });
+    }
   }
 
   // --- LOCAL FS LOGIC ---
@@ -893,7 +945,104 @@
         >
           +Dir
         </button>
+        <button
+          onclick={() => (showRemoteSearch = !showRemoteSearch)}
+          class={`px-2 py-1 rounded text-xs border flex items-center gap-1 transition ${
+            showRemoteSearch
+              ? 'bg-cyan-600 text-white border-cyan-500'
+              : 'bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 border-neutral-300 dark:border-slate-700'
+          }`}
+          title="Search remote files"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Search
+        </button>
       </div>
+
+      <!-- Remote Search & Filter Drawer -->
+      {#if showRemoteSearch}
+        <div class="p-2.5 bg-neutral-100/90 dark:bg-[#151921] border-b border-neutral-200 dark:border-slate-800 flex flex-col gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search pattern (e.g. *.log, config*)"
+              bind:value={remoteSearchQuery}
+              onkeydown={(e) => e.key === 'Enter' && executeRemoteSearch()}
+              class="flex-1 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+            />
+            <button
+              onclick={executeRemoteSearch}
+              disabled={isSearchingRemote || !remoteSearchQuery.trim()}
+              class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded font-medium flex items-center gap-1 transition"
+            >
+              {#if isSearchingRemote}
+                <span class="animate-spin inline-block">⏳</span> Searching...
+              {:else}
+                Find
+              {/if}
+            </button>
+            <button
+              onclick={() => { showRemoteSearch = false; remoteSearchResults = []; }}
+              class="px-2 py-1 text-neutral-500 hover:text-neutral-700 dark:hover:text-slate-200"
+              title="Close search"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="flex items-center gap-3 text-neutral-600 dark:text-slate-400">
+            <span class="text-[11px] font-semibold">Filters:</span>
+            <label class="flex items-center gap-1 text-[11px]">
+              Min KB:
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                bind:value={searchMinSizeKB}
+                class="w-16 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono"
+              />
+            </label>
+            <label class="flex items-center gap-1 text-[11px]">
+              Max KB:
+              <input
+                type="number"
+                min="0"
+                placeholder="∞"
+                bind:value={searchMaxSizeKB}
+                class="w-16 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono"
+              />
+            </label>
+            <span class="text-[10px] text-neutral-400 dark:text-slate-500 ml-auto">Under {remotePath}</span>
+          </div>
+
+          <!-- Search Results List -->
+          {#if remoteSearchResults.length > 0}
+            <div class="max-h-48 overflow-auto border border-neutral-200 dark:border-slate-800 rounded bg-white dark:bg-slate-900 divide-y divide-neutral-100 dark:divide-slate-800/60 font-mono text-[11px]">
+              {#each remoteSearchResults as result}
+                <div
+                  role="button"
+                  tabindex="0"
+                  onclick={() => jumpToSearchResult(result)}
+                  onkeydown={(e) => e.key === 'Enter' && jumpToSearchResult(result)}
+                  class="p-1.5 px-2 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 cursor-pointer flex items-center justify-between gap-2"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span>{result.is_dir ? '📁' : '📄'}</span>
+                    <span class="font-medium text-neutral-800 dark:text-slate-200 truncate">{result.name}</span>
+                    <span class="text-neutral-400 dark:text-slate-500 text-[10px] truncate">({result.path})</span>
+                  </div>
+                  <div class="shrink-0 text-neutral-500 dark:text-slate-400 text-[10px]">
+                    {result.is_dir ? '<DIR>' : formatSize(result.size)}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {:else if !isSearchingRemote && remoteSearchQuery && remoteSearchResults.length === 0}
+            <div class="text-[11px] text-neutral-400 dark:text-slate-500 italic py-1">No matching files found.</div>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Remote File Table -->
       <div class="flex-1 overflow-auto text-xs font-mono">
