@@ -49,6 +49,7 @@
   const theme = getTheme();
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
   let terminalContainer: HTMLDivElement;
+  let rootContainer: HTMLDivElement | undefined = $state();
 
   let session = $state<SshSession | null>(null);
   let term: Terminal | null = null;
@@ -56,6 +57,8 @@
 
   // Autocomplete state
   let autocompleteEnabled = $state(true);
+  let cursorX = $state(20);
+  let cursorY = $state(60);
   let currentInputLine = $state('');
   let commandHistory = $state<string[]>([]);
   let userSnippets = $state<SnippetRecord[]>([]);
@@ -70,6 +73,28 @@
       })
       .catch(() => {});
   });
+
+  function updateCursorPosition() {
+    if (!rootContainer) return;
+    const rootRect = rootContainer.getBoundingClientRect();
+    const cursorEl = terminalContainer?.querySelector('.xterm-cursor') as HTMLElement | null;
+
+    if (cursorEl) {
+      const cursorRect = cursorEl.getBoundingClientRect();
+      cursorX = Math.round(cursorRect.left - rootRect.left);
+      cursorY = Math.round(cursorRect.bottom - rootRect.top + 4);
+    } else if (term) {
+      const termRect = terminalContainer?.getBoundingClientRect() ?? rootRect;
+      const cellWidth =
+        (term as any)._core?._renderService?.dimensions?.actualCellWidth || 9;
+      const cellHeight =
+        (term as any)._core?._renderService?.dimensions?.actualCellHeight || 18;
+      const offsetX = Math.round(termRect.left - rootRect.left);
+      const offsetY = Math.round(termRect.top - rootRect.top);
+      cursorX = offsetX + Math.round(term.buffer.active.cursorX * cellWidth);
+      cursorY = offsetY + Math.round((term.buffer.active.cursorY + 1) * cellHeight + 4);
+    }
+  }
 
   function updateSuggestions(input: string) {
     if (!autocompleteEnabled || !input.trim()) {
@@ -134,6 +159,10 @@
 
     suggestions = results;
     selectedSuggestionIndex = 0;
+    if (results.length > 0) {
+      updateCursorPosition();
+      requestAnimationFrame(updateCursorPosition);
+    }
   }
 
   function applySuggestion(item: AutocompleteItem) {
@@ -334,6 +363,7 @@
         // Backspace
         currentInputLine = currentInputLine.slice(0, -1);
         updateSuggestions(currentInputLine);
+        updateCursorPosition();
       } else if (data === '\x03') {
         // Ctrl+C
         currentInputLine = '';
@@ -341,6 +371,7 @@
       } else if (!data.includes('\x1b') && data >= ' ') {
         currentInputLine += data;
         updateSuggestions(currentInputLine);
+        updateCursorPosition();
       }
     });
 
@@ -351,6 +382,9 @@
       fit.fit();
       if (session) {
         void sshResize(session.sessionId, terminal.cols, terminal.rows).catch(() => {});
+      }
+      if (suggestions.length > 0) {
+        updateCursorPosition();
       }
     };
     const observer = new ResizeObserver(() => {
@@ -383,7 +417,10 @@
   });
 </script>
 
-<div class="relative flex flex-col h-full bg-white dark:bg-[#09090b] border border-neutral-200 dark:border-neutral-800 rounded-md overflow-hidden">
+<div
+  bind:this={rootContainer}
+  class="relative flex flex-col h-full bg-white dark:bg-[#09090b] border border-neutral-200 dark:border-neutral-800 rounded-md overflow-hidden"
+>
   <!-- Top Bar -->
   <div class="h-7 sm:h-8 bg-neutral-100 dark:bg-neutral-900/90 border-b border-neutral-200 dark:border-neutral-800 px-2.5 flex items-center justify-between text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0">
     <div class="flex items-center gap-2 min-w-0">
@@ -437,6 +474,10 @@
     <TerminalAutocomplete
       {suggestions}
       selectedIndex={selectedSuggestionIndex}
+      {cursorX}
+      {cursorY}
+      containerWidth={rootContainer?.clientWidth ?? 0}
+      containerHeight={rootContainer?.clientHeight ?? 0}
       onSelect={applySuggestion}
       onClose={dismissSuggestions}
     />

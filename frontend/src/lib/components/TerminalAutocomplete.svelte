@@ -4,19 +4,53 @@
   let {
     suggestions = [],
     selectedIndex = 0,
+    cursorX = 20,
+    cursorY = 60,
+    containerWidth = 0,
+    containerHeight = 0,
     onSelect,
     onClose
   }: {
     suggestions: AutocompleteItem[];
     selectedIndex: number;
+    cursorX?: number;
+    cursorY?: number;
+    containerWidth?: number;
+    containerHeight?: number;
     onSelect: (item: AutocompleteItem) => void;
     onClose: () => void;
   } = $props();
+
+  let popupEl: HTMLDivElement | undefined = $state();
+
+  let parentWidth = $derived(
+    containerWidth > 0
+      ? containerWidth
+      : (popupEl?.parentElement?.clientWidth ?? (typeof window !== 'undefined' ? window.innerWidth : 800))
+  );
+
+  let parentHeight = $derived(
+    containerHeight > 0
+      ? containerHeight
+      : (popupEl?.parentElement?.clientHeight ?? (typeof window !== 'undefined' ? window.innerHeight : 600))
+  );
+
+  let clampedX = $derived(
+    Math.max(8, Math.min(cursorX, Math.max(8, parentWidth - 360)))
+  );
+
+  let clampedY = $derived(
+    cursorY + 240 > parentHeight
+      ? Math.max(8, cursorY - 240)
+      : cursorY + 4
+  );
 </script>
 
 {#if suggestions.length > 0}
   <div
-    class="absolute left-4 bottom-4 z-40 max-w-lg min-w-[320px] bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-200 rounded-lg shadow-2xl overflow-hidden font-mono text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+    bind:this={popupEl}
+    class="absolute z-40 max-w-lg min-w-[320px] bg-white/95 dark:bg-[#121215]/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-neutral-200 rounded-lg shadow-2xl overflow-hidden font-mono text-xs select-none animate-in fade-in zoom-in-95 duration-100"
+    style="left: {clampedX}px; top: {clampedY}px;"
   >
     <!-- Header bar -->
     <div class="px-2.5 py-1.5 bg-neutral-100/90 dark:bg-neutral-900/80 border-b border-neutral-200 dark:border-neutral-700/50 flex items-center justify-between text-[10px] text-neutral-600 dark:text-neutral-400">
