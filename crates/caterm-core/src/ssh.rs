@@ -682,7 +682,7 @@ pub fn disconnect(session_id: &str) -> Result<(), CatermError> {
     Ok(())
 }
 
-/// Parses raw remote probe output (from `/etc/os-release` or `uname`) into a canonical OS identifier.
+/// # Infallible: pure string parsing of os-release or uname output into a canonical OS identifier.
 pub fn parse_os_key(raw: &str) -> String {
     let lower = raw.to_lowercase();
 

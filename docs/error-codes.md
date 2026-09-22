@@ -13,3 +13,5 @@ Generated from `crates/caterm-core/src/error.rs`. Do not edit by hand — regene
 | `CAT-SYNC-000` | SYNC | sync: unclassified error in this domain |
 | `CAT-IO-000` | IO | io: unclassified error in this domain |
 | `CAT-VALIDATION-000` | VALIDATION | validation: unclassified error in this domain |
+| `CAT-FTP-000` | FTP | ftp: unclassified error in this domain |
+| `CAT-CORE-501` | CORE | not implemented: unclassified error in this domain |

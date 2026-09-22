@@ -229,6 +229,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 tags: vec![],
                 os: None,
+                protocol: None,
                 secret: None,
             },
             "test-local-key",

@@ -24,6 +24,44 @@ pub enum AuthMethod {
     KeyId { id: String },
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum ConnectionProtocol {
+    #[default]
+    Ssh,
+    Scp,
+    Ftp,
+    Ftps,
+    WebDav,
+    S3,
+}
+
+impl ConnectionProtocol {
+    /// # Infallible: returns static string representation of protocol.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ssh => "ssh",
+            Self::Scp => "scp",
+            Self::Ftp => "ftp",
+            Self::Ftps => "ftps",
+            Self::WebDav => "webdav",
+            Self::S3 => "s3",
+        }
+    }
+
+    /// # Infallible: parses protocol string with fallback to SSH.
+    pub fn from_str_opt(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "scp" => Self::Scp,
+            "ftp" => Self::Ftp,
+            "ftps" => Self::Ftps,
+            "webdav" => Self::WebDav,
+            "s3" => Self::S3,
+            _ => Self::Ssh,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HostRecord {
@@ -36,6 +74,8 @@ pub struct HostRecord {
     pub tags: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub os: Option<String>,
+    #[serde(default)]
+    pub protocol: ConnectionProtocol,
     pub created_at: u64,
     pub updated_at: u64,
     /// Whether a password/passphrase is already stored for this host. Never the secret
@@ -58,6 +98,8 @@ pub struct HostInput {
     pub tags: Vec<String>,
     #[serde(default)]
     pub os: Option<String>,
+    #[serde(default)]
+    pub protocol: Option<ConnectionProtocol>,
     /// Write-only. `None` (field omitted) = leave the stored secret untouched. `Some("")` =
     /// clear it. `Some(s)` = encrypt `s` and store it, replacing whatever was there.
     #[serde(default)]
@@ -90,6 +132,10 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
     })?;
     let os: Option<String> = row.get("os").unwrap_or(None);
+    let protocol_str: String = row
+        .get("protocol")
+        .unwrap_or_else(|_| "ssh".to_string());
+    let protocol = ConnectionProtocol::from_str_opt(&protocol_str);
     Ok(HostRecord {
         id: row.get("id")?,
         label: row.get("label")?,
@@ -99,6 +145,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
         auth_method,
         tags,
         os,
+        protocol,
         created_at: row.get::<_, i64>("created_at")? as u64,
         updated_at: row.get::<_, i64>("updated_at")? as u64,
         has_secret: secret_enc.map(|s| !s.is_empty()).unwrap_or(false),
@@ -110,7 +157,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
 pub(crate) fn list_hosts_in(conn: &Connection) -> Result<Vec<HostRecord>, CatermError> {
     let mut stmt = conn
         .prepare(
-            "SELECT id, label, address, port, username, auth_method, tags, os, created_at, updated_at, secret_enc \
+            "SELECT id, label, address, port, username, auth_method, tags, os, protocol, created_at, updated_at, secret_enc \
              FROM hosts ORDER BY created_at ASC",
         )
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal query hosts: {e}"))))?;
@@ -161,9 +208,10 @@ pub(crate) fn save_host_in(
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal serialisasi tags: {e}"))))?;
 
     let os = input.os.filter(|s| !s.is_empty());
+    let protocol = input.protocol.unwrap_or(ConnectionProtocol::Ssh);
     conn.execute(
-        "INSERT INTO hosts (id, label, address, port, username, auth_method, tags, os, created_at, updated_at, secret_enc)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        "INSERT INTO hosts (id, label, address, port, username, auth_method, tags, os, protocol, created_at, updated_at, secret_enc)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
          ON CONFLICT(id) DO UPDATE SET
             label = excluded.label,
             address = excluded.address,
@@ -172,6 +220,7 @@ pub(crate) fn save_host_in(
             auth_method = excluded.auth_method,
             tags = excluded.tags,
             os = excluded.os,
+            protocol = excluded.protocol,
             updated_at = excluded.updated_at,
             secret_enc = excluded.secret_enc",
         params![
@@ -183,6 +232,7 @@ pub(crate) fn save_host_in(
             auth_json,
             tags_json,
             os,
+            protocol.as_str(),
             created_at as i64,
             now as i64,
             secret_enc
@@ -199,6 +249,7 @@ pub(crate) fn save_host_in(
         auth_method: input.auth_method,
         tags: input.tags,
         os,
+        protocol,
         created_at,
         updated_at: now,
         has_secret: secret_enc.map(|s| !s.is_empty()).unwrap_or(false),
@@ -260,7 +311,7 @@ pub(crate) fn load_host_for_connect_in(
 ) -> Result<(HostRecord, Option<String>), CatermError> {
     let (host, secret_enc): (HostRecord, Option<String>) = conn
         .query_row(
-            "SELECT id, label, address, port, username, auth_method, tags, os, created_at, updated_at, secret_enc \
+            "SELECT id, label, address, port, username, auth_method, tags, os, protocol, created_at, updated_at, secret_enc \
              FROM hosts WHERE id = ?1",
             params![id],
             |row| Ok((row_to_host(row)?, row.get::<_, Option<String>>("secret_enc")?)),
@@ -324,6 +375,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 tags: vec!["test".into()],
                 os: None,
+                protocol: None,
                 secret: None,
             },
             TEST_KEY,
@@ -350,6 +402,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 tags: vec![],
                 os: None,
+                protocol: None,
                 secret: Some("hunter2".into()),
             },
             TEST_KEY,
@@ -370,6 +423,7 @@ mod tests {
                 },
                 tags: vec!["prod".into()],
                 os: Some("fedora".into()),
+                protocol: None,
                 secret: None,
             },
             TEST_KEY,
@@ -406,6 +460,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 tags: vec![],
                 os: None,
+                protocol: None,
                 secret: Some("hunter2".into()),
             },
             TEST_KEY,
@@ -424,6 +479,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 tags: vec![],
                 os: None,
+                protocol: None,
                 secret: Some("".into()),
             },
             TEST_KEY,
@@ -446,6 +502,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 tags: vec![],
                 os: None,
+                protocol: None,
                 secret: None,
             },
             TEST_KEY,
@@ -471,6 +528,7 @@ mod tests {
                 auth_method: AuthMethod::Password,
                 tags: vec![],
                 os: None,
+                protocol: None,
                 secret: None,
             },
             TEST_KEY,

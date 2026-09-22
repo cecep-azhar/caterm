@@ -25,12 +25,12 @@ pub fn cancel_transfer(transfer_id: &str) -> Result<(), CatermError> {
     Ok(())
 }
 
-fn is_cancelled(transfer_id: &str) -> bool {
+pub(crate) fn is_cancelled(transfer_id: &str) -> bool {
     let set = CANCEL_TOKENS.lock();
     set.contains(transfer_id)
 }
 
-fn clear_cancel_token(transfer_id: &str) {
+pub(crate) fn clear_cancel_token(transfer_id: &str) {
     let mut set = CANCEL_TOKENS.lock();
     set.remove(transfer_id);
 }
@@ -400,7 +400,7 @@ pub fn upload_file_with_progress<F>(
     on_progress: Arc<Mutex<F>>,
 ) -> Result<(), CatermError>
 where
-    F: FnMut(SftpProgressPayload) + Send + 'static,
+    F: FnMut(SftpProgressPayload) + Send + 'static + ?Sized,
 {
     clear_cancel_token(transfer_id);
     let local_file = File::open(local_path)
@@ -482,7 +482,7 @@ pub fn download_file_with_progress<F>(
     on_progress: Arc<Mutex<F>>,
 ) -> Result<(), CatermError>
 where
-    F: FnMut(SftpProgressPayload) + Send + 'static,
+    F: FnMut(SftpProgressPayload) + Send + 'static + ?Sized,
 {
     clear_cancel_token(transfer_id);
     let t_id = transfer_id.to_string();

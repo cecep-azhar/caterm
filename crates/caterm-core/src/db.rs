@@ -34,23 +34,25 @@ pub fn open_encrypted(data_dir: &Path, passphrase: &str) -> Result<Connection, C
     init_schema(&conn)?;
     migrate_hosts_secret_column(&conn)?;
     migrate_hosts_os_column(&conn)?;
+    migrate_hosts_protocol_column(&conn)?;
     Ok(conn)
 }
 
 fn init_schema(conn: &Connection) -> Result<(), CatermError> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS hosts (
-            id TEXT PRIMARY KEY,
-            label TEXT NOT NULL,
-            address TEXT NOT NULL,
-            port INTEGER NOT NULL,
-            username TEXT NOT NULL,
-            auth_method TEXT NOT NULL,
-            tags TEXT NOT NULL,
-            os TEXT,
-            created_at INTEGER NOT NULL,
-            updated_at INTEGER NOT NULL
-         );
+           id TEXT PRIMARY KEY,
+           label TEXT NOT NULL,
+           address TEXT NOT NULL,
+           port INTEGER NOT NULL,
+           username TEXT NOT NULL,
+           auth_method TEXT NOT NULL,
+           tags TEXT NOT NULL,
+           os TEXT,
+           protocol TEXT NOT NULL DEFAULT 'ssh',
+           created_at INTEGER NOT NULL,
+           updated_at INTEGER NOT NULL
+        );
          CREATE TABLE IF NOT EXISTS groups (
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -136,6 +138,22 @@ fn migrate_hosts_os_column(conn: &Connection) -> Result<(), CatermError> {
             .map_err(|e| {
                 CatermError::Db(DbError::Generic(format!(
                     "gagal migrasi kolom os: {e}"
+                )))
+            })?;
+    }
+    Ok(())
+}
+
+fn migrate_hosts_protocol_column(conn: &Connection) -> Result<(), CatermError> {
+    let has_column: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('hosts') WHERE name = 'protocol'")
+        .and_then(|mut stmt| stmt.exists([]))
+        .unwrap_or(false);
+    if !has_column {
+        conn.execute_batch("ALTER TABLE hosts ADD COLUMN protocol TEXT NOT NULL DEFAULT 'ssh'")
+            .map_err(|e| {
+                CatermError::Db(DbError::Generic(format!(
+                    "gagal migrasi kolom protocol: {e}"
                 )))
             })?;
     }
