@@ -47,3 +47,10 @@ elease\bundle\msi\CATerm_2.0.10_x64_en-US.msi`
   - **Split Screen In-Connection**: Kontrol tata letak split (Single, Horizontal, Vertical, Grid 2x2) hanya muncul di dalam sesi koneksi multi-host (`tabs.length > 1`).
   - **Penyimpanan Workspace**: Fitur simpan dan aktifkan kembali susunan tab, layout, serta status file explorer remote via `WorkspaceMenu` & `workspaceStore.svelte.ts` (`localStorage['caterm_workspaces_v2']`).
   - **Navigasi Responsif Mobile**: Navigasi slide-out drawer dengan hamburger toggle pada layar kecil (<768px), layout terminal adaptif dan tab switcher khusus mobile agar terminal tetap terbaca jelas.
+
+## WinSCP Feature Parity Architecture Decisions (22 Sep 2026)
+* **DX-3 (Protokol Non-SSH & Trait Abstraction)**: Diperkenalkan trait `RemoteFileSystem` di `caterm-core` untuk membungkus operasi FS (list, read, write, stat, remove, rename, mkdir). Crate `suppaftp` dipilih untuk FTP/FTPS, `reqwest` untuk WebDAV, dan `rust-s3` (lebih ringan dari `aws-sdk-s3` untuk desktop bundle) untuk S3-compatible storage.
+* **DX-4 (Transfer Queue & Resume State)**: Antrean transfer dikelola via background worker `caterm-core/src/transfers.rs` dengan persistensi status task di SQLite untuk mendukung resume byte-offset pasca restart.
+* **DX-5 (Editor Kode Ringan)**: CodeMirror 6 dipilih menggantikan Monaco untuk memangkas bundle size webview desktop.
+* **DX-6 (Integritas, Pencarian, Kompresi)**: Remote operations mengutamakan execution channel cepat berbasis Unix commands (`sha256sum`, `find`, `tar`, `zip`) dengan safe shell escaping, serta fallback client-side streaming jika remote OS minimalis.
+
