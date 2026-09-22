@@ -5,7 +5,7 @@
 
 use caterm_core::{
     CatermError, ai, audit, backup, groups, investigations, keys, monitor, sftp, snippets, ssh,
-    store, teams, tunnels, vault,
+    store, sync, teams, tunnels, vault,
 };
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
@@ -546,3 +546,42 @@ pub async fn ai_execute_step(
 ) -> Result<ai::AiExecutionResult, CatermError> {
     run_blocking(move || ai::execute_plan_step(&host_id, &command)).await
 }
+
+#[tauri::command]
+pub async fn plan_sync(
+    host_id: String,
+    local_dir: String,
+    remote_dir: String,
+    direction: sync::SyncDirection,
+) -> Result<sync::SyncPlan, CatermError> {
+    run_blocking(move || sync::plan_sync(&host_id, &local_dir, &remote_dir, direction)).await
+}
+
+#[tauri::command]
+pub async fn execute_sync(
+    host_id: String,
+    plan: sync::SyncPlan,
+    direction: sync::SyncDirection,
+) -> Result<sync::SyncStats, CatermError> {
+    run_blocking(move || sync::execute_sync(&host_id, &plan, direction)).await
+}
+
+#[tauri::command]
+pub async fn start_watch(
+    host_id: String,
+    local_dir: String,
+    remote_dir: String,
+) -> Result<sync::WatchHandle, CatermError> {
+    run_blocking(move || sync::start_watch(&host_id, &local_dir, &remote_dir)).await
+}
+
+#[tauri::command]
+pub async fn stop_watch(id: String) -> Result<(), CatermError> {
+    run_blocking(move || sync::stop_watch(&id)).await
+}
+
+#[tauri::command]
+pub async fn list_watches() -> Result<Vec<sync::WatchInfo>, CatermError> {
+    run_blocking(sync::list_watches).await
+}
+

@@ -36,6 +36,7 @@ uuid = { version = "1.26.1", features = ["v4"] }
 # in the process argv where any local user could read it off the process table.
 ureq = { version = "3.1", features = ["json"] }
 md-5 = "0.10"
+notify = { version = "7", features = ["macos_kqueue"] }
 
 [target.'cfg(windows)'.dependencies]
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
