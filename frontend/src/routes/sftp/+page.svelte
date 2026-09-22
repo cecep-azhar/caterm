@@ -33,6 +33,7 @@
   } from '$lib/api/local_fs';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import RemoteFileEditor from '$lib/components/RemoteFileEditor.svelte';
+  import DirectorySync from '$lib/components/DirectorySync.svelte';
 
   interface TransferItem {
     id: string;
@@ -117,6 +118,9 @@
   let extractArchivePath = $state('');
   let extractDestDir = $state('');
   let isExtracting = $state(false);
+
+  // Directory Sync modal
+  let showSyncModal = $state(false);
 
   // Remote Search State
   let remoteSearchQuery = $state("");
@@ -1037,6 +1041,13 @@
           🗜️ Zip
         </button>
         <button
+          onclick={() => (showSyncModal = true)}
+          class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
+          title="Directory Synchronize & Live Watch"
+        >
+          🔄 Sync
+        </button>
+        <button
           onclick={() => (showRemoteSearch = !showRemoteSearch)}
           class={`px-2 py-1 rounded text-xs border flex items-center gap-1 transition ${
             showRemoteSearch
@@ -1639,3 +1650,18 @@
     </div>
   </div>
 {/if}
+
+<!-- MODAL: DIRECTORY SYNC & LIVE WATCH -->
+{#if showSyncModal}
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-[#151921] rounded-lg shadow-2xl border border-neutral-200 dark:border-slate-800 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DirectorySync
+        hostId={currentHostId}
+        initialLocalPath={localPath}
+        initialRemotePath={remotePath}
+        onClose={() => (showSyncModal = false)}
+      />
+    </div>
+  </div>
+{/if}
+

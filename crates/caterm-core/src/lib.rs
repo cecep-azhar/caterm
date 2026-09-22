@@ -37,6 +37,7 @@ pub mod sftp;
 pub mod snippets;
 pub mod ssh;
 pub mod store;
+pub mod sync;
 pub mod teams;
 pub mod tunnels;
 pub mod vault;
