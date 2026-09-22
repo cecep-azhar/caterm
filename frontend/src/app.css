@@ -4,6 +4,14 @@ button, [role="button"], a, input[type="submit"], input[type="button"], select {
   cursor: pointer !important;
 }
 
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+button, input, textarea, a, select, [role="button"], .no-drag {
+  -webkit-app-region: no-drag;
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {

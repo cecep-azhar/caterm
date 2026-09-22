@@ -161,7 +161,17 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 flex bg-[#0a0a0a] text-white select-none">
+<div
+  data-tauri-drag-region
+  class="fixed inset-0 z-50 flex bg-[#0a0a0a] text-white select-none cursor-default"
+  onmousedown={startDragging}
+  ondblclick={(e) => {
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) {
+      maximizeWindow();
+    }
+  }}
+>
   <!-- Top Drag Region Bar with Custom Window Controls -->
   <div
     data-tauri-drag-region
@@ -209,7 +219,11 @@
   </div>
 
   <!-- Left Panel: Brand & Quote -->
-  <div class="hidden lg:flex flex-1 flex-col justify-between p-12 bg-neutral-950 border-r border-neutral-800/60 relative overflow-hidden">
+  <div
+    data-tauri-drag-region
+    class="hidden lg:flex flex-1 flex-col justify-between p-12 bg-neutral-950 border-r border-neutral-800/60 relative overflow-hidden"
+    onmousedown={startDragging}
+  >
     <!-- Ambient Grid Effect -->
     <div class="absolute inset-0 bg-[linear-gradient(to_right,#1f293715_1px,transparent_1px),linear-gradient(to_bottom,#1f293715_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
     
@@ -250,8 +264,12 @@
   </div>
 
   <!-- Right Panel: Master Password Input Form -->
-  <div class="flex-1 flex flex-col justify-center items-center p-8 sm:p-16 bg-[#0a0a0a]">
-    <div class="w-full max-w-md space-y-8">
+  <div
+    data-tauri-drag-region
+    class="flex-1 flex flex-col justify-center items-center p-8 sm:p-16 bg-[#0a0a0a]"
+    onmousedown={startDragging}
+  >
+    <div class="w-full max-w-md space-y-8 no-drag">
       <div class="text-center">
         <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto mb-4 text-sky-400">
           <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
