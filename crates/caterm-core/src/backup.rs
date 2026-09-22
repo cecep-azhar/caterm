@@ -93,6 +93,7 @@ pub fn import_encrypted_backup(
             auth_method: host.auth_method,
             tags: host.tags,
             os: host.os,
+            protocol: Some(host.protocol),
             secret: None,
         })?;
         imported_count += 1;
@@ -148,6 +149,7 @@ mod tests {
                 auth_method: crate::store::AuthMethod::Password,
                 tags: vec![],
                 os: None,
+                protocol: crate::store::ConnectionProtocol::Ssh,
                 created_at: 1,
                 updated_at: 1,
                 has_secret: false,

@@ -26,12 +26,14 @@ pub mod audit;
 pub mod backup;
 pub mod db;
 pub mod error;
+pub mod ftp;
 pub mod groups;
 pub mod investigations;
 pub mod keys;
 pub mod local_fs;
 pub mod monitor;
 pub mod paths;
+pub mod scp;
 pub mod secret;
 pub mod sftp;
 pub mod snippets;
@@ -41,7 +43,9 @@ pub mod sync;
 pub mod teams;
 pub mod tunnels;
 pub mod vault;
+pub mod vfs;
 
 pub use error::CatermError;
+pub use vfs::RemoteFileSystem;
 
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");

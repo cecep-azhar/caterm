@@ -37,6 +37,7 @@ domain_error!(AiError, "AI");
 domain_error!(SyncError, "SYNC");
 domain_error!(IoError, "IO");
 domain_error!(ValidationError, "VALIDATION");
+domain_error!(FtpError, "FTP");
 
 #[derive(Debug, Error)]
 pub enum CatermError {
@@ -58,6 +59,10 @@ pub enum CatermError {
     Io(#[from] IoError),
     #[error("validation: {0}")]
     Validation(#[from] ValidationError),
+    #[error("ftp: {0}")]
+    Ftp(#[from] FtpError),
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
 }
 
 impl CatermError {
@@ -73,6 +78,8 @@ impl CatermError {
             Self::Sync(e) => e.code(),
             Self::Io(e) => e.code(),
             Self::Validation(e) => e.code(),
+            Self::Ftp(e) => e.code(),
+            Self::NotImplemented(_) => "CAT-CORE-501",
         }
     }
 
@@ -88,6 +95,8 @@ impl CatermError {
             Self::Sync(_) => "SYNC",
             Self::Io(_) => "IO",
             Self::Validation(_) => "VALIDATION",
+            Self::Ftp(_) => "FTP",
+            Self::NotImplemented(_) => "CORE",
         }
     }
 
@@ -114,6 +123,8 @@ impl CatermError {
             Self::Sync(SyncError::Generic(PLACEHOLDER.into())),
             Self::Io(IoError::Generic(PLACEHOLDER.into())),
             Self::Validation(ValidationError::Generic(PLACEHOLDER.into())),
+            Self::Ftp(FtpError::Generic(PLACEHOLDER.into())),
+            Self::NotImplemented(PLACEHOLDER.into()),
         ]
     }
 

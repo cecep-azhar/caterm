@@ -354,6 +354,7 @@ fn handle_host(action: HostAction) -> i32 {
                 auth_method: auth,
                 tags,
                 os: None,
+                protocol: Some(caterm_core::store::ConnectionProtocol::Ssh),
                 secret: if secret.is_empty() {
                     None
                 } else {
