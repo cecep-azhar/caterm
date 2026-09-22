@@ -32,6 +32,7 @@
     type LocalFileEntry
   } from '$lib/api/local_fs';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
+  import RemoteFileEditor from '$lib/components/RemoteFileEditor.svelte';
 
   interface TransferItem {
     id: string;
@@ -1407,17 +1408,15 @@
         </div>
       </div>
 
-      <div class="flex-1 p-2 bg-neutral-50 dark:bg-[#12161b] relative overflow-hidden flex flex-col">
-        {#if isEditorLoading}
-          <div class="absolute inset-0 flex items-center justify-center bg-black/20 dark:bg-black/40 text-xs text-neutral-600 dark:text-slate-400">
-            Loading file contents...
-          </div>
-        {/if}
-        <textarea
-          bind:value={editorContent}
-          class="w-full h-full bg-transparent text-neutral-900 dark:text-slate-200 font-mono text-xs p-2 resize-none focus:outline-none"
-          spellcheck="false"
-        ></textarea>
+      <div class="flex-1 bg-neutral-50 dark:bg-[#12161b] relative overflow-hidden flex flex-col">
+        <RemoteFileEditor
+          bind:content={editorContent}
+          filename={editorItem.name}
+          pane={editorItem.pane}
+          onSave={saveEditorFile}
+          saving={isEditorSaving}
+          loading={isEditorLoading}
+        />
       </div>
     </div>
   </div>
