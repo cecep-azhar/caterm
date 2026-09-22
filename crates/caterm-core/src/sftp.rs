@@ -297,6 +297,100 @@ pub fn copy_remote_file(
     write_remote_file(host_id, dst_path, &data)
 }
 
+/// Compress remote items via `tar -czf` (unix) or `tar.exe -czf` (windows).
+/// `archive_name` must be a simple filename (e.g. `archive.tar.gz`); it is
+/// created in `parent_dir`. Items are relative names inside `parent_dir`.
+pub fn compress_remote(
+    host_id: &str,
+    parent_dir: &str,
+    items: Vec<String>,
+    archive_name: &str,
+) -> Result<(), CatermError> {
+    if items.is_empty() {
+        return Err(sftp_err("No items specified for compression".into()));
+    }
+    let dir = parent_dir.to_string();
+    let archive = archive_name.to_string();
+    // ponytail: zip support, use archive_name suffix to pick tool; add when needed
+    let items_shell: Vec<String> = items.iter().map(|s| shell_quote(s)).collect();
+    let items_str = items_shell.join(" ");
+    let q_dir = shell_quote(&dir);
+    let q_archive = shell_quote(&archive);
+    // Works on all POSIX targets; Windows SSH servers typically ship tar.exe (Win10+).
+    let cmd = format!("cd {q_dir} && tar -czf {q_archive} {items_str}");
+
+    crate::ssh::with_exec_session(host_id, move |sess| {
+        let mut channel = sess
+            .channel_session()
+            .map_err(|e| sftp_err(format!("Failed to open SSH channel for compress: {e}")))?;
+        channel
+            .exec(&cmd)
+            .map_err(|e| sftp_err(format!("Failed to exec compress command: {e}")))?;
+        let mut stdout = String::new();
+        let mut stderr = String::new();
+        use std::io::Read;
+        let _ = channel.read_to_string(&mut stdout);
+        let _ = channel.stderr().read_to_string(&mut stderr);
+        channel.wait_close().unwrap_or_default();
+        let exit = channel.exit_status().unwrap_or(1);
+        if exit != 0 {
+            return Err(sftp_err(format!(
+                "tar exited with status {exit}: {stderr}"
+            )));
+        }
+        Ok(())
+    })
+}
+
+/// Extract a remote archive into `dest_dir`.
+/// Supports `.tar.gz`, `.tgz`, `.tar.bz2`, `.tar.xz`, `.tar`, `.zip`.
+pub fn extract_remote(
+    host_id: &str,
+    archive_path: &str,
+    dest_dir: &str,
+) -> Result<(), CatermError> {
+    let archive = archive_path.to_string();
+    let dest = dest_dir.to_string();
+    let q_archive = shell_quote(&archive);
+    let q_dest = shell_quote(&dest);
+
+    let lower = archive.to_lowercase();
+    // ponytail: PowerShell Expand-Archive fallback for Windows-only SSH servers; add when needed
+    let cmd = if lower.ends_with(".zip") {
+        format!("mkdir -p {q_dest} && unzip -o {q_archive} -d {q_dest}")
+    } else {
+        // tar auto-detects compression from the flag set; -xf handles .gz/.bz2/.xz
+        format!("mkdir -p {q_dest} && tar -xf {q_archive} -C {q_dest}")
+    };
+
+    crate::ssh::with_exec_session(host_id, move |sess| {
+        let mut channel = sess
+            .channel_session()
+            .map_err(|e| sftp_err(format!("Failed to open SSH channel for extract: {e}")))?;
+        channel
+            .exec(&cmd)
+            .map_err(|e| sftp_err(format!("Failed to exec extract command: {e}")))?;
+        let mut stdout = String::new();
+        let mut stderr = String::new();
+        use std::io::Read;
+        let _ = channel.read_to_string(&mut stdout);
+        let _ = channel.stderr().read_to_string(&mut stderr);
+        channel.wait_close().unwrap_or_default();
+        let exit = channel.exit_status().unwrap_or(1);
+        if exit != 0 {
+            return Err(sftp_err(format!(
+                "extract exited with status {exit}: {stderr}"
+            )));
+        }
+        Ok(())
+    })
+}
+
+/// POSIX single-quote escaping: wrap in `'`, replace every `'` inside with `'\''`.
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
+}
+
 /// Uploads a local file to remote SFTP with 64KB chunking and progress callbacks.
 pub fn upload_file_with_progress<F>(
     host_id: &str,
@@ -479,6 +573,20 @@ mod tests {
         assert!(delete_remote_file("", "/tmp/x", false, false).is_err());
         assert!(chmod_remote_file("", "/tmp/x", 0o755).is_err());
         assert!(stat_remote("", "/tmp/x").is_err());
+        assert!(compress_remote("", "/tmp", vec!["a".into()], "out.tar.gz").is_err());
+        assert!(extract_remote("", "/tmp/out.tar.gz", "/tmp/dest").is_err());
+    }
+
+    #[test]
+    fn compress_rejects_empty_items() {
+        assert!(compress_remote("host1", "/tmp", vec![], "out.tar.gz").is_err());
+    }
+
+    #[test]
+    fn shell_quote_escapes_properly() {
+        assert_eq!(shell_quote("hello"), "'hello'");
+        assert_eq!(shell_quote("hello world"), "'hello world'");
+        assert_eq!(shell_quote("foo'bar"), r"'foo'\''bar'");
     }
 
     #[test]

@@ -91,3 +91,20 @@ export function sftpDownload(
 export function sftpCancel(transferId: string): Promise<void> {
   return invoke('sftp_cancel', { transferId });
 }
+
+export function sftpCompress(
+  hostId: string,
+  parentDir: string,
+  items: string[],
+  archiveName: string
+): Promise<void> {
+  return invoke('sftp_compress', { hostId, parentDir, items, archiveName });
+}
+
+export function sftpExtract(
+  hostId: string,
+  archivePath: string,
+  destDir: string
+): Promise<void> {
+  return invoke('sftp_extract', { hostId, archivePath, destDir });
+}
