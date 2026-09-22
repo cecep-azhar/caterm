@@ -3,6 +3,7 @@
   import { isVaultInitialized, validateVaultPassword, resetVault } from '$lib/api/vault';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import Logo from './Logo.svelte';
+  import SnakeFlowBackground from './SnakeFlowBackground.svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
 
@@ -63,6 +64,21 @@
       } catch (err) {
         console.warn('Failed to close window:', err);
       }
+    }
+  }
+
+  async function startDragging(e: MouseEvent) {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, input, textarea, a, .no-drag')) return;
+    try {
+      if (appWindow) {
+        await appWindow.startDragging();
+      } else if (typeof window !== 'undefined') {
+        await getCurrentWindow().startDragging();
+      }
+    } catch (err) {
+      console.warn('Failed to start dragging window:', err);
     }
   }
 
@@ -143,11 +159,23 @@
 
 <div class="fixed inset-0 z-50 flex bg-[#0a0a0a] text-white select-none">
   <!-- Top Drag Region Bar with Custom Window Controls -->
-  <div data-tauri-drag-region class="absolute top-0 left-0 right-0 h-9 z-50 flex items-center justify-between px-3">
-    <div class="flex items-center gap-2 pointer-events-none opacity-80">
-      <span class="text-[11px] font-mono text-neutral-400 font-semibold tracking-wider">CATERM</span>
-      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono">v2.1.7</span>
+  <div
+    data-tauri-drag-region
+    class="absolute top-0 left-0 right-0 h-9 z-50 flex items-center justify-between px-3 cursor-default"
+    onmousedown={startDragging}
+    ondblclick={(e) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('button, input, textarea, a, .no-drag')) {
+        maximizeWindow();
+      }
+    }}
+  >
+    <div class="flex items-center gap-2 pointer-events-none opacity-80" data-tauri-drag-region>
+      <span class="text-[11px] font-mono text-neutral-400 font-semibold tracking-wider" data-tauri-drag-region>CATERM</span>
+      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono" data-tauri-drag-region>v2.1.7</span>
     </div>
+    <!-- Draggable space spanning the rest of the header -->
+    <div class="flex-1 h-full" data-tauri-drag-region></div>
     <div class="flex items-center no-drag">
       <button
         onclick={() => minimizeWindow()}
@@ -181,6 +209,9 @@
     <!-- Ambient Grid Effect -->
     <div class="absolute inset-0 bg-[linear-gradient(to_right,#1f293715_1px,transparent_1px),linear-gradient(to_bottom,#1f293715_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
     
+    <!-- White Snake Flow Animation to CATerm Logo -->
+    <SnakeFlowBackground targetX={70} targetY={70} count={18} />
+
     <div class="relative z-10 flex items-center gap-3">
       <Logo size={40} mode="brand" />
       <div>

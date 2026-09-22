@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
   import HostDetailPanel from '$lib/components/HostDetailPanel.svelte';
@@ -81,9 +82,30 @@
   let showFormSecret = $state(false);
   let formTags = $state('');
   let formOs = $state('');
+  let unlistenOsDetected: UnlistenFn | null = null;
 
   onMount(async () => {
     await refreshHosts();
+    try {
+      unlistenOsDetected = await listen<{ hostId: string; os: string }>('host:os_detected', (event) => {
+        const { hostId, os } = event.payload;
+        const targetIndex = hosts.findIndex((h) => h.id === hostId);
+        if (targetIndex !== -1) {
+          hosts[targetIndex] = { ...hosts[targetIndex], os };
+        }
+        if (detailHost && detailHost.id === hostId) {
+          detailHost = { ...detailHost, os };
+        }
+      });
+    } catch (e) {
+      console.error('Failed to listen for host:os_detected', e);
+    }
+  });
+
+  onDestroy(() => {
+    if (unlistenOsDetected) {
+      unlistenOsDetected();
+    }
   });
 
   async function refreshHosts() {
@@ -279,25 +301,9 @@
       {#each filteredHosts as host (host.id)}
         <div class="p-5 bg-white dark:bg-neutral-900 border rounded-xl shadow-sm dark:shadow-none transition-colors flex flex-col justify-between group {isSelected(host.id) ? 'border-sky-500 dark:border-sky-500 ring-1 ring-sky-500/40' : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700'}">
           <div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-2 min-w-0">
-                <OsIcon os={host.os} name={host.label} tags={host.tags} address={host.address} size={18} />
-                <span class="font-bold text-neutral-900 dark:text-white text-base truncate">{host.label}</span>
-              </div>
-              <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button
-                  onclick={() => openEditModal(host)}
-                  class="p-1 text-neutral-400 hover:text-sky-500 dark:hover:text-sky-400 rounded transition-colors"
-                  title="Edit Host">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-                </button>
-                <button
-                  onclick={() => handleDelete(host.id)}
-                  class="p-1 text-neutral-400 hover:text-rose-500 dark:hover:text-rose-400 rounded transition-colors"
-                  title="Delete Host">
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                </button>
-              </div>
+            <div class="flex items-center gap-2 min-w-0 mb-2">
+              <OsIcon os={host.os} name={host.label} tags={host.tags} address={host.address} size={18} />
+              <span class="font-bold text-neutral-900 dark:text-white text-base truncate">{host.label}</span>
             </div>
 
             <div class="space-y-1 font-mono text-xs text-neutral-500 dark:text-neutral-400">
@@ -314,61 +320,85 @@
             {/if}
           </div>
 
-          <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-start gap-2">
-            <!-- 1. Connect: Lightning SVG, primary button -->
-            <button
-              onclick={() => openSession(host.id)}
-              class="w-8 h-8 flex items-center justify-center bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all shrink-0"
-              title="Connect"
-              aria-label="Connect"
-            >
-              <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M13 2L3 14h7v8l11-12h-8l1-8z" />
-              </svg>
-            </button>
+          <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <!-- 1. Connect: Lightning SVG, primary button -->
+              <button
+                onclick={() => openSession(host.id)}
+                class="w-8 h-8 flex items-center justify-center bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all shrink-0"
+                title="Connect"
+                aria-label="Connect"
+              >
+                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                  <path d="M13 2L3 14h7v8l11-12h-8l1-8z" />
+                </svg>
+              </button>
 
-            <!-- 2. Clone: Duplicate/Copy SVG -->
-            <button
-              onclick={() => handleClone(host)}
-              class="w-8 h-8 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-300 dark:border-neutral-700 transition-all shrink-0 shadow-sm"
-              title="Clone Host"
-              aria-label="Clone Host"
-            >
-              <svg class="w-4 h-4 text-sky-600 dark:text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-            </button>
+              <!-- 2. Clone: Duplicate/Copy SVG -->
+              <button
+                onclick={() => handleClone(host)}
+                class="w-8 h-8 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-300 dark:border-neutral-700 transition-all shrink-0 shadow-sm"
+                title="Clone Host"
+                aria-label="Clone Host"
+              >
+                <svg class="w-4 h-4 text-sky-600 dark:text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </button>
 
-            <!-- 3. Check: Select checkbox SVG -->
-            <button
-              onclick={() => toggleSelected(host.id)}
-              aria-pressed={isSelected(host.id)}
-              class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium border transition-all shrink-0 {isSelected(host.id) ? 'bg-sky-600 border-sky-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
-              title="Select for batch action"
-              aria-label="Select for batch action"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-            </button>
+              <!-- 3. Check: Select checkbox SVG -->
+              <button
+                onclick={() => toggleSelected(host.id)}
+                aria-pressed={isSelected(host.id)}
+                class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium border transition-all shrink-0 {isSelected(host.id) ? 'bg-sky-600 border-sky-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
+                title="Select for batch action"
+                aria-label="Select for batch action"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+              </button>
 
-            <!-- 4. Folder: SFTP File Manager SVG -->
-            <a
-              href="/sftp?host={host.id}"
-              class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
-              title="Files (SFTP)"
-              aria-label="Files (SFTP)"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-            </a>
+              <!-- 4. Folder: SFTP File Manager SVG -->
+              <a
+                href="/sftp?host={host.id}"
+                class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
+                title="Files (SFTP)"
+                aria-label="Files (SFTP)"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
+              </a>
 
-            <!-- 5. Info: Host Details SVG -->
-            <button
-              onclick={() => (detailHost = host)}
-              class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
-              title="Host Details"
-              aria-label="Host Details"
-            >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-            </button>
+              <!-- 5. Info: Host Details SVG -->
+              <button
+                onclick={() => (detailHost = host)}
+                class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
+                title="Host Details"
+                aria-label="Host Details"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <!-- Edit Host -->
+              <button
+                onclick={() => openEditModal(host)}
+                class="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-700/80 text-neutral-400 hover:text-sky-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
+                title="Edit Host"
+                aria-label="Edit Host"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+              </button>
+
+              <!-- Delete Host -->
+              <button
+                onclick={() => handleDelete(host.id)}
+                class="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-700/80 text-neutral-400 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800/60 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all shrink-0"
+                title="Delete Host"
+                aria-label="Delete Host"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+              </button>
+            </div>
           </div>
         </div>
       {/each}

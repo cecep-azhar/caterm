@@ -238,6 +238,21 @@ pub fn delete_host(id: &str) -> Result<(), CatermError> {
     delete_host_in(&db::open()?, id)
 }
 
+pub(crate) fn update_host_os_in(conn: &Connection, id: &str, os: &str) -> Result<(), CatermError> {
+    let now = now_unix();
+    conn.execute(
+        "UPDATE hosts SET os = ?1, updated_at = ?2 WHERE id = ?3",
+        params![os, now as i64, id],
+    )
+    .map_err(|e| CatermError::Db(DbError::Generic(format!("failed to update host os: {e}"))))?;
+    Ok(())
+}
+
+/// Update only the operating system identifier for a host.
+pub fn update_host_os(id: &str, os: &str) -> Result<(), CatermError> {
+    update_host_os_in(&db::open()?, id, os)
+}
+
 pub(crate) fn load_host_for_connect_in(
     conn: &Connection,
     id: &str,

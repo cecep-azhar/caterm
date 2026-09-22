@@ -42,6 +42,13 @@ struct SshClosedEvent {
     session_id: String,
 }
 
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HostOsDetectedEvent {
+    host_id: String,
+    os: String,
+}
+
 /// Bridges `caterm_core`'s GUI-free event sink to Tauri's event bus. Registering this is what
 /// switches PTY delivery from "frontend polls `ssh_read` 25x/second" to push — the core buffers
 /// nothing once a sink exists, so bytes are delivered exactly once.
@@ -53,6 +60,9 @@ fn install_ssh_event_bridge(app: &tauri::AppHandle) {
         }
         caterm_core::ssh::SshEvent::Closed { session_id } => {
             let _ = handle.emit("ssh://closed", SshClosedEvent { session_id });
+        }
+        caterm_core::ssh::SshEvent::OsDetected { host_id, os } => {
+            let _ = handle.emit("host:os_detected", HostOsDetectedEvent { host_id, os });
         }
     });
 }
@@ -158,6 +168,7 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::ssh_read,
             commands::ssh_resize,
             commands::ssh_disconnect,
+            commands::detect_host_os,
             commands::get_ai_settings,
             commands::save_ai_settings,
             commands::ai_generate_plan,

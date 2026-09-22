@@ -126,6 +126,22 @@
     }
   }
 
+  async function startDragging(e: MouseEvent) {
+    if (e.button !== 0) return;
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) return;
+    try {
+      if (appWindow) {
+        await appWindow.startDragging();
+      } else if (typeof window !== 'undefined') {
+        const win = getCurrentWindow();
+        await win.startDragging();
+      }
+    } catch (err) {
+      console.warn('Failed to start dragging window:', err);
+    }
+  }
+
   let toastsList = $derived(getToasts());
   let unreadCount = $derived(toastsList.length);
 
@@ -514,7 +530,17 @@
          (host chip, Files toggle, split controls, a duplicate Workspaces menu) is folded in
          here: two stacked 40-44px bars cost ~84px of vertical space to show one row of
          information. Per-pane host/address now lives on each TerminalPane's own strip. -->
-    <header class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center pl-1 pr-1 md:pl-2 bg-white dark:bg-neutral-900 shrink-0 select-none transition-colors duration-150 gap-1 md:gap-2" data-tauri-drag-region>
+    <header
+      class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center pl-1 pr-1 md:pl-2 bg-white dark:bg-neutral-900 shrink-0 select-none transition-colors duration-150 gap-1 md:gap-2 cursor-default"
+      data-tauri-drag-region
+      onmousedown={startDragging}
+      ondblclick={(e) => {
+        const target = e.target as HTMLElement | null;
+        if (!target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) {
+          maximizeWindow();
+        }
+      }}
+    >
       <!-- Left: navigation + session tabs -->
       <div class="flex items-center gap-1 min-w-0 flex-1">
         <!-- Mobile Menu Hamburger Button -->

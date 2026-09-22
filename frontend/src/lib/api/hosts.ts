@@ -46,3 +46,7 @@ export function saveHost(input: HostInput): Promise<HostRecord> {
 export function deleteHost(id: string): Promise<void> {
   return invoke('delete_host', { id });
 }
+
+export function detectHostOs(hostId: string): Promise<string> {
+  return invoke('detect_host_os', { hostId });
+}

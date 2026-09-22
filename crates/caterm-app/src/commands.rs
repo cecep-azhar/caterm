@@ -382,6 +382,11 @@ pub async fn ssh_disconnect(session_id: String) -> Result<(), CatermError> {
 }
 
 #[tauri::command]
+pub async fn detect_host_os(host_id: String) -> Result<String, CatermError> {
+    run_blocking(move || ssh::detect_host_os(&host_id)).await
+}
+
+#[tauri::command]
 pub async fn list_teams() -> Result<Vec<teams::TeamRecord>, CatermError> {
     run_blocking(teams::list_teams).await
 }
@@ -446,32 +451,19 @@ pub async fn ai_chat(
     run_blocking(move || ai::chat(messages, host_label.as_deref())).await
 }
 
+fn do_open_url(url: &str) -> Result<(), CatermError> {
+    #[cfg(target_os = "linux")]
+    let res = std::process::Command::new("xdg-open").arg(url).spawn();
+    #[cfg(target_os = "windows")]
+    let res = std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn();
+    #[cfg(target_os = "macos")]
+    let res = std::process::Command::new("open").arg(url).spawn();
+    res.map(|_| ()).map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into())
+}
+
 #[tauri::command]
 pub async fn open_external_url(url: String) -> Result<(), CatermError> {
-    run_blocking(move || {
-        #[cfg(target_os = "linux")]
-        {
-            std::process::Command::new("xdg-open")
-                .arg(&url)
-                .spawn()
-                .map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")))?;
-        }
-        #[cfg(target_os = "windows")]
-        {
-            std::process::Command::new("cmd")
-                .args(["/C", "start", "", &url])
-                .spawn()
-                .map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")))?;
-        }
-        #[cfg(target_os = "macos")]
-        {
-            std::process::Command::new("open")
-                .arg(&url)
-                .spawn()
-                .map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")))?;
-        }
-        Ok(())
-    }).await
+    run_blocking(move || do_open_url(&url)).await
 }
 
 #[tauri::command]

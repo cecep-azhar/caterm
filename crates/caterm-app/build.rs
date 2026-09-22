@@ -60,6 +60,7 @@ const COMMANDS: &[&str] = &[
     "window_minimize",
     "window_maximize",
     "window_close",
+    "open_external_url",
     // Backup & restore
     "export_encrypted_backup",
     "import_encrypted_backup",
@@ -81,6 +82,7 @@ const COMMANDS: &[&str] = &[
     "ssh_read",
     "ssh_resize",
     "ssh_disconnect",
+    "detect_host_os",
     // AI / Prompt Studio
     "get_ai_settings",
     "save_ai_settings",

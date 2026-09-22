@@ -44,6 +44,7 @@ pub struct SshSession {
 pub enum SshEvent {
     Output { session_id: String, data: String },
     Closed { session_id: String },
+    OsDetected { host_id: String, os: String },
 }
 
 type EventSink = Box<dyn Fn(SshEvent) + Send + Sync + 'static>;
@@ -564,6 +565,12 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         sessions.insert(session_id.clone(), handle);
     }
 
+    // Automatically detect remote OS in the background without blocking terminal startup
+    let hid_detect = host.id.clone();
+    thread::spawn(move || {
+        let _ = detect_host_os(&hid_detect);
+    });
+
     Ok(SshSession {
         session_id,
         host_id: host.id,
@@ -675,6 +682,253 @@ pub fn disconnect(session_id: &str) -> Result<(), CatermError> {
     Ok(())
 }
 
+/// Parses raw remote probe output (from `/etc/os-release` or `uname`) into a canonical OS identifier.
+pub fn parse_os_key(raw: &str) -> String {
+    let lower = raw.to_lowercase();
+
+    // 1. Look for ID= line in os-release
+    for line in lower.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("id=") {
+            let id = rest.trim_matches('"').trim_matches('\'').trim();
+            if !id.is_empty() {
+                if id.contains("ubuntu") {
+                    return "ubuntu".to_string();
+                }
+                if id.contains("debian") {
+                    return "debian".to_string();
+                }
+                if id.contains("alpine") {
+                    return "alpine".to_string();
+                }
+                if id.contains("arch") {
+                    return "arch".to_string();
+                }
+                if id.contains("fedora") {
+                    return "fedora".to_string();
+                }
+                if id.contains("centos") {
+                    return "centos".to_string();
+                }
+                if id.contains("rocky") {
+                    return "rocky".to_string();
+                }
+                if id.contains("alma") {
+                    return "almalinux".to_string();
+                }
+                if id.contains("rhel") || id.contains("redhat") {
+                    return "redhat".to_string();
+                }
+                if id.contains("manjaro") {
+                    return "manjaro".to_string();
+                }
+                if id.contains("opensuse") || id.contains("suse") {
+                    return "opensuse".to_string();
+                }
+                if id.contains("mint") {
+                    return "mint".to_string();
+                }
+                if id.contains("kali") {
+                    return "kali".to_string();
+                }
+                if id.contains("pop") {
+                    return "popos".to_string();
+                }
+                if id.contains("gentoo") {
+                    return "gentoo".to_string();
+                }
+                if id.contains("nixos") {
+                    return "nixos".to_string();
+                }
+                if id.contains("raspbian") || id.contains("raspberry") {
+                    return "raspberry".to_string();
+                }
+                if id.contains("amzn") || id.contains("amazon") {
+                    return "amazon".to_string();
+                }
+                if id.contains("oracle") {
+                    return "oracle".to_string();
+                }
+                if id.contains("void") {
+                    return "void".to_string();
+                }
+                if id.contains("endeavour") {
+                    return "endeavour".to_string();
+                }
+                if id.contains("elementary") {
+                    return "elementary".to_string();
+                }
+                if id.contains("zorin") {
+                    return "zorin".to_string();
+                }
+                if id.contains("freebsd") {
+                    return "freebsd".to_string();
+                }
+                if id.contains("openbsd") {
+                    return "openbsd".to_string();
+                }
+                if id.contains("netbsd") {
+                    return "netbsd".to_string();
+                }
+                return id.to_string();
+            }
+        }
+    }
+
+    // 2. Check ID_LIKE= line
+    for line in lower.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("id_like=") {
+            let like = rest.trim_matches('"').trim_matches('\'').trim();
+            if like.contains("ubuntu") {
+                return "ubuntu".to_string();
+            }
+            if like.contains("debian") {
+                return "debian".to_string();
+            }
+            if like.contains("rhel") || like.contains("centos") || like.contains("fedora") {
+                return "redhat".to_string();
+            }
+            if like.contains("arch") {
+                return "arch".to_string();
+            }
+            if like.contains("suse") {
+                return "opensuse".to_string();
+            }
+        }
+    }
+
+    // 3. Fallback checks across full output
+    if lower.contains("ubuntu") {
+        return "ubuntu".to_string();
+    }
+    if lower.contains("debian") {
+        return "debian".to_string();
+    }
+    if lower.contains("alpine") {
+        return "alpine".to_string();
+    }
+    if lower.contains("arch") {
+        return "arch".to_string();
+    }
+    if lower.contains("fedora") {
+        return "fedora".to_string();
+    }
+    if lower.contains("centos") {
+        return "centos".to_string();
+    }
+    if lower.contains("rocky") {
+        return "rocky".to_string();
+    }
+    if lower.contains("alma") {
+        return "almalinux".to_string();
+    }
+    if lower.contains("red hat") || lower.contains("rhel") {
+        return "redhat".to_string();
+    }
+    if lower.contains("manjaro") {
+        return "manjaro".to_string();
+    }
+    if lower.contains("opensuse") || lower.contains("suse") {
+        return "opensuse".to_string();
+    }
+    if lower.contains("mint") {
+        return "mint".to_string();
+    }
+    if lower.contains("kali") {
+        return "kali".to_string();
+    }
+    if lower.contains("pop!_os") || lower.contains("popos") {
+        return "popos".to_string();
+    }
+    if lower.contains("gentoo") {
+        return "gentoo".to_string();
+    }
+    if lower.contains("nixos") {
+        return "nixos".to_string();
+    }
+    if lower.contains("raspbian") || lower.contains("raspberry") {
+        return "raspberry".to_string();
+    }
+    if lower.contains("amazon") || lower.contains("amzn") {
+        return "amazon".to_string();
+    }
+    if lower.contains("oracle") {
+        return "oracle".to_string();
+    }
+    if lower.contains("void") {
+        return "void".to_string();
+    }
+    if lower.contains("darwin") || lower.contains("macos") || lower.contains("apple") {
+        return "macos".to_string();
+    }
+    if lower.contains("windows")
+        || lower.contains("microsoft")
+        || lower.contains("cygwin")
+        || lower.contains("mingw")
+    {
+        return "windows".to_string();
+    }
+    if lower.contains("freebsd") {
+        return "freebsd".to_string();
+    }
+    if lower.contains("openbsd") {
+        return "openbsd".to_string();
+    }
+    if lower.contains("netbsd") {
+        return "netbsd".to_string();
+    }
+    if lower.contains("linux") {
+        return "linux".to_string();
+    }
+
+    "linux".to_string()
+}
+
+/// Detects the remote host's operating system via SSH non-interactive exec session,
+/// saves it to the local encrypted SQLite store, and emits an `OsDetected` event.
+pub fn detect_host_os(host_id: &str) -> Result<String, CatermError> {
+    require_non_empty("host_id", host_id)?;
+
+    const OS_DETECT_SCRIPT: &str = r#"
+if [ -f /etc/os-release ]; then
+    cat /etc/os-release
+elif [ -f /usr/lib/os-release ]; then
+    cat /usr/lib/os-release
+elif type uname >/dev/null 2>&1; then
+    uname -s
+elif [ -n "$COMSPEC" ] || [ -n "$OS" ]; then
+    echo "windows"
+else
+    echo "linux"
+fi
+"#;
+
+    let raw_output = with_exec_session(host_id, |sess| {
+        let mut channel = sess
+            .channel_session()
+            .map_err(|e| invalid(format!("Failed to open SSH channel for OS detection: {e}")))?;
+        channel
+            .exec(OS_DETECT_SCRIPT)
+            .map_err(|e| invalid(format!("Failed to execute OS detection command: {e}")))?;
+        let mut out = String::new();
+        channel.read_to_string(&mut out).unwrap_or_default();
+        channel.wait_close().unwrap_or_default();
+        Ok(out)
+    })?;
+
+    let detected = parse_os_key(&raw_output);
+    if !detected.is_empty() && detected != "unknown" {
+        let _ = crate::store::update_host_os(host_id, &detected);
+        emit(SshEvent::OsDetected {
+            host_id: host_id.to_string(),
+            os: detected.clone(),
+        });
+    }
+
+    Ok(detected)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -740,5 +994,38 @@ mod tests {
         let out = drain_utf8(&mut buf);
         assert!(out.starts_with("ok"));
         assert!(buf.is_empty());
+    }
+
+    #[test]
+    fn parse_os_key_debian() {
+        let os_release = r#"
+PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"
+NAME="Debian GNU/Linux"
+VERSION_ID="12"
+VERSION="12 (bookworm)"
+ID=debian
+HOME_URL="https://www.debian.org/"
+"#;
+        assert_eq!(parse_os_key(os_release), "debian");
+    }
+
+    #[test]
+    fn parse_os_key_ubuntu() {
+        let os_release = r#"
+NAME="Ubuntu"
+VERSION="24.04 LTS (Noble Numbat)"
+ID=ubuntu
+ID_LIKE=debian
+PRETTY_NAME="Ubuntu 24.04 LTS"
+"#;
+        assert_eq!(parse_os_key(os_release), "ubuntu");
+    }
+
+    #[test]
+    fn parse_os_key_alpine_and_arch() {
+        assert_eq!(parse_os_key("ID=alpine\nNAME=\"Alpine Linux\""), "alpine");
+        assert_eq!(parse_os_key("ID=arch\nNAME=\"Arch Linux\""), "arch");
+        assert_eq!(parse_os_key("Linux"), "linux");
+        assert_eq!(parse_os_key("Darwin"), "macos");
     }
 }
