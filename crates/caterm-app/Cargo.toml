@@ -21,11 +21,16 @@ serde.workspace = true
 serde_json.workspace = true
 async-trait = "0.1.92"
 parking_lot = "0.12.5"
-ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 tokio = { version = "1.53.1", features = ["full"] }
 tauri-plugin-shell = "2.3.6"
 tauri-plugin-dialog = "2.7.3"
 mimalloc = { version = "0.1", default-features = false }
+
+[target.'cfg(windows)'.dependencies]
+ssh2 = "0.9.6"
+
+[target.'cfg(not(windows))'.dependencies]
+ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", default-features = false }

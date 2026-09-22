@@ -16,9 +16,7 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 directories.workspace = true
-rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
 rand = "0.8"
-ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 argon2 = "0.5"
 secrecy = "0.8"
 zeroize = "1.8"
@@ -37,6 +35,14 @@ uuid = { version = "1.26.1", features = ["v4"] }
 # Blocking HTTP for the LLM endpoint. Replaces shelling out to `curl`, which put the API key
 # in the process argv where any local user could read it off the process table.
 ureq = { version = "3.1", features = ["json"] }
+
+[target.'cfg(windows)'.dependencies]
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
+ssh2 = "0.9.6"
+
+[target.'cfg(not(windows))'.dependencies]
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 
 [dev-dependencies]
 serde_json.workspace = true
