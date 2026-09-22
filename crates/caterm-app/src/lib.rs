@@ -134,6 +134,7 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::stop_tunnel,
             commands::poll_active_metrics,
             commands::list_remote_dir,
+            commands::search_remote_files,
             commands::read_remote_file,
             commands::write_remote_file,
             commands::mkdir_remote_dir,

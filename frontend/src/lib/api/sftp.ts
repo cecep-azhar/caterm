@@ -92,6 +92,32 @@ export function sftpCancel(transferId: string): Promise<void> {
   return invoke('sftp_cancel', { transferId });
 }
 
+export interface RemoteSearchItem {
+  path: string;
+  name: string;
+  size: number;
+  mtime: number;
+  is_dir: boolean;
+}
+
+export function searchRemoteFiles(
+  hostId: string,
+  basePath: string,
+  pattern: string,
+  maxResults?: number,
+  minSize?: number,
+  maxSize?: number
+): Promise<RemoteSearchItem[]> {
+  return invoke('search_remote_files', {
+    hostId,
+    basePath,
+    pattern,
+    maxResults: maxResults ?? 100,
+    minSize: minSize ?? null,
+    maxSize: maxSize ?? null
+  });
+}
+
 export interface ChecksumComparison {
   local_checksum: string;
   remote_checksum: string;
@@ -114,3 +140,4 @@ export function compareFileChecksums(
 ): Promise<ChecksumComparison> {
   return invoke('compare_file_checksums', { hostId, remotePath, localPath, algorithm });
 }
+

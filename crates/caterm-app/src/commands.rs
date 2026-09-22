@@ -85,6 +85,28 @@ pub async fn list_remote_dir(
 }
 
 #[tauri::command]
+pub async fn search_remote_files(
+    host_id: String,
+    base_path: String,
+    pattern: String,
+    max_results: Option<usize>,
+    min_size: Option<u64>,
+    max_size: Option<u64>,
+) -> Result<Vec<sftp::RemoteSearchItem>, CatermError> {
+    run_blocking(move || {
+        sftp::search_remote_files(
+            &host_id,
+            &base_path,
+            &pattern,
+            max_results.unwrap_or(100),
+            min_size,
+            max_size,
+        )
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn read_remote_file(
     host_id: String,
     remote_path: String,

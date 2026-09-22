@@ -14,11 +14,10 @@
     sftpUpload,
     sftpDownload,
     sftpCancel,
-    calculateRemoteChecksum,
-    compareFileChecksums,
+    searchRemoteFiles,
     type SftpFileEntry,
     type SftpProgressPayload,
-    type ChecksumComparison
+    type RemoteSearchItem
   } from '$lib/api/sftp';
   import {
     localListDir,
@@ -28,7 +27,6 @@
     localRename,
     localReadFile,
     localWriteFile,
-    calculateLocalChecksum,
     type LocalFileEntry
   } from '$lib/api/local_fs';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
@@ -64,6 +62,14 @@
   let remoteLoading = $state(false);
   let remoteSelectedPaths = $state<Set<string>>(new Set());
   let remoteLastSelected = $state<SftpFileEntry | null>(null);
+
+  // Remote Search State
+  let remoteSearchQuery = $state('');
+  let isSearchingRemote = $state(false);
+  let remoteSearchResults = $state<RemoteSearchItem[]>([]);
+  let showRemoteSearch = $state(false);
+  let searchMinSizeKB = $state<string>('');
+  let searchMaxSizeKB = $state<string>('');
 
   // Notifications
   let errorMsg = $state('');
@@ -104,89 +110,6 @@
   let chmodOtherR = $state(true);
   let chmodOtherW = $state(false);
   let chmodOtherX = $state(true);
-
-  // Checksum Modal
-  let showChecksumModal = $state(false);
-  let checksumPane = $state<'local' | 'remote'>('remote');
-  let checksumFilePath = $state('');
-  let checksumFileName = $state('');
-  let checksumAlgorithm = $state<'sha256' | 'md5'>('sha256');
-  let checksumResult = $state('');
-  let checksumLoading = $state(false);
-  let checksumError = $state('');
-  let compareResult = $state<ChecksumComparison | null>(null);
-  let compareOtherPath = $state('');    // path on the other pane for comparison
-
-  // Context Menu
-  let ctxMenu = $state<{ x: number; y: number; pane: 'local' | 'remote'; file: SftpFileEntry | LocalFileEntry } | null>(null);
-
-  function openChecksumModal(pane: 'local' | 'remote', file: SftpFileEntry | LocalFileEntry) {
-    ctxMenu = null;
-    checksumPane = pane;
-    checksumFilePath = file.path;
-    checksumFileName = file.name;
-    checksumResult = '';
-    checksumError = '';
-    compareResult = null;
-    // Pre-populate other pane path with same filename
-    if (pane === 'remote') {
-      compareOtherPath = localPath.replace(/\/+$/, '') + '/' + file.name;
-    } else {
-      compareOtherPath = remotePath.replace(/\/+$/, '') + '/' + file.name;
-    }
-    showChecksumModal = true;
-  }
-
-  async function runChecksum() {
-    checksumLoading = true;
-    checksumError = '';
-    checksumResult = '';
-    compareResult = null;
-    try {
-      if (checksumPane === 'remote') {
-        checksumResult = await calculateRemoteChecksum(currentHostId, checksumFilePath, checksumAlgorithm);
-      } else {
-        checksumResult = await calculateLocalChecksum(checksumFilePath, checksumAlgorithm);
-      }
-    } catch (e: any) {
-      checksumError = e?.message || String(e);
-    }
-    checksumLoading = false;
-  }
-
-  async function runComparison() {
-    if (!currentHostId || !compareOtherPath.trim()) return;
-    checksumLoading = true;
-    checksumError = '';
-    compareResult = null;
-    checksumResult = '';
-    try {
-      if (checksumPane === 'remote') {
-        // remote → local comparison
-        compareResult = await compareFileChecksums(currentHostId, checksumFilePath, compareOtherPath.trim(), checksumAlgorithm);
-      } else {
-        // local → remote comparison
-        compareResult = await compareFileChecksums(currentHostId, compareOtherPath.trim(), checksumFilePath, checksumAlgorithm);
-      }
-    } catch (e: any) {
-      checksumError = e?.message || String(e);
-    }
-    checksumLoading = false;
-  }
-
-  function copyToClipboard(text: string) {
-    navigator.clipboard.writeText(text).catch(() => {});
-    notifySuccess('Hash copied to clipboard!');
-  }
-
-  function handleContextMenu(e: MouseEvent, pane: 'local' | 'remote', file: SftpFileEntry | LocalFileEntry) {
-    e.preventDefault();
-    ctxMenu = { x: e.clientX, y: e.clientY, pane, file };
-  }
-
-  function closeCtxMenu() {
-    ctxMenu = null;
-  }
 
   function notifySuccess(msg: string) {
     successMsg = msg;
@@ -237,6 +160,48 @@
   function joinPath(dir: string, name: string): string {
     if (dir === '/' || dir === '.' || !dir) return `/${name}`;
     return `${dir.replace(/\/+$/, '')}/${name}`;
+  }
+
+  // --- REMOTE SEARCH ---
+  async function executeRemoteSearch() {
+    if (!currentHostId || !remoteSearchQuery.trim()) return;
+    isSearchingRemote = true;
+    remoteSearchResults = [];
+    const query = remoteSearchQuery.trim();
+    const pat = query.includes('*') || query.includes('?') ? query : `*${query}*`;
+    const minSizeBytes = searchMinSizeKB ? Math.round(parseFloat(searchMinSizeKB) * 1024) : undefined;
+    const maxSizeBytes = searchMaxSizeKB ? Math.round(parseFloat(searchMaxSizeKB) * 1024) : undefined;
+    try {
+      remoteSearchResults = await searchRemoteFiles(
+        currentHostId,
+        remotePath,
+        pat,
+        100,
+        minSizeBytes,
+        maxSizeBytes
+      );
+    } catch (e: any) {
+      errorMsg = `Search failed: ${e?.message || e}`;
+    } finally {
+      isSearchingRemote = false;
+    }
+  }
+
+  function jumpToSearchResult(item: RemoteSearchItem) {
+    if (item.is_dir) {
+      showRemoteSearch = false;
+      navigateRemote(item.path);
+    } else {
+      const parent = item.path.substring(0, item.path.lastIndexOf('/')) || '/';
+      showRemoteSearch = false;
+      remotePath = parent;
+      fetchRemoteFiles().then(() => {
+        remoteLastSelected = remoteFiles.find((f) => f.path === item.path) ?? null;
+        if (remoteLastSelected) {
+          remoteSelectedPaths = new Set([remoteLastSelected.path]);
+        }
+      });
+    }
   }
 
   // --- LOCAL FS LOGIC ---
@@ -721,7 +686,6 @@
 
   onMount(async () => {
     window.addEventListener('keydown', handleKeydown);
-    window.addEventListener('click', closeCtxMenu);
 
     unlistenProgress = await listen<SftpProgressPayload>('sftp-progress', (event) => {
       const payload = event.payload;
@@ -742,7 +706,6 @@
 
   onDestroy(() => {
     window.removeEventListener('keydown', handleKeydown);
-    window.removeEventListener('click', closeCtxMenu);
     if (unlistenProgress) {
       unlistenProgress();
     }
@@ -801,7 +764,6 @@
       <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F8</span> Delete
       <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F2</span> Rename
       <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F4</span> Edit
-      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-500 dark:text-slate-500">Right-click</span> Checksum
     </div>
 
     {#if currentHostId}
@@ -913,7 +875,6 @@
                     ondblclick={() => item.is_dir ? navigateLocal(item.path) : openEditorModal()}
                     draggable="true"
                     ondragstart={(e) => onDragStart(e, 'local', item)}
-                    oncontextmenu={(e) => handleContextMenu(e, 'local', item)}
                   >
                     <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
                       {#if item.is_dir}
@@ -984,7 +945,104 @@
         >
           +Dir
         </button>
+        <button
+          onclick={() => (showRemoteSearch = !showRemoteSearch)}
+          class={`px-2 py-1 rounded text-xs border flex items-center gap-1 transition ${
+            showRemoteSearch
+              ? 'bg-cyan-600 text-white border-cyan-500'
+              : 'bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 border-neutral-300 dark:border-slate-700'
+          }`}
+          title="Search remote files"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Search
+        </button>
       </div>
+
+      <!-- Remote Search & Filter Drawer -->
+      {#if showRemoteSearch}
+        <div class="p-2.5 bg-neutral-100/90 dark:bg-[#151921] border-b border-neutral-200 dark:border-slate-800 flex flex-col gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <input
+              type="text"
+              placeholder="Search pattern (e.g. *.log, config*)"
+              bind:value={remoteSearchQuery}
+              onkeydown={(e) => e.key === 'Enter' && executeRemoteSearch()}
+              class="flex-1 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+            />
+            <button
+              onclick={executeRemoteSearch}
+              disabled={isSearchingRemote || !remoteSearchQuery.trim()}
+              class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded font-medium flex items-center gap-1 transition"
+            >
+              {#if isSearchingRemote}
+                <span class="animate-spin inline-block">⏳</span> Searching...
+              {:else}
+                Find
+              {/if}
+            </button>
+            <button
+              onclick={() => { showRemoteSearch = false; remoteSearchResults = []; }}
+              class="px-2 py-1 text-neutral-500 hover:text-neutral-700 dark:hover:text-slate-200"
+              title="Close search"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="flex items-center gap-3 text-neutral-600 dark:text-slate-400">
+            <span class="text-[11px] font-semibold">Filters:</span>
+            <label class="flex items-center gap-1 text-[11px]">
+              Min KB:
+              <input
+                type="number"
+                min="0"
+                placeholder="0"
+                bind:value={searchMinSizeKB}
+                class="w-16 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono"
+              />
+            </label>
+            <label class="flex items-center gap-1 text-[11px]">
+              Max KB:
+              <input
+                type="number"
+                min="0"
+                placeholder="∞"
+                bind:value={searchMaxSizeKB}
+                class="w-16 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono"
+              />
+            </label>
+            <span class="text-[10px] text-neutral-400 dark:text-slate-500 ml-auto">Under {remotePath}</span>
+          </div>
+
+          <!-- Search Results List -->
+          {#if remoteSearchResults.length > 0}
+            <div class="max-h-48 overflow-auto border border-neutral-200 dark:border-slate-800 rounded bg-white dark:bg-slate-900 divide-y divide-neutral-100 dark:divide-slate-800/60 font-mono text-[11px]">
+              {#each remoteSearchResults as result}
+                <div
+                  role="button"
+                  tabindex="0"
+                  onclick={() => jumpToSearchResult(result)}
+                  onkeydown={(e) => e.key === 'Enter' && jumpToSearchResult(result)}
+                  class="p-1.5 px-2 hover:bg-cyan-50 dark:hover:bg-cyan-950/40 cursor-pointer flex items-center justify-between gap-2"
+                >
+                  <div class="flex items-center gap-1.5 truncate">
+                    <span>{result.is_dir ? '📁' : '📄'}</span>
+                    <span class="font-medium text-neutral-800 dark:text-slate-200 truncate">{result.name}</span>
+                    <span class="text-neutral-400 dark:text-slate-500 text-[10px] truncate">({result.path})</span>
+                  </div>
+                  <div class="shrink-0 text-neutral-500 dark:text-slate-400 text-[10px]">
+                    {result.is_dir ? '<DIR>' : formatSize(result.size)}
+                  </div>
+                </div>
+              {/each}
+            </div>
+          {:else if !isSearchingRemote && remoteSearchQuery && remoteSearchResults.length === 0}
+            <div class="text-[11px] text-neutral-400 dark:text-slate-500 italic py-1">No matching files found.</div>
+          {/if}
+        </div>
+      {/if}
 
       <!-- Remote File Table -->
       <div class="flex-1 overflow-auto text-xs font-mono">
@@ -1018,7 +1076,6 @@
                   ondblclick={() => item.is_dir ? navigateRemote(item.path) : openEditorModal()}
                   draggable="true"
                   ondragstart={(e) => onDragStart(e, 'remote', item)}
-                  oncontextmenu={(e) => handleContextMenu(e, 'remote', item)}
                 >
                   <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
                     {#if item.is_dir}
@@ -1353,222 +1410,6 @@
             Apply
           </button>
         </div>
-      </div>
-    </div>
-  </div>
-{/if}
-
-<!-- CONTEXT MENU -->
-{#if ctxMenu}
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="fixed z-50 bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded shadow-xl py-1 text-xs w-48 font-mono select-none"
-    style={`top: ${ctxMenu.y}px; left: ${ctxMenu.x}px;`}
-    onclick={(e) => e.stopPropagation()}
-  >
-    <div class="px-3 py-1 text-[11px] text-neutral-400 dark:text-slate-500 truncate border-b border-neutral-100 dark:border-slate-800">
-      {ctxMenu.file.name}
-    </div>
-    {#if !ctxMenu.file.is_dir}
-      <button
-        onclick={() => ctxMenu && openChecksumModal(ctxMenu.pane, ctxMenu.file)}
-        class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 flex items-center gap-2 text-neutral-700 dark:text-slate-200"
-      >
-        <span>#</span>
-        <span>Checksum / Verify</span>
-      </button>
-    {/if}
-    {#if ctxMenu.pane === 'remote'}
-      <button
-        onclick={() => {
-          if (ctxMenu) {
-            const f = ctxMenu.file as SftpFileEntry;
-            closeCtxMenu();
-            openChmodModal(f);
-          }
-        }}
-        class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 flex items-center gap-2 text-neutral-700 dark:text-slate-200"
-      >
-        <span>🔒</span>
-        <span>Permissions (chmod)</span>
-      </button>
-    {/if}
-    <button
-      onclick={() => {
-        closeCtxMenu();
-        openRenameModal();
-      }}
-      class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-800 flex items-center gap-2 text-neutral-700 dark:text-slate-200"
-    >
-      <span>✏️</span>
-      <span>Rename (F2)</span>
-    </button>
-    <button
-      onclick={() => {
-        closeCtxMenu();
-        openDeleteModal();
-      }}
-      class="w-full text-left px-3 py-1.5 hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 flex items-center gap-2 border-t border-neutral-100 dark:border-slate-800"
-    >
-      <span>🗑️</span>
-      <span>Delete (F8)</span>
-    </button>
-  </div>
-{/if}
-
-<!-- MODAL: CHECKSUM & VERIFY -->
-{#if showChecksumModal}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
-    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-lg w-full p-4 space-y-4 shadow-xl text-xs">
-      <div class="flex items-center justify-between border-b border-neutral-200 dark:border-slate-700 pb-2">
-        <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200 flex items-center gap-2">
-          <span>#</span>
-          <span>File Checksum & Verification</span>
-        </h3>
-        <button
-          onclick={() => (showChecksumModal = false)}
-          class="text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200 text-base"
-        >
-          ✕
-        </button>
-      </div>
-
-      <!-- File info -->
-      <div class="bg-neutral-50 dark:bg-slate-900 p-2.5 rounded border border-neutral-200 dark:border-slate-800 space-y-1">
-        <div class="flex items-center justify-between">
-          <span class="text-neutral-500 dark:text-slate-400">Target File:</span>
-          <span class="font-bold text-neutral-800 dark:text-slate-200 truncate max-w-[280px]">{checksumFileName}</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-neutral-500 dark:text-slate-400">Pane:</span>
-          <span class="capitalize text-cyan-600 dark:text-cyan-400 font-medium">{checksumPane}</span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-neutral-500 dark:text-slate-400">Path:</span>
-          <span class="font-mono text-neutral-600 dark:text-slate-400 truncate max-w-[280px]" title={checksumFilePath}>{checksumFilePath}</span>
-        </div>
-      </div>
-
-      <!-- Algorithm selector -->
-      <div class="flex items-center gap-3">
-        <span class="font-medium text-neutral-700 dark:text-slate-300">Algorithm:</span>
-        <label class="flex items-center gap-1.5 cursor-pointer text-neutral-700 dark:text-slate-300">
-          <input
-            type="radio"
-            name="algo"
-            value="sha256"
-            checked={checksumAlgorithm === 'sha256'}
-            onchange={() => { checksumAlgorithm = 'sha256'; checksumResult = ''; compareResult = null; }}
-          />
-          <span class="font-mono">SHA-256</span>
-        </label>
-        <label class="flex items-center gap-1.5 cursor-pointer text-neutral-700 dark:text-slate-300">
-          <input
-            type="radio"
-            name="algo"
-            value="md5"
-            checked={checksumAlgorithm === 'md5'}
-            onchange={() => { checksumAlgorithm = 'md5'; checksumResult = ''; compareResult = null; }}
-          />
-          <span class="font-mono">MD5</span>
-        </label>
-      </div>
-
-      <!-- Calculate Single Checksum -->
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="font-semibold text-neutral-700 dark:text-slate-300">Hash:</span>
-          <button
-            onclick={runChecksum}
-            disabled={checksumLoading}
-            class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded font-medium transition"
-          >
-            {checksumLoading ? 'Computing...' : 'Compute Checksum'}
-          </button>
-        </div>
-
-        {#if checksumResult}
-          <div class="p-2.5 bg-neutral-100 dark:bg-slate-900 rounded border border-neutral-300 dark:border-slate-800 flex items-center justify-between gap-2">
-            <span class="font-mono text-[11px] text-neutral-800 dark:text-slate-200 break-all select-all">{checksumResult}</span>
-            <button
-              onclick={() => copyToClipboard(checksumResult)}
-              class="px-2 py-1 bg-white dark:bg-slate-800 border border-neutral-300 dark:border-slate-700 rounded text-[11px] hover:bg-neutral-50 shrink-0"
-              title="Copy to clipboard"
-            >
-              Copy
-            </button>
-          </div>
-        {/if}
-      </div>
-
-      <!-- Compare with Opposite Pane -->
-      {#if currentHostId}
-        <div class="border-t border-neutral-200 dark:border-slate-700 pt-3 space-y-2">
-          <span class="font-semibold text-neutral-700 dark:text-slate-300">
-            Compare against {checksumPane === 'remote' ? 'Local' : 'Remote'} File:
-          </span>
-          <div class="flex gap-2">
-            <input
-              type="text"
-              bind:value={compareOtherPath}
-              placeholder={checksumPane === 'remote' ? 'Local file path...' : 'Remote file path...'}
-              class="flex-1 bg-neutral-100 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-mono text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
-            />
-            <button
-              onclick={runComparison}
-              disabled={checksumLoading || !compareOtherPath.trim()}
-              class="px-3 py-1 bg-neutral-800 dark:bg-slate-700 hover:bg-neutral-700 text-white rounded font-medium disabled:opacity-50 shrink-0 transition"
-            >
-              {checksumLoading ? 'Comparing...' : 'Compare'}
-            </button>
-          </div>
-
-          {#if compareResult}
-            <div class={`p-3 rounded border space-y-2 ${
-              compareResult.matches
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800'
-                : 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800'
-            }`}>
-              <div class="flex items-center justify-between font-bold text-xs">
-                <span>Result:</span>
-                {#if compareResult.matches}
-                  <span class="text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
-                    ✓ MATCH — Files are identical
-                  </span>
-                {:else}
-                  <span class="text-rose-700 dark:text-rose-300 flex items-center gap-1">
-                    ✗ MISMATCH — Files differ!
-                  </span>
-                {/if}
-              </div>
-              <div class="font-mono text-[11px] space-y-1">
-                <div class="flex items-start justify-between gap-1">
-                  <span class="text-neutral-500 dark:text-slate-400 shrink-0">Local:</span>
-                  <span class="break-all text-right select-all">{compareResult.local_checksum}</span>
-                </div>
-                <div class="flex items-start justify-between gap-1">
-                  <span class="text-neutral-500 dark:text-slate-400 shrink-0">Remote:</span>
-                  <span class="break-all text-right select-all">{compareResult.remote_checksum}</span>
-                </div>
-              </div>
-            </div>
-          {/if}
-        </div>
-      {/if}
-
-      {#if checksumError}
-        <div class="p-2 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-600 dark:text-rose-400 text-xs rounded">
-          {checksumError}
-        </div>
-      {/if}
-
-      <div class="flex justify-end pt-1">
-        <button
-          onclick={() => (showChecksumModal = false)}
-          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded"
-        >
-          Close
-        </button>
       </div>
     </div>
   </div>
