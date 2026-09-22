@@ -3,7 +3,7 @@
   import { page } from '$app/state';
   import TerminalPane from '$lib/components/TerminalPane.svelte';
   import SessionFileManager from '$lib/components/SessionFileManager.svelte';
-  import { listHosts } from '$lib/api/hosts';
+  import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { getTabs, openTab, closeTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
