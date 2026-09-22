@@ -31,7 +31,7 @@
     localWriteFile,
     type LocalFileEntry
   } from '$lib/api/local_fs';
-  import { listHosts, type HostRecord } from '$lib/api/hosts';
+  import { listHosts, saveHost, type HostRecord, type ConnectionProtocol } from '$lib/api/hosts';
   import RemoteFileEditor from '$lib/components/RemoteFileEditor.svelte';
   import DirectorySync from '$lib/components/DirectorySync.svelte';
 
@@ -52,6 +52,79 @@
   let currentHostId = $state('');
   let viewMode = $state<'dual' | 'single'>('dual');
   let activePane = $state<'local' | 'remote'>('remote');
+
+  // Protocol & Quick Connect State
+  let showProtocolSelector = $state(false);
+  let qcAddress = $state('');
+  let qcPort = $state<number>(22);
+  let qcUsername = $state('root');
+  let qcPassword = $state('');
+  let qcProtocol = $state<ConnectionProtocol>('ssh');
+  let qcLabel = $state('');
+  let qcConnecting = $state(false);
+  let qcError = $state('');
+
+  let currentHost = $derived(hosts.find((h) => h.id === currentHostId));
+  let activeProtocolBadge = $derived.by(() => {
+    const proto = currentHost?.protocol;
+    if (proto === 's3') return 'S3';
+    if (proto === 'webdav') return 'WebDAV';
+    if (proto === 'ftp' || proto === 'ftps') return 'FTP';
+    return 'SFTP';
+  });
+
+  async function switchCurrentProtocol(proto: ConnectionProtocol) {
+    if (!currentHost) return;
+    try {
+      await saveHost({
+        id: currentHost.id,
+        label: currentHost.label,
+        address: currentHost.address,
+        port: currentHost.port,
+        username: currentHost.username,
+        authMethod: currentHost.authMethod,
+        tags: currentHost.tags,
+        os: currentHost.os,
+        protocol: proto,
+      });
+      currentHost.protocol = proto;
+      showProtocolSelector = false;
+      await fetchRemoteFiles();
+    } catch (e: any) {
+      errorMsg = e?.message || String(e);
+    }
+  }
+
+  async function handleQuickConnect() {
+    if (!qcAddress.trim()) {
+      qcError = 'Address is required';
+      return;
+    }
+    qcConnecting = true;
+    qcError = '';
+    try {
+      const label = qcLabel.trim() || `${qcProtocol.toUpperCase()} - ${qcAddress.trim()}`;
+      const defaultPort = qcProtocol === 'ftp' ? 21 : (qcProtocol === 's3' || qcProtocol === 'webdav' ? 443 : 22);
+      const newHost = await saveHost({
+        label,
+        address: qcAddress.trim(),
+        port: Number(qcPort) || defaultPort,
+        username: qcUsername.trim() || 'root',
+        authMethod: { type: 'password' },
+        tags: ['quick-connect'],
+        protocol: qcProtocol,
+        secret: qcPassword ? qcPassword : undefined,
+      });
+      hosts = await listHosts();
+      currentHostId = newHost.id;
+      showProtocolSelector = false;
+      await fetchRemoteFiles();
+    } catch (e: any) {
+      qcError = e?.message || String(e);
+    } finally {
+      qcConnecting = false;
+    }
+  }
 
   // Local Pane State
   let localPath = $state('~');

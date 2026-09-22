@@ -139,3 +139,29 @@ impl RemoteFileSystem for SftpFileSystem {
         )
     }
 }
+
+/// Factory function returning the appropriate `RemoteFileSystem` implementation
+/// based on the host's configured connection protocol.
+pub fn get_remote_fs(host_id: &str) -> Result<Box<dyn RemoteFileSystem>, CatermError> {
+    let host = crate::store::get_host(host_id)?;
+    match host.protocol {
+        crate::store::ConnectionProtocol::Ssh => {
+            Ok(Box::new(SftpFileSystem::new(host_id)))
+        }
+        crate::store::ConnectionProtocol::Scp => {
+            Ok(Box::new(crate::scp::ScpFileSystem::new(host_id)))
+        }
+        crate::store::ConnectionProtocol::Ftp => {
+            Ok(Box::new(crate::ftp::FtpFileSystem::new(host_id, false)))
+        }
+        crate::store::ConnectionProtocol::Ftps => {
+            Ok(Box::new(crate::ftp::FtpFileSystem::new(host_id, true)))
+        }
+        crate::store::ConnectionProtocol::WebDav => {
+            Ok(Box::new(crate::webdav::WebDavFileSystem::new(host_id)))
+        }
+        crate::store::ConnectionProtocol::S3 => {
+            Ok(Box::new(crate::s3::S3FileSystem::new(host_id)))
+        }
+    }
+}

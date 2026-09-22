@@ -212,7 +212,11 @@
   let prevTabsCount = $state(0);
   let mobileDrawerOpen = $state(false);
 
-  // Auto-collapse to icon-only mode when an active connection exists, expand when none
+  function trimMemory() {
+    invoke('trim_memory').catch(() => {});
+  }
+
+  // Auto-collapse sidebar and trim memory when no active sessions or when a session is closed
   $effect(() => {
     const currentCount = sessionTabs.length;
     if (prevTabsCount === 0 && currentCount > 0) {
@@ -220,7 +224,20 @@
     } else if (prevTabsCount > 0 && currentCount === 0) {
       isCollapsed = false;
     }
+    if (currentCount === 0 || currentCount < prevTabsCount) {
+      trimMemory();
+    }
     prevTabsCount = currentCount;
+  });
+
+  // Periodic memory trimming when idle (every 60s)
+  $effect(() => {
+    const timer = setInterval(() => {
+      if (sessionTabs.length === 0) {
+        trimMemory();
+      }
+    }, 60000);
+    return () => clearInterval(timer);
   });
 
   function toggleSidebar() {

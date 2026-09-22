@@ -36,8 +36,15 @@ pub fn reset_vault() -> Result<(), CatermError> {
     let _ = crate::tunnels::stop_all_tunnels();
     if let Ok(mut sessions) = crate::ssh::SESSIONS.lock() {
         for (_id, handle) in sessions.drain() {
-            if let Ok(mut ch) = handle.channel.lock() {
+            if let Some(channel) = &handle.channel
+                && let Ok(mut ch) = channel.lock()
+            {
                 let _ = ch.close();
+            }
+            if let Some(child) = &handle.child
+                && let Ok(mut ch) = child.lock()
+            {
+                let _ = ch.kill();
             }
         }
     }

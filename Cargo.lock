@@ -445,7 +445,7 @@ dependencies = [
 
 [[package]]
 name = "caterm-app"
-version = "2.1.7"
+version = "2.1.8"
 dependencies = [
  "async-trait",
  "caterm-core",
@@ -460,11 +460,12 @@ dependencies = [
  "tauri-plugin-shell",
  "tokio",
  "webkit2gtk",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
 name = "caterm-cli"
-version = "2.1.7"
+version = "2.1.8"
 dependencies = [
  "caterm-core",
  "clap",
@@ -476,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "caterm-core"
-version = "2.1.7"
+version = "2.1.8"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -485,6 +486,7 @@ dependencies = [
  "chrono",
  "directories",
  "hex",
+ "hmac",
  "md-5",
  "notify",
  "once_cell",

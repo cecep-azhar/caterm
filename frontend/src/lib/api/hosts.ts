@@ -5,6 +5,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export type AuthMethod = { type: 'password' } | { type: 'key'; path: string } | { type: 'keyId'; id: string };
+export type ConnectionProtocol = 'ssh' | 'scp' | 'ftp' | 'ftps' | 'webdav' | 's3';
 
 export interface HostRecord {
   id: string;
@@ -15,6 +16,7 @@ export interface HostRecord {
   authMethod: AuthMethod;
   tags: string[];
   os?: string;
+  protocol?: ConnectionProtocol;
   createdAt: number;
   updatedAt: number;
   /** Whether a password/passphrase is already stored for this host (never the value itself). */
@@ -30,6 +32,7 @@ export interface HostInput {
   authMethod: AuthMethod;
   tags: string[];
   os?: string;
+  protocol?: ConnectionProtocol;
   /** Write-only. Omit to leave the stored secret untouched, "" to clear it, or a new
    * password/passphrase to (re)encrypt and store it. Never comes back out via HostRecord. */
   secret?: string;

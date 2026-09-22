@@ -44,6 +44,8 @@ pub mod teams;
 pub mod tunnels;
 pub mod vault;
 pub mod vfs;
+pub mod webdav;
+pub mod s3;
 
 pub use error::CatermError;
 pub use vfs::RemoteFileSystem;

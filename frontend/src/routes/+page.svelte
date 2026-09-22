@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput } from '$lib/api/hosts';
+  import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput, type ConnectionProtocol } from '$lib/api/hosts';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
   import HostDetailPanel from '$lib/components/HostDetailPanel.svelte';
   import OsIcon from '$lib/components/OsIcon.svelte';
@@ -16,6 +16,7 @@
   let errorMsg = $state('');
   let editingId = $state<string | null>(null);
   let editingHadSecret = $state(false);
+  let formProtocol = $state<ConnectionProtocol>('ssh');
 
   // Bulk selection + detail slide-over. Both buttons on the host card were previously inert
   // markup with no onclick; this is the state behind them.
@@ -124,6 +125,7 @@
     formAddress = '';
     formPort = 22;
     formUsername = 'root';
+    formProtocol = 'ssh';
     formAuthType = 'password';
     formKeyPath = '';
     formSecret = '';
@@ -140,6 +142,7 @@
     formAddress = host.address;
     formPort = host.port;
     formUsername = host.username;
+    formProtocol = host.protocol || 'ssh';
     formAuthType = host.authMethod.type;
     formKeyPath = host.authMethod.type === 'key' ? host.authMethod.path : '';
     formKeyId = host.authMethod.type === 'keyId' ? host.authMethod.id : '';
@@ -165,6 +168,7 @@
         address: formAddress,
         port: Number(formPort) || 22,
         username: formUsername,
+        protocol: formProtocol,
         authMethod: formAuthType === 'password' ? { type: 'password' } : (formAuthType === 'keyId' ? { type: 'keyId', id: formKeyId } : { type: 'key', path: formKeyPath }),
         tags: formTags.split(',').map(t => t.trim()).filter(Boolean),
         os: formOs ? formOs : undefined,
@@ -203,6 +207,7 @@
         address: host.address,
         port: host.port,
         username: host.username,
+        protocol: host.protocol,
         authMethod: host.authMethod,
         tags: [...host.tags],
         os: host.os
@@ -242,6 +247,14 @@
           class="w-full pl-9 pr-4 py-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
         />
       </div>
+
+      <button 
+        onclick={() => openSession('local')}
+        class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 shrink-0"
+        title="Open Local Shell (PowerShell / cmd)">
+        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+        Local Terminal
+      </button>
 
       <button 
         onclick={openAddModal}
@@ -455,6 +468,26 @@
               class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
             />
           </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Protocol</label>
+          <select
+            bind:value={formProtocol}
+            onchange={(e) => {
+              const proto = (e.currentTarget as HTMLSelectElement).value;
+              if (proto === 'ftp' && formPort === 22) formPort = 21;
+              else if (proto === 'ssh' && formPort === 21) formPort = 22;
+              else if ((proto === 'webdav' || proto === 's3') && (formPort === 22 || formPort === 21)) formPort = 443;
+            }}
+            class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none text-xs"
+          >
+            <option value="ssh">SSH / SFTP</option>
+            <option value="ftp">FTP</option>
+            <option value="ftps">FTPS</option>
+            <option value="webdav">WebDAV</option>
+            <option value="s3">S3</option>
+          </select>
         </div>
 
         <div>

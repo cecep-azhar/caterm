@@ -48,6 +48,14 @@ const COMMANDS: &[&str] = &[
     "sftp_cancel",
     "sftp_rename",
     "sftp_copy",
+    "search_remote_files",
+    "sftp_compress",
+    "sftp_extract",
+    "plan_sync",
+    "execute_sync",
+    "start_watch",
+    "stop_watch",
+    "list_watches",
     "calculate_remote_checksum",
     "calculate_local_checksum",
     "compare_file_checksums",
@@ -93,6 +101,8 @@ const COMMANDS: &[&str] = &[
     "ai_generate_plan",
     "ai_chat",
     "ai_execute_step",
+    // System / Memory
+    "trim_memory",
 ];
 
 fn main() {

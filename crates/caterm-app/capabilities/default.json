@@ -40,6 +40,14 @@
     "allow-sftp-cancel",
     "allow-sftp-rename",
     "allow-sftp-copy",
+    "allow-search-remote-files",
+    "allow-sftp-compress",
+    "allow-sftp-extract",
+    "allow-plan-sync",
+    "allow-execute-sync",
+    "allow-start-watch",
+    "allow-stop-watch",
+    "allow-list-watches",
     "allow-calculate-remote-checksum",
     "allow-calculate-local-checksum",
     "allow-compare-file-checksums",
@@ -76,6 +84,7 @@
     "allow-save-ai-settings",
     "allow-ai-generate-plan",
     "allow-ai-chat",
-    "allow-ai-execute-step"
+    "allow-ai-execute-step",
+    "allow-trim-memory"
   ]
 }

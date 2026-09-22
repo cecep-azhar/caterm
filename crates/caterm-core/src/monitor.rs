@@ -131,6 +131,9 @@ pub fn poll_active_metrics() -> Result<Vec<HostMetrics>, CatermError> {
 
     let mut results = Vec::new();
     for hid in active_host_ids.into_iter() {
+        if hid == "local" || hid == "__local__" {
+            continue;
+        }
         if let Ok(metrics) = fetch_metrics_for_host(&hid) {
             results.push(metrics);
         }

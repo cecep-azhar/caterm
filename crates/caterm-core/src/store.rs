@@ -289,6 +289,18 @@ pub fn delete_host(id: &str) -> Result<(), CatermError> {
     delete_host_in(&db::open()?, id)
 }
 
+/// Retrieve a single host by id without decrypting its secret.
+pub fn get_host(id: &str) -> Result<HostRecord, CatermError> {
+    let conn = db::open()?;
+    conn.query_row(
+        "SELECT id, label, address, port, username, auth_method, tags, os, protocol, created_at, updated_at, secret_enc \
+         FROM hosts WHERE id = ?1",
+        params![id],
+        |row| row_to_host(row),
+    )
+    .map_err(|e| CatermError::Db(DbError::Generic(format!("host {id} not found: {e}"))))
+}
+
 pub(crate) fn update_host_os_in(conn: &Connection, id: &str, os: &str) -> Result<(), CatermError> {
     let now = now_unix();
     conn.execute(

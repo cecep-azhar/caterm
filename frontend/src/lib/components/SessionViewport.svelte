@@ -48,6 +48,24 @@
         loadError = '';
         let lastOpened = '';
         for (const id of ids) {
+          if (id === 'local') {
+            const localHost: HostRecord = {
+              id: 'local',
+              label: 'Local Terminal',
+              address: 'localhost',
+              port: 0,
+              username: 'local',
+              authMethod: { type: 'password' },
+              tags: ['local'],
+              os: 'windows',
+              protocol: 'ssh',
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+              hasSecret: false,
+            };
+            lastOpened = openTab(localHost);
+            continue;
+          }
           const host = hosts.find((h) => h.id === id);
           if (host) lastOpened = openTab(host);
         }

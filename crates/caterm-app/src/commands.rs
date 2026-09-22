@@ -5,7 +5,7 @@
 
 use caterm_core::{
     CatermError, ai, audit, backup, groups, investigations, keys, monitor, sftp, snippets, ssh,
-    store, sync, teams, tunnels, vault,
+    store, sync, teams, tunnels, vault, vfs,
 };
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
@@ -81,7 +81,7 @@ pub async fn list_remote_dir(
     host_id: String,
     remote_path: String,
 ) -> Result<Vec<sftp::SftpFileEntry>, CatermError> {
-    run_blocking(move || sftp::list_remote_dir(&host_id, &remote_path)).await
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.list_dir(&remote_path)).await
 }
 
 #[tauri::command]
@@ -111,7 +111,7 @@ pub async fn read_remote_file(
     host_id: String,
     remote_path: String,
 ) -> Result<Vec<u8>, CatermError> {
-    run_blocking(move || sftp::read_remote_file(&host_id, &remote_path)).await
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.read_file(&remote_path)).await
 }
 
 #[tauri::command]
@@ -120,12 +120,12 @@ pub async fn write_remote_file(
     remote_path: String,
     data: Vec<u8>,
 ) -> Result<(), CatermError> {
-    run_blocking(move || sftp::write_remote_file(&host_id, &remote_path, &data)).await
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.write_file(&remote_path, &data)).await
 }
 
 #[tauri::command]
 pub async fn mkdir_remote_dir(host_id: String, remote_path: String) -> Result<(), CatermError> {
-    run_blocking(move || sftp::mkdir_remote_dir(&host_id, &remote_path)).await
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.mkdir(&remote_path)).await
 }
 
 #[tauri::command]
@@ -136,8 +136,7 @@ pub async fn delete_remote_file(
     recursive: Option<bool>,
 ) -> Result<(), CatermError> {
     run_blocking(move || {
-        sftp::delete_remote_file(
-            &host_id,
+        vfs::get_remote_fs(&host_id)?.delete(
             &remote_path,
             is_dir.unwrap_or(false),
             recursive.unwrap_or(false),
@@ -151,7 +150,7 @@ pub async fn sftp_stat(
     host_id: String,
     remote_path: String,
 ) -> Result<sftp::SftpFileEntry, CatermError> {
-    run_blocking(move || sftp::stat_remote(&host_id, &remote_path)).await
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.stat(&remote_path)).await
 }
 
 #[tauri::command]
@@ -160,7 +159,7 @@ pub async fn sftp_chmod(
     remote_path: String,
     mode: u32,
 ) -> Result<(), CatermError> {
-    run_blocking(move || sftp::chmod_remote_file(&host_id, &remote_path, mode)).await
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.chmod(&remote_path, mode)).await
 }
 
 fn emit_progress_fn(app: &tauri::AppHandle) -> std::sync::Arc<parking_lot::Mutex<impl FnMut(sftp::SftpProgressPayload) + Send + 'static>> {
@@ -180,7 +179,10 @@ pub async fn sftp_upload(
     transfer_id: String,
 ) -> Result<(), CatermError> {
     let cb = emit_progress_fn(&app);
-    run_blocking(move || sftp::upload_file_with_progress(&host_id, &local_path, &remote_path, &transfer_id, cb)).await
+    run_blocking(move || {
+        vfs::get_remote_fs(&host_id)?.upload(&local_path, &remote_path, &transfer_id, cb)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -192,7 +194,10 @@ pub async fn sftp_download(
     transfer_id: String,
 ) -> Result<(), CatermError> {
     let cb = emit_progress_fn(&app);
-    run_blocking(move || sftp::download_file_with_progress(&host_id, &remote_path, &local_path, &transfer_id, cb)).await
+    run_blocking(move || {
+        vfs::get_remote_fs(&host_id)?.download(&remote_path, &local_path, &transfer_id, cb)
+    })
+    .await
 }
 
 #[tauri::command]
@@ -275,7 +280,7 @@ pub async fn sftp_rename(
     old_path: String,
     new_path: String,
 ) -> Result<(), CatermError> {
-    run_blocking(move || sftp::rename_remote_file(&host_id, &old_path, &new_path)).await
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.rename(&old_path, &new_path)).await
 }
 
 #[tauri::command]
@@ -584,4 +589,48 @@ pub async fn stop_watch(id: String) -> Result<(), CatermError> {
 pub async fn list_watches() -> Result<Vec<sync::WatchInfo>, CatermError> {
     run_blocking(sync::list_watches).await
 }
+
+#[cfg(target_os = "windows")]
+fn trim_working_set_impl() {
+    unsafe {
+        use windows_sys::Win32::System::ProcessStatus::K32EmptyWorkingSet;
+        use windows_sys::Win32::System::Threading::{GetCurrentProcess, GetCurrentProcessId, OpenProcess, PROCESS_SET_QUOTA, PROCESS_QUERY_INFORMATION};
+        use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS};
+
+        let current_proc = GetCurrentProcess();
+        K32EmptyWorkingSet(current_proc);
+
+        let current_pid = GetCurrentProcessId();
+        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snap != windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
+            let mut entry: PROCESSENTRY32 = std::mem::zeroed();
+            entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as u32;
+            if Process32First(snap, &mut entry) != 0 {
+                loop {
+                    if entry.th32ParentProcessID == current_pid {
+                        let child_proc = OpenProcess(PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION, 0, entry.th32ProcessID);
+                        if child_proc != 0 as _ {
+                            K32EmptyWorkingSet(child_proc);
+                            windows_sys::Win32::Foundation::CloseHandle(child_proc);
+                        }
+                    }
+                    if Process32Next(snap, &mut entry) == 0 {
+                        break;
+                    }
+                }
+            }
+            windows_sys::Win32::Foundation::CloseHandle(snap);
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn trim_memory() -> Result<(), CatermError> {
+    run_blocking(|| {
+        #[cfg(target_os = "windows")]
+        trim_working_set_impl();
+        Ok(())
+    }).await
+}
+
 

@@ -28,6 +28,12 @@ mimalloc = { version = "0.1", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 ssh2 = "0.9.6"
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_ProcessStatus",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+] }
 
 [target.'cfg(not(windows))'.dependencies]
 ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }

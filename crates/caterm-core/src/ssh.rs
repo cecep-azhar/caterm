@@ -80,7 +80,8 @@ pub(crate) struct SessionHandle {
     pub(crate) tx: std::sync::mpsc::Sender<Vec<u8>>,
     pub(crate) output_buffer: Arc<Mutex<Vec<u8>>>,
     pub(crate) input_buffer: Arc<Mutex<String>>,
-    pub(crate) channel: Arc<Mutex<ssh2::Channel>>,
+    pub(crate) channel: Option<Arc<Mutex<ssh2::Channel>>>,
+    pub(crate) child: Option<Arc<Mutex<std::process::Child>>>,
     pub(crate) host_id: String,
 }
 
@@ -409,10 +410,143 @@ fn flush_pty_output(session_id: &str, pending: &mut String) {
     });
 }
 
+/// Spawns a local shell (PowerShell on Windows, /bin/bash on Unix) as a local PTY session.
+fn connect_local() -> Result<SshSession, CatermError> {
+    let session_id = format!(
+        "local-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+
+    #[cfg(windows)]
+    let mut cmd = std::process::Command::new("powershell.exe");
+    #[cfg(not(windows))]
+    let mut cmd = std::process::Command::new("/bin/bash");
+
+    #[cfg(windows)]
+    cmd.args(["-NoLogo"]);
+
+    cmd.stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped());
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| invalid(format!("Failed to spawn local shell: {e}")))?;
+
+    let mut stdin = child
+        .stdin
+        .take()
+        .ok_or_else(|| invalid("Failed to open child stdin".to_string()))?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| invalid("Failed to open child stdout".to_string()))?;
+    let mut stderr = child
+        .stderr
+        .take()
+        .ok_or_else(|| invalid("Failed to open child stderr".to_string()))?;
+
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
+
+    // Writer thread: pipe user keystrokes into child stdin
+    thread::spawn(move || {
+        use std::io::Write;
+        while let Ok(data) = rx.recv() {
+            if stdin.write_all(&data).is_err() {
+                break;
+            }
+            let _ = stdin.flush();
+        }
+    });
+
+    // Reader thread: stdout -> xterm events
+    let buffer_read = Arc::clone(&output_buffer);
+    let reader_session_id = session_id.clone();
+    thread::spawn(move || {
+        use std::io::Read;
+        let mut buf = [0u8; 4096];
+        let push = has_event_sink();
+        loop {
+            match stdout.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let chunk = buf[..n].to_vec();
+                    if push {
+                        let text = String::from_utf8_lossy(&chunk).to_string();
+                        emit(SshEvent::Output {
+                            session_id: reader_session_id.clone(),
+                            data: text,
+                        });
+                    } else if let Ok(mut ob) = buffer_read.lock() {
+                        ob.extend_from_slice(&chunk);
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        emit(SshEvent::Closed {
+            session_id: reader_session_id,
+        });
+    });
+
+    // Reader thread: stderr -> xterm events
+    let err_session_id = session_id.clone();
+    let err_buffer = Arc::clone(&output_buffer);
+    thread::spawn(move || {
+        use std::io::Read;
+        let mut buf = [0u8; 4096];
+        let push = has_event_sink();
+        loop {
+            match stderr.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let chunk = buf[..n].to_vec();
+                    if push {
+                        emit(SshEvent::Output {
+                            session_id: err_session_id.clone(),
+                            data: String::from_utf8_lossy(&chunk).to_string(),
+                        });
+                    } else if let Ok(mut ob) = err_buffer.lock() {
+                        ob.extend_from_slice(&chunk);
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let child_arc = Arc::new(Mutex::new(child));
+    let handle = SessionHandle {
+        tx,
+        output_buffer,
+        input_buffer: Arc::new(Mutex::new(String::new())),
+        channel: None,
+        child: Some(child_arc),
+        host_id: "local".to_string(),
+    };
+
+    let mut sessions = SESSIONS
+        .lock()
+        .map_err(|_| invalid("Lock failure".to_string()))?;
+    sessions.insert(session_id.clone(), handle);
+
+    Ok(SshSession {
+        session_id,
+        host_id: "local".to_string(),
+    })
+}
+
 /// Opens a real SSH connection & PTY channel via `ssh2` for a saved host. Looks the host
 /// (and its decrypted credential, if any) up via `crate::store::load_host_for_connect` —
 /// the frontend only ever supplies a `host_id`.
 pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
+    if host_id == "local" || host_id == "__local__" {
+        return connect_local();
+    }
     let (sess, host) = open_authenticated_session(host_id)?;
 
     let session_id = generate_session_id(&host.id);
@@ -557,7 +691,8 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         tx,
         output_buffer,
         input_buffer: Arc::new(Mutex::new(String::new())),
-        channel: channel_arc,
+        channel: Some(channel_arc),
+        child: None,
         host_id: host.id.clone(),
     };
 
@@ -662,7 +797,8 @@ pub fn resize(session_id: &str, cols: u16, rows: u16) -> Result<(), CatermError>
         .lock()
         .map_err(|_| invalid("Lock failure".to_string()))?;
     if let Some(handle) = sessions.get(session_id)
-        && let Ok(mut ch) = handle.channel.lock()
+        && let Some(channel) = &handle.channel
+        && let Ok(mut ch) = channel.lock()
     {
         let _ = ch.request_pty_size(cols as u32, rows as u32, None, None);
     }
@@ -675,9 +811,20 @@ pub fn disconnect(session_id: &str) -> Result<(), CatermError> {
 
     if let Ok(mut sessions) = SESSIONS.lock()
         && let Some(handle) = sessions.remove(session_id)
-        && let Ok(mut ch) = handle.channel.lock()
     {
-        let _ = ch.close();
+        if let Some(channel) = &handle.channel
+            && let Ok(mut ch) = channel.lock()
+        {
+            let _ = ch.close();
+        }
+        if let Some(child) = &handle.child
+            && let Ok(mut ch) = child.lock()
+        {
+            let _ = ch.kill();
+            emit(SshEvent::Closed {
+                session_id: session_id.to_string(),
+            });
+        }
     }
     Ok(())
 }
@@ -890,6 +1037,15 @@ pub fn parse_os_key(raw: &str) -> String {
 pub fn detect_host_os(host_id: &str) -> Result<String, CatermError> {
     require_non_empty("host_id", host_id)?;
 
+    if host_id == "local" || host_id == "__local__" {
+        let os = if cfg!(windows) { "windows" } else { "linux" }.to_string();
+        emit(SshEvent::OsDetected {
+            host_id: host_id.to_string(),
+            os: os.clone(),
+        });
+        return Ok(os);
+    }
+
     const OS_DETECT_SCRIPT: &str = r#"
 if [ -f /etc/os-release ]; then
     cat /etc/os-release
@@ -1027,5 +1183,19 @@ PRETTY_NAME="Ubuntu 24.04 LTS"
         assert_eq!(parse_os_key("ID=arch\nNAME=\"Arch Linux\""), "arch");
         assert_eq!(parse_os_key("Linux"), "linux");
         assert_eq!(parse_os_key("Darwin"), "macos");
+    }
+
+    #[test]
+    fn local_terminal_session_lifecycle() {
+        let session = connect("local").expect("failed to connect local terminal");
+        assert_eq!(session.host_id, "local");
+        assert!(session.session_id.starts_with("ssh-local-"));
+
+        let _ = write(&session.session_id, "echo hello\r\n");
+        std::thread::sleep(Duration::from_millis(300));
+        let _ = read(&session.session_id);
+
+        disconnect(&session.session_id).expect("failed to disconnect local terminal");
+        assert!(write(&session.session_id, "test").is_err());
     }
 }

@@ -2,7 +2,7 @@
   // Slide-over shown by the (i) button on a host card. That button used to be a decoration
   // with no onclick at all; this is what it now opens.
   import { invoke } from '@tauri-apps/api/core';
-  import type { HostRecord } from '$lib/api/hosts';
+  import { saveHost, type HostRecord, type ConnectionProtocol } from '$lib/api/hosts';
   import { openSession } from '$lib/nav';
   import { errorText } from '$lib/errors';
 
@@ -90,6 +90,36 @@
       <section class="space-y-2">
         <h3 class="text-[11px] font-semibold uppercase tracking-wider text-neutral-500">Connection</h3>
         <dl class="text-xs space-y-1.5">
+          <div class="flex justify-between items-center gap-3">
+            <dt class="text-neutral-500 dark:text-neutral-400">Protocol</dt>
+            <dd>
+              <select
+                value={host.protocol || 'ssh'}
+                onchange={async (e) => {
+                  const proto = (e.currentTarget as HTMLSelectElement).value as ConnectionProtocol;
+                  await saveHost({
+                    id: host.id,
+                    label: host.label,
+                    address: host.address,
+                    port: host.port,
+                    username: host.username,
+                    authMethod: host.authMethod,
+                    tags: host.tags,
+                    os: host.os,
+                    protocol: proto,
+                  });
+                  host.protocol = proto;
+                }}
+                class="text-xs bg-neutral-100 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded px-2 py-0.5 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-cyan-500 font-mono"
+              >
+                <option value="ssh">SSH / SFTP</option>
+                <option value="ftp">FTP</option>
+                <option value="ftps">FTPS</option>
+                <option value="webdav">WebDAV</option>
+                <option value="s3">S3</option>
+              </select>
+            </dd>
+          </div>
           <div class="flex justify-between gap-3">
             <dt class="text-neutral-500 dark:text-neutral-400">Address</dt>
             <dd class="font-mono text-neutral-800 dark:text-neutral-200 truncate">{host.address}</dd>
