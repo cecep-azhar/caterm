@@ -46,6 +46,11 @@ pub async fn window_close(#[allow(unused_variables)] window: tauri::Window) {
 }
 
 #[tauri::command]
+pub async fn window_start_dragging(#[allow(unused_variables)] window: tauri::Window) {
+    let _ = window.start_dragging();
+}
+
+#[tauri::command]
 pub async fn list_tunnels() -> Result<Vec<tunnels::TunnelRecord>, CatermError> {
     run_blocking(tunnels::list_tunnels).await
 }

@@ -56,7 +56,8 @@
       const target = (e.target as HTMLElement)?.closest('a');
       if (target && target.href) {
         const href = target.href;
-        if (href.startsWith('http://') || href.startsWith('https://')) {
+        const isInternal = href.startsWith(window.location.origin) || href.includes('tauri.localhost') || href.includes('ipc.localhost') || href.startsWith('/') || href.startsWith('#');
+        if (!isInternal && (href.startsWith('http://') || href.startsWith('https://'))) {
           e.preventDefault();
           e.stopPropagation();
           openExternalUrl(href);
@@ -131,14 +132,18 @@
     const target = e.target as HTMLElement | null;
     if (target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) return;
     try {
-      if (appWindow) {
-        await appWindow.startDragging();
-      } else if (typeof window !== 'undefined') {
-        const win = getCurrentWindow();
-        await win.startDragging();
+      await invoke('window_start_dragging');
+    } catch {
+      try {
+        if (appWindow) {
+          await appWindow.startDragging();
+        } else if (typeof window !== 'undefined') {
+          const win = getCurrentWindow();
+          await win.startDragging();
+        }
+      } catch (err) {
+        console.warn('Failed to start dragging window:', err);
       }
-    } catch (err) {
-      console.warn('Failed to start dragging window:', err);
     }
   }
 
@@ -542,7 +547,7 @@
       }}
     >
       <!-- Left: navigation + session tabs -->
-      <div class="flex items-center gap-1 min-w-0 flex-1">
+      <div class="flex items-center gap-1 min-w-0 flex-1" data-tauri-drag-region>
         <!-- Mobile Menu Hamburger Button -->
         <button
           type="button"
@@ -602,6 +607,9 @@
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         </a>
+
+        <!-- Draggable blank space spanning remaining left area -->
+        <div class="flex-1 h-full min-w-[20px]" data-tauri-drag-region></div>
       </div>
 
       <div class="flex items-center gap-1 md:gap-2 text-neutral-500 dark:text-neutral-400 shrink-0">

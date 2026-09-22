@@ -60,6 +60,7 @@ const COMMANDS: &[&str] = &[
     "window_minimize",
     "window_maximize",
     "window_close",
+    "window_start_dragging",
     "open_external_url",
     // Backup & restore
     "export_encrypted_backup",

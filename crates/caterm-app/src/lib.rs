@@ -177,6 +177,7 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::window_minimize,
             commands::window_maximize,
             commands::window_close,
+            commands::window_start_dragging,
             commands::open_external_url,
         ])
         .run(tauri::generate_context!())

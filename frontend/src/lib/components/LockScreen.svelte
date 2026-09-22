@@ -70,15 +70,19 @@
   async function startDragging(e: MouseEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement | null;
-    if (target?.closest('button, input, textarea, a, .no-drag')) return;
+    if (target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) return;
     try {
-      if (appWindow) {
-        await appWindow.startDragging();
-      } else if (typeof window !== 'undefined') {
-        await getCurrentWindow().startDragging();
+      await invoke('window_start_dragging');
+    } catch {
+      try {
+        if (appWindow) {
+          await appWindow.startDragging();
+        } else if (typeof window !== 'undefined') {
+          await getCurrentWindow().startDragging();
+        }
+      } catch (err) {
+        console.warn('Failed to start dragging window:', err);
       }
-    } catch (err) {
-      console.warn('Failed to start dragging window:', err);
     }
   }
 
@@ -165,7 +169,7 @@
     onmousedown={startDragging}
     ondblclick={(e) => {
       const target = e.target as HTMLElement | null;
-      if (!target?.closest('button, input, textarea, a, .no-drag')) {
+      if (!target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) {
         maximizeWindow();
       }
     }}

@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "core:window:default",
+    "core:window:allow-start-dragging",
     "allow-list-hosts",
     "allow-save-host",
     "allow-delete-host",
@@ -49,6 +50,7 @@
     "allow-window-minimize",
     "allow-window-maximize",
     "allow-window-close",
+    "allow-window-start-dragging",
     "allow-open-external-url",
     "allow-export-encrypted-backup",
     "allow-import-encrypted-backup",
