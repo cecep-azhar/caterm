@@ -180,7 +180,7 @@
         </div>
       </div>
 
-      <div class="border border-sky-500/30 rounded-lg p-5 bg-neutral-950 flex flex-col gap-4 opacity-90">
+      <div class="border border-sky-500/30 rounded-lg p-5 bg-neutral-950 flex flex-col gap-4 opacity-90 hidden">
         <div class="flex justify-between items-start">
           <div>
             <div class="flex items-center gap-2">

@@ -254,7 +254,9 @@ fn authenticate(
             let priv_pem = crate::keys::get_private_key(id)?;
             let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
             std::fs::write(&temp_path, priv_pem.as_bytes()).map_err(|e| {
-                invalid(format!("Failed to prepare temporary key for authentication: {e}"))
+                invalid(format!(
+                    "Failed to prepare temporary key for authentication: {e}"
+                ))
             })?;
             let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
             // Best-effort shred: the key must not outlive the auth attempt on disk.
@@ -1189,7 +1191,7 @@ PRETTY_NAME="Ubuntu 24.04 LTS"
     fn local_terminal_session_lifecycle() {
         let session = connect("local").expect("failed to connect local terminal");
         assert_eq!(session.host_id, "local");
-        assert!(session.session_id.starts_with("ssh-local-"));
+        assert!(session.session_id.starts_with("local-"));
 
         let _ = write(&session.session_id, "echo hello\r\n");
         std::thread::sleep(Duration::from_millis(300));

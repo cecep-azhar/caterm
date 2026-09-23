@@ -188,7 +188,7 @@
             <input id="snip-tags" bind:value={newSnippet.tags} placeholder="docker, devops, deploy" class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
           </div>
 
-          <div class="flex items-center justify-between p-3 bg-neutral-950 border border-neutral-800 rounded opacity-50">
+          <div class="flex items-center justify-between p-3 bg-neutral-950 border border-neutral-800 rounded opacity-50 hidden">
             <div>
               <span class="block text-sm text-neutral-300">Share publicly</span>
               <span class="block text-xs text-neutral-500">Coming soon</span>

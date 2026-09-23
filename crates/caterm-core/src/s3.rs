@@ -67,6 +67,7 @@ pub struct S3FileSystem {
 }
 
 impl S3FileSystem {
+    /// # Infallible: creates an instance holding host_id.
     pub fn new(host_id: impl Into<String>) -> Self {
         Self {
             host_id: host_id.into(),
@@ -77,21 +78,32 @@ impl S3FileSystem {
         let (host, secret) = crate::store::load_host_for_connect(&self.host_id)?;
         let raw = host.address.trim();
 
-        let (_scheme, host_header, base_url) = if raw.starts_with("http://") || raw.starts_with("https://") {
-            let s = if raw.starts_with("https://") { "https" } else { "http" };
-            let stripped = raw.trim_start_matches("https://").trim_start_matches("http://");
-            let host_part = stripped.trim_end_matches('/');
-            (s.to_string(), host_part.to_string(), format!("{s}://{host_part}"))
-        } else {
-            let scheme = if host.port == 80 { "http" } else { "https" };
-            let host_header = if host.port == 0 || host.port == 80 || host.port == 443 {
-                raw.trim_end_matches('/').to_string()
+        let (_scheme, host_header, base_url) =
+            if raw.starts_with("http://") || raw.starts_with("https://") {
+                let s = if raw.starts_with("https://") {
+                    "https"
+                } else {
+                    "http"
+                };
+                let stripped = raw
+                    .trim_start_matches("https://")
+                    .trim_start_matches("http://");
+                let host_part = stripped.trim_end_matches('/');
+                (
+                    s.to_string(),
+                    host_part.to_string(),
+                    format!("{s}://{host_part}"),
+                )
             } else {
-                format!("{}:{}", raw.trim_end_matches('/'), host.port)
+                let scheme = if host.port == 80 { "http" } else { "https" };
+                let host_header = if host.port == 0 || host.port == 80 || host.port == 443 {
+                    raw.trim_end_matches('/').to_string()
+                } else {
+                    format!("{}:{}", raw.trim_end_matches('/'), host.port)
+                };
+                let base_url = format!("{scheme}://{host_header}");
+                (scheme.to_string(), host_header, base_url)
             };
-            let base_url = format!("{scheme}://{host_header}");
-            (scheme.to_string(), host_header, base_url)
-        };
 
         // Determine region: default to us-east-1 unless present in address
         let region = if let Some(idx) = host_header.find(".s3.") {
@@ -215,7 +227,8 @@ impl S3FileSystem {
         };
 
         let agent = ureq::Agent::new_with_defaults();
-        let http_method = Method::from_bytes(method.as_bytes()).map_err(|e| io_err(e.to_string()))?;
+        let http_method =
+            Method::from_bytes(method.as_bytes()).map_err(|e| io_err(e.to_string()))?;
         let mut builder = Request::builder()
             .method(http_method)
             .uri(&full_url)
@@ -259,7 +272,9 @@ impl RemoteFileSystem for S3FileSystem {
                 let mut resp = self.sign_and_execute("GET", "/", &[], &[], &[])?;
                 let status = resp.status().as_u16();
                 if status < 200 || status >= 300 {
-                    return Err(io_err(format!("S3 ListAllMyBuckets returned HTTP {status}")));
+                    return Err(io_err(format!(
+                        "S3 ListAllMyBuckets returned HTTP {status}"
+                    )));
                 }
 
                 let xml = resp
@@ -318,11 +333,7 @@ impl RemoteFileSystem for S3FileSystem {
                 let query_params: Vec<(&str, &str)> = if prefix.is_empty() {
                     vec![("delimiter", "/"), ("list-type", "2")]
                 } else {
-                    vec![
-                        ("delimiter", "/"),
-                        ("list-type", "2"),
-                        ("prefix", &prefix),
-                    ]
+                    vec![("delimiter", "/"), ("list-type", "2"), ("prefix", &prefix)]
                 };
 
                 let path = format!("/{bucket}");
@@ -549,14 +560,21 @@ impl RemoteFileSystem for S3FileSystem {
                 let resp = self.sign_and_execute("PUT", &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
                 if status < 200 || status >= 300 {
-                    return Err(io_err(format!("S3 create folder marker returned HTTP {status}")));
+                    return Err(io_err(format!(
+                        "S3 create folder marker returned HTTP {status}"
+                    )));
                 }
                 Ok(())
             }
         }
     }
 
-    fn delete(&self, remote_path: &str, _is_dir: bool, _recursive: bool) -> Result<(), CatermError> {
+    fn delete(
+        &self,
+        remote_path: &str,
+        _is_dir: bool,
+        _recursive: bool,
+    ) -> Result<(), CatermError> {
         let (bucket, key) = Self::parse_path(remote_path);
         match (bucket, key) {
             (None, _) => Err(io_err("Cannot delete root")),

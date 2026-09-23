@@ -60,6 +60,7 @@ pub struct WebDavFileSystem {
 }
 
 impl WebDavFileSystem {
+    /// # Infallible: creates an instance holding host_id.
     pub fn new(host_id: impl Into<String>) -> Self {
         Self {
             host_id: host_id.into(),
@@ -148,10 +149,13 @@ impl RemoteFileSystem for WebDavFileSystem {
             .read_to_string()
             .map_err(|e| io_err(format!("Failed to read PROPFIND response: {e}")))?;
 
-        let response_re = Regex::new(r"(?is)<([a-zA-Z0-9_-]+:)?response\b[^>]*>(.*?)</([a-zA-Z0-9_-]+:)?response>")
-            .map_err(|e| io_err(e.to_string()))?;
-        let href_re = Regex::new(r"(?is)<([a-zA-Z0-9_-]+:)?href\b[^>]*>(.*?)</([a-zA-Z0-9_-]+:)?href>")
-            .map_err(|e| io_err(e.to_string()))?;
+        let response_re = Regex::new(
+            r"(?is)<([a-zA-Z0-9_-]+:)?response\b[^>]*>(.*?)</([a-zA-Z0-9_-]+:)?response>",
+        )
+        .map_err(|e| io_err(e.to_string()))?;
+        let href_re =
+            Regex::new(r"(?is)<([a-zA-Z0-9_-]+:)?href\b[^>]*>(.*?)</([a-zA-Z0-9_-]+:)?href>")
+                .map_err(|e| io_err(e.to_string()))?;
         let len_re = Regex::new(r"(?is)<([a-zA-Z0-9_-]+:)?getcontentlength\b[^>]*>(\d+)</([a-zA-Z0-9_-]+:)?getcontentlength>")
             .map_err(|e| io_err(e.to_string()))?;
         let mod_re = Regex::new(r"(?is)<([a-zA-Z0-9_-]+:)?getlastmodified\b[^>]*>(.*?)</([a-zA-Z0-9_-]+:)?getlastmodified>")
@@ -172,10 +176,15 @@ impl RemoteFileSystem for WebDavFileSystem {
 
             // Skip the current directory itself
             if href_clean == target_clean
-                || (href_clean.ends_with(remote_path.trim_matches('/')) && (href_raw.ends_with('/') || href_clean == target_clean))
+                || (href_clean.ends_with(remote_path.trim_matches('/'))
+                    && (href_raw.ends_with('/') || href_clean == target_clean))
             {
                 let last_segment = href_clean.rsplit('/').next().unwrap_or("");
-                let req_segment = remote_path.trim_matches('/').rsplit('/').next().unwrap_or("");
+                let req_segment = remote_path
+                    .trim_matches('/')
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or("");
                 if last_segment == req_segment {
                     continue;
                 }
@@ -363,9 +372,7 @@ impl RemoteFileSystem for WebDavFileSystem {
 
         let agent = ureq::Agent::new_with_defaults();
         let method = Method::from_bytes(b"MKCOL").map_err(|e| io_err(e.to_string()))?;
-        let mut req_builder = Request::builder()
-            .method(method)
-            .uri(&target_url);
+        let mut req_builder = Request::builder().method(method).uri(&target_url);
 
         if let Some(auth_val) = &auth {
             req_builder = req_builder.header("Authorization", auth_val);
@@ -387,7 +394,12 @@ impl RemoteFileSystem for WebDavFileSystem {
         }
     }
 
-    fn delete(&self, remote_path: &str, _is_dir: bool, _recursive: bool) -> Result<(), CatermError> {
+    fn delete(
+        &self,
+        remote_path: &str,
+        _is_dir: bool,
+        _recursive: bool,
+    ) -> Result<(), CatermError> {
         let (base, auth) = self.get_conn()?;
         let target_url = self.url_for(&base, remote_path);
 
