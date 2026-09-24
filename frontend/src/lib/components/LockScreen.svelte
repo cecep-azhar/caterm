@@ -248,8 +248,8 @@
   	class="hidden lg:flex w-3/4 flex-col justify-between p-12 lg:p-16 xl:p-20 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800/60 relative overflow-hidden shrink-0"
   	onmousedown={startDragging}
   >
-  	<!-- Sky Blue Grid Flow Animation & CATerm Logo -->
-  	<GridFlowBackground targetX={64} targetY={64} count={17} />
+  	<!-- Sky Blue Grid Flow Animation CATerm Logo -->
+  	<GridFlowBackground targetX={64} targetY={64} count={5} />
 
   	<div class="relative z-10 flex items-center gap-3">
   		<Logo size={40} mode="brand" />
@@ -293,50 +293,46 @@
   >
   	<div class="w-full max-w-sm space-y-8 no-drag">
       <div class="text-center">
-        {#if isSetup}
-          <div class="w-16 h-16 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto mb-4 text-sky-500 dark:text-sky-400">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-          </div>
-          <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.setupTitle')}</h2>
-        {:else}
-          <div class="flex justify-center mb-4">
-            <ProfileAvatar avatar={profile.avatar} name={profile.name} size={64} />
-          </div>
-          <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.welcomeBack', { name: profile.name })}</h2>
-        {/if}
-        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{t('lock.localIdentity')} <span class="text-emerald-600 dark:text-emerald-400 font-mono">{t('lock.encrypted')}</span></p>
+      	{#if isSetup}
+      		<div class="flex justify-center mb-4">
+      			<AvatarPicker bind:value={setupAvatar} size={64} centered />
+      		</div>
+      		<h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.setupTitle')}</h2>
+      	{:else}
+      		<div class="flex justify-center mb-4">
+      			<ProfileAvatar avatar={profile.avatar} name={profile.name} size={64} />
+      		</div>
+      		<h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.welcomeBack', { name: profile.name })}</h2>
+      	{/if}
+      	<p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{t('lock.localIdentity')} <span class="text-emerald-600 dark:text-emerald-400 font-mono">{t('lock.encrypted')}</span></p>
       </div>
 
       {#if successMsg}
-        <div class="p-3 text-xs rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-center">
-          {successMsg}
-        </div>
+      	<div class="p-3 text-xs rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-center">
+      		{successMsg}
+      	</div>
       {/if}
 
       {#if errorMsg}
-        <div class="p-3 text-xs rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-center">
-          {errorMsg}
-        </div>
+      	<div class="p-3 text-xs rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-center">
+      		{errorMsg}
+      	</div>
       {/if}
 
       <div class="space-y-4">
-        {#if isSetup}
-          <div>
-            <label for="profile-name" class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">{t('lock.yourName')}</label>
-            <input
-              id="profile-name"
-              type="text"
-              bind:value={setupName}
-              maxlength="48"
-              placeholder="CATerm User"
-              class="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
-            />
-          </div>
-          <div>
-            <span class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">{t('lock.profilePicture')}</span>
-            <AvatarPicker bind:value={setupAvatar} size={36} />
-          </div>
-        {/if}
+      	{#if isSetup}
+      		<div>
+      			<label for="profile-name" class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">{t('lock.yourName')}</label>
+      			<input
+      				id="profile-name"
+      				type="text"
+      				bind:value={setupName}
+      				maxlength="48"
+      				placeholder="CATerm User"
+      				class="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
+      			/>
+      		</div>
+      	{/if}
         <div>
           <label for="master-password" class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">{isSetup ? t('lock.createMasterPassword') : t('lock.masterPassword')}</label>
           <div class="relative">

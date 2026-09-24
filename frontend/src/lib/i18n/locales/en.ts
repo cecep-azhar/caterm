@@ -434,14 +434,15 @@ const en = {
     failed: 'Update failed: {{error}}'
   },
   about: {
-    closeDialog: 'Close About dialog',
-    tagline: 'Local-first SSH manager with an encrypted vault, SFTP, and an AI ops assistant.',
+    closeDialog: 'Close dialog',
+    tagline: 'Local-first SSH manager with encrypted vault, SFTP, and ops assistant.',
     license: 'License',
+    website: 'Website',
     source: 'Source',
     builtBy: 'Built by',
     dedication: 'Dedication',
     dedicationText: '"To the Five Lights of My Life: Fatih, Harun, Ibrahim, Khadijah, Maryam, and My Beloved Wife Rini.."',
-    copyright: 'Copyright 2026 by Cecep Azhar',
+    copyright: 'Copyright © 2026',
     builtWithLove: 'Built with Love',
     love: 'Love',
     fromIndonesia: 'from Indonesia'

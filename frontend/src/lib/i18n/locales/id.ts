@@ -438,11 +438,12 @@ const id: Dictionary = {
     closeDialog: 'Tutup dialog Tentang',
     tagline: 'Pengelola SSH lokal dengan vault terenkripsi, SFTP, dan asisten operasional AI.',
     license: 'Lisensi',
+    website: 'Website',
     source: 'Sumber',
     builtBy: 'Dibuat oleh',
     dedication: 'Dedikasi',
     dedicationText: '"Untuk Lima Cahaya Hidupku: Fatih, Harun, Ibrahim, Khadijah, Maryam, dan Istriku Tercinta Rini.."',
-    copyright: 'Hak cipta 2026 oleh Cecep Azhar',
+    copyright: 'Hak cipta © 2026',
     builtWithLove: 'Dibuat dengan Cinta',
     love: 'Cinta',
     fromIndonesia: 'dari Indonesia'

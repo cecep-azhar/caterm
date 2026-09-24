@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n/index.svelte';
   import Logo from './Logo.svelte';
-  import { APP_VERSION, REPO_URL } from '$lib/appInfo';
+  import { APP_VERSION, REPO_URL, WEBSITE_URL, AUTHOR_URL } from '$lib/appInfo';
 
   let { onClose }: { onClose: () => void } = $props();
 </script>
@@ -46,14 +46,22 @@
         <dd class="text-neutral-900 dark:text-neutral-200 font-medium">MIT</dd>
       </div>
       <div class="flex justify-between py-2">
+        <dt class="text-neutral-500">{t('about.website')}</dt>
+        <dd>
+          <a href={WEBSITE_URL} target="_blank" rel="noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline font-mono">caterm.fathforce.com</a>
+        </dd>
+      </div>
+      <div class="flex justify-between py-2">
         <dt class="text-neutral-500">{t('about.source')}</dt>
         <dd>
-          <a href={REPO_URL} class="text-sky-600 dark:text-sky-400 hover:underline font-mono">cecep-azhar/caterm</a>
+          <a href={REPO_URL} target="_blank" rel="noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline font-mono">cecep-azhar/caterm</a>
         </dd>
       </div>
       <div class="flex justify-between py-2">
         <dt class="text-neutral-500">{t('about.builtBy')}</dt>
-        <dd class="text-neutral-900 dark:text-neutral-200 font-medium">Cecep Azhar</dd>
+        <dd>
+          <a href={AUTHOR_URL} target="_blank" rel="noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline font-medium">Cecep Azhar</a>
+        </dd>
       </div>
     </dl>
 
@@ -71,7 +79,9 @@
     </div>
 
     <div class="mt-4 text-[11px] text-neutral-500 dark:text-neutral-400 flex flex-col items-center justify-center gap-1">
-      <div>{t('about.copyright')}</div>
+      <div>
+        {t('about.copyright')} <a href={AUTHOR_URL} target="_blank" rel="noreferrer" class="text-neutral-700 dark:text-neutral-300 hover:text-sky-600 dark:hover:text-sky-400 hover:underline font-medium">Cecep Azhar</a>
+      </div>
       <div class="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
         <span>{t('about.builtWithLove')}</span>
         <svg class="w-3 h-3 text-rose-500 fill-rose-500 inline-block shrink-0" viewBox="0 0 24 24" aria-label={t('about.love')}>
