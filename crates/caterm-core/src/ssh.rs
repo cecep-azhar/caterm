@@ -411,7 +411,9 @@ fn flush_pty_output(session_id: &str, pending: &mut String) {
     });
 }
 
-/// Spawns a local shell (PowerShell on Windows, /bin/bash on Unix) as a local PTY session.
+/// Spawns a local shell (PowerShell on Windows, the user's `$SHELL` on Unix) as a local
+/// session. Not a real PTY yet (see the doc comment on the platform-specific blocks below for
+/// what that costs); stdio is plain OS pipes, decoded and pushed to the xterm.js pane as text.
 fn connect_local() -> Result<SshSession, CatermError> {
     let session_id = format!(
         "local-{}",
@@ -423,11 +425,33 @@ fn connect_local() -> Result<SshSession, CatermError> {
 
     #[cfg(windows)]
     let mut cmd = std::process::Command::new("powershell.exe");
+    // Unix has no single canonical shell the way Windows has powershell.exe: macOS has
+    // defaulted to zsh since Catalina, many Linux desktops to bash, some users to fish. `$SHELL`
+    // is how every terminal emulator picks this, so CATerm matches that instead of forcing bash
+    // on people who never asked for it.
     #[cfg(not(windows))]
-    let mut cmd = std::process::Command::new("/bin/bash");
+    let mut cmd = std::process::Command::new(
+        std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string()),
+    );
 
     #[cfg(windows)]
-    cmd.args(["-NoLogo"]);
+    {
+        cmd.args(["-NoLogo"]);
+        // Without this, spawning a console-subsystem process (powershell.exe) from a GUI app
+        // that owns no console of its own (Tauri's webview host) makes Windows allocate and
+        // show a brand-new console window for the child — piping its stdio does not suppress
+        // that window, only this flag does. The pane already renders the piped output; that
+        // second window was a stray real console sitting on top of it with nothing wired to it.
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    // `-i`: without a real tty on stdin, a shell defaults to non-interactive and skips its rc
+    // file (.bashrc/.zshrc) and prompt — forcing interactive mode is what makes this act like a
+    // terminal instead of a script runner. Job control (Ctrl+Z) still won't work: that needs a
+    // real PTY (ConPTY/openpty), which this session-based, pipe-backed shell doesn't allocate.
+    #[cfg(not(windows))]
+    cmd.arg("-i");
 
     cmd.stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
