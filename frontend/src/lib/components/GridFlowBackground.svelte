@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { getAppearance } from '$lib/stores/appearance.svelte';
+
+  const appearance = getAppearance();
 
   interface Props {
     targetX?: number;
@@ -370,6 +373,12 @@
   }
 
   onMount(() => {
+    // Drawing to canvas promotes it to a GPU-composited layer, which is what makes
+    // WebView2/Chromium spin up (and keep resident for the rest of the session) a
+    // dedicated GPU process. Skip touching the canvas at all when the user has
+    // motion reduced, so this purely decorative effect never pays that cost.
+    if (appearance.reduceMotion) return;
+
     ctx = canvas.getContext('2d');
     resize();
     initStreamers();
@@ -395,8 +404,17 @@
   });
 </script>
 
-<canvas
-  bind:this={canvas}
-  class="absolute inset-0 pointer-events-none w-full h-full z-0"
-  aria-hidden="true"
-></canvas>
+{#if appearance.reduceMotion}
+  <!-- Static CSS fallback: no canvas element at all, so no GPU-composited layer. -->
+  <div
+    class="absolute inset-0 pointer-events-none w-full h-full z-0"
+    style="background: radial-gradient(circle at {targetX}px {targetY}px, rgba(56,189,248,0.12), transparent 55%)"
+    aria-hidden="true"
+  ></div>
+{:else}
+  <canvas
+    bind:this={canvas}
+    class="absolute inset-0 pointer-events-none w-full h-full z-0"
+    aria-hidden="true"
+  ></canvas>
+{/if}
