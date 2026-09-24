@@ -78,6 +78,10 @@
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="1.8" /><path stroke-linecap="round" stroke-width="1.8" d="M12 11v5M12 8h.01" /></svg>
           About
         </button>
+        <button type="button" role="menuitem" onclick={() => run(() => goto('/contribution'))} class={itemClass}>
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+          Contribution
+        </button>
         <button type="button" role="menuitem" onclick={() => run(() => feedbackPrompt.open())} class={itemClass}>
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M8 8a4 4 0 118 0v1H8zM7 9h10v5a5 5 0 01-10 0zM12 14v5M3 13h4M17 13h4M4 8l3 2M20 8l-3 2M4 19l3-2M20 19l-3-2" /></svg>
           Report bug

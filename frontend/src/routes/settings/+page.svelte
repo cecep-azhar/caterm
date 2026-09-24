@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { changeMasterPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
   import { exportEncryptedBackup, importEncryptedBackup } from '$lib/api/backup';
@@ -41,6 +42,26 @@
   let confirmPassword = $state('');
   let showPasswords = $state(false);
   let isChangingPassword = $state(false);
+
+  // Audit Logs Setting
+  let maxAuditRecords = $state(1000);
+
+  onMount(() => {
+    try {
+      const stored = localStorage.getItem('caterm_max_audit_records');
+      if (stored) maxAuditRecords = parseInt(stored, 10) || 1000;
+    } catch {}
+  });
+
+  function handleSaveAuditSettings(e: Event) {
+    e.preventDefault();
+    try {
+      localStorage.setItem('caterm_max_audit_records', maxAuditRecords.toString());
+      showToast(`Max audit records set to ${maxAuditRecords}`, 'success');
+    } catch {
+      showToast('Failed to save audit settings', 'error');
+    }
+  }
 
   let backupPassphrase = $state('');
   let showBackupPassphrase = $state(false);
@@ -444,6 +465,34 @@
           {isChangingPassword ? 'Re-encrypting vault...' : 'Change Master Password'}
         </button>
       </form>
+
+      <!-- Audit Trail Settings -->
+      <div class="border-t border-neutral-800 pt-6 space-y-3">
+        <div>
+          <h3 class="text-base font-semibold text-white">Audit Trail & Command Logs</h3>
+          <p class="text-neutral-400 text-xs mt-1">Limit the number of records loaded from the local database. Older records beyond the limit are stored but not shown until the limit is raised.</p>
+        </div>
+        <form onsubmit={handleSaveAuditSettings} class="flex items-end gap-4 max-w-sm">
+          <div class="flex-1">
+            <label for="max-audit" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Max Records (default: 1000)</label>
+            <input
+              id="max-audit"
+              type="number"
+              min="100"
+              max="50000"
+              step="100"
+              bind:value={maxAuditRecords}
+              class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500"
+            />
+          </div>
+          <button
+            type="submit"
+            class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors whitespace-nowrap"
+          >
+            Save
+          </button>
+        </form>
+      </div>
     </div>
   {:else if activeTab === 'backup'}
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-8">

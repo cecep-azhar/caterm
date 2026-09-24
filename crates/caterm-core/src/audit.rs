@@ -53,6 +53,7 @@ pub fn log_event(
 pub fn get_logs(
     host_id_filter: Option<&str>,
     search: Option<&str>,
+    limit: Option<usize>,
 ) -> Result<Vec<CommandLog>, CatermError> {
     let conn = crate::db::open()?;
     let mut query =
@@ -73,6 +74,8 @@ pub fn get_logs(
     }
 
     query.push_str(" ORDER BY timestamp DESC");
+    let max_limit = limit.unwrap_or(1000);
+    query.push_str(&format!(" LIMIT {}", max_limit));
 
     let mut stmt = conn
         .prepare(&query)

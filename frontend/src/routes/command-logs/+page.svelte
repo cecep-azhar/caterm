@@ -47,9 +47,16 @@
   async function fetchLogs() {
     isLoading = true;
     try {
+      let maxLimit = 1000;
+      try {
+        const stored = localStorage.getItem('caterm_max_audit_records');
+        if (stored) maxLimit = parseInt(stored, 10) || 1000;
+      } catch {}
+
       logs = await invoke<CommandLog[]>('get_command_logs', {
         hostId: null,
-        search: null
+        search: null,
+        limit: maxLimit
       });
     } catch (e) {
       console.error('Failed to fetch logs', e);
@@ -115,6 +122,17 @@
     };
   }
 
+  // Pagination
+  const PAGE_SIZE_DEFAULT = 50;
+  let pageSize = $state(PAGE_SIZE_DEFAULT);
+  let currentPage = $state(1);
+
+  // Reset page when filters change
+  $effect(() => {
+    hostFilter; eventFilter; dateFilter; searchQuery;
+    currentPage = 1;
+  });
+
   let filteredLogs = $derived(
     logs.filter((log) => {
       if (hostFilter && log.host_id !== hostFilter) return false;
@@ -137,6 +155,11 @@
       }
       return true;
     })
+  );
+
+  let totalPages = $derived(Math.max(1, Math.ceil(filteredLogs.length / pageSize)));
+  let paginatedLogs = $derived(
+    filteredLogs.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   );
 
   let aiAutomationCount = $derived(logs.filter((l) => l.event_type === 'AI_AUTOMATION').length);
@@ -348,7 +371,7 @@
         </tr>
       </thead>
       <tbody class="divide-y divide-neutral-200/60 dark:divide-neutral-700/50 text-sm">
-        {#each filteredLogs as log (log.id)}
+        {#each paginatedLogs as log (log.id)}
           <tr class="hover:bg-neutral-100/70 dark:hover:bg-[#2A2D2E] transition-colors">
             <td class="p-3 whitespace-nowrap text-xs text-neutral-500 dark:text-neutral-400 font-mono">
               {formatTime(log.timestamp)}
@@ -443,4 +466,68 @@
       </tbody>
     </table>
   </div>
+
+  <!-- Pagination Footer -->
+  {#if filteredLogs.length > 0}
+    <div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-600 dark:text-neutral-400 select-none">
+      <div class="flex items-center gap-2">
+        <span>Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredLogs.length)} of {filteredLogs.length} records</span>
+        <span class="text-neutral-400 dark:text-neutral-600">|</span>
+        <label class="flex items-center gap-1.5">
+          <span>Rows per page:</span>
+          <select
+            bind:value={pageSize}
+            class="px-2 py-1 bg-neutral-100 dark:bg-[#2D2D2D] rounded border border-neutral-300 dark:border-neutral-700 text-xs focus:outline-none"
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="flex items-center gap-1">
+        <button
+          type="button"
+          disabled={currentPage <= 1}
+          onclick={() => currentPage = 1}
+          class="px-2 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+          title="First Page"
+        >
+          «
+        </button>
+        <button
+          type="button"
+          disabled={currentPage <= 1}
+          onclick={() => currentPage = Math.max(1, currentPage - 1)}
+          class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+        >
+          Prev
+        </button>
+
+        <span class="px-3 py-1 font-mono text-neutral-800 dark:text-neutral-200">
+          Page {currentPage} / {totalPages}
+        </span>
+
+        <button
+          type="button"
+          disabled={currentPage >= totalPages}
+          onclick={() => currentPage = Math.min(totalPages, currentPage + 1)}
+          class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+        >
+          Next
+        </button>
+        <button
+          type="button"
+          disabled={currentPage >= totalPages}
+          onclick={() => currentPage = totalPages}
+          class="px-2 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+          title="Last Page"
+        >
+          »
+        </button>
+      </div>
+    </div>
+  {/if}
 </div>

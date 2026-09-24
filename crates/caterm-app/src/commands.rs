@@ -420,8 +420,9 @@ pub async fn validate_vault_password(password: String) -> Result<(), CatermError
 pub async fn get_command_logs(
     host_id: Option<String>,
     search: Option<String>,
+    limit: Option<usize>,
 ) -> Result<Vec<audit::CommandLog>, CatermError> {
-    run_blocking(move || audit::get_logs(host_id.as_deref(), search.as_deref())).await
+    run_blocking(move || audit::get_logs(host_id.as_deref(), search.as_deref(), limit)).await
 }
 
 #[tauri::command]

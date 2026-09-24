@@ -556,7 +556,7 @@ fn handle_key(action: KeyAction) -> i32 {
 fn handle_audit(action: AuditAction) -> i32 {
     match action {
         AuditAction::Tail { host_id, search } => {
-            match caterm_core::audit::get_logs(host_id.as_deref(), search.as_deref()) {
+            match caterm_core::audit::get_logs(host_id.as_deref(), search.as_deref(), None) {
                 Ok(logs) => {
                     for l in logs {
                         println!(
