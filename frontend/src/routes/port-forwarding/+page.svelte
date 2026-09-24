@@ -151,10 +151,10 @@
           <div class="flex items-center justify-between mb-2">
             <span class="font-medium text-neutral-900 dark:text-white text-sm flex items-center gap-2">
               <span class="w-2 h-2 rounded-full {tun.isActive ? 'bg-emerald-400 animate-pulse' : 'bg-neutral-300 dark:bg-neutral-600'}"></span>
-              {tun.bindAddr}:{tun.bindPort} &rarr; {tun.targetAddr}:{tun.targetPort}
+              {tun.bindAddr}:{tun.bindPort} &rarr; {tun.forwardType === 'dynamic' ? 'SOCKS5' : `${tun.targetAddr}:${tun.targetPort}`}
             </span>
-            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono capitalize">
-              {tun.forwardType}
+            <span class="text-xs px-2 py-0.5 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-mono">
+              {t(`portForwarding.badge.${tun.forwardType}`)}
             </span>
           </div>
 

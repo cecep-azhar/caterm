@@ -237,6 +237,11 @@ const id: Dictionary = {
     typeLocal: 'Lokal (Teruskan port lokal ke tujuan remote)',
     typeRemote: 'Remote (Teruskan port remote ke lokal)',
     typeDynamic: 'Dinamis (Proxy SOCKS5)',
+    badge: {
+      local: 'Lokal',
+      remote: 'Remote',
+      dynamic: 'Dinamis',
+    },
     bindAddress: 'Alamat Bind',
     bindPort: 'Port Bind',
     targetAddress: 'Alamat Tujuan',

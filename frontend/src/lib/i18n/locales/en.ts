@@ -236,6 +236,11 @@ const en = {
     typeLocal: 'Local (Forward local port to remote destination)',
     typeRemote: 'Remote (Forward remote port to local)',
     typeDynamic: 'Dynamic (SOCKS5 Proxy)',
+    badge: {
+      local: 'Local',
+      remote: 'Remote',
+      dynamic: 'Dynamic',
+    },
     bindAddress: 'Bind Address',
     bindPort: 'Bind Port',
     targetAddress: 'Target Address',
