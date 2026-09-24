@@ -17,7 +17,8 @@
   import { listSnippets, type SnippetRecord } from '$lib/api/snippets';
   import { setActiveSession, clearActiveSession } from '$lib/stores/activeSession.svelte';
   import { getTheme, terminalTheme } from '$lib/stores/theme.svelte';
-  import { LINUX_COMMANDS, type AutocompleteItem } from '$lib/data/terminalCommands';
+  import { LINUX_COMMANDS, commandDescription, type AutocompleteItem } from '$lib/data/terminalCommands';
+  import { t } from '$lib/i18n/index.svelte';
   import TerminalAutocomplete from '$lib/components/TerminalAutocomplete.svelte';
 
   let {
@@ -116,7 +117,7 @@
         results.push({
           text: hist,
           type: 'history',
-          desc: 'Recent command'
+          desc: t('terminal.recentCommand')
         });
         if (results.length >= 3) break;
       }
@@ -151,7 +152,7 @@
         results.push({
           text: cmd.text,
           type: 'command',
-          desc: cmd.desc
+          desc: commandDescription(cmd)
         });
         if (results.length >= 8) break;
       }
@@ -255,7 +256,7 @@
     }
 
     terminal.writeln(
-      `\x1b[1;32mWelcome to CATerm v2\x1b[0m — connecting to \x1b[1;36m${host.label}\x1b[0m (${host.address})...`
+      `\x1b[1;32m${t('terminal.welcome')}\x1b[0m — ${t('terminal.connectingTo')} \x1b[1;36m${host.label}\x1b[0m (${host.address})...`
     );
 
     void (async () => {
@@ -277,14 +278,14 @@
           await onSshClosed(({ sessionId }) => {
             if (disposed || !session || sessionId !== session.sessionId) return;
             status = 'offline';
-            terminal.write('\r\n\x1b[33mconnection closed by remote host\x1b[0m\r\n');
+            terminal.write(`\r\n\x1b[33m${t('terminal.closedByRemote')}\x1b[0m\r\n`);
           })
         );
       } catch (err) {
         if (!disposed) {
           status = 'offline';
           terminal.write(
-            `\r\n\x1b[31mUnable to subscribe to terminal output: ${errorMessage(err)}\x1b[0m\r\n`
+            `\r\n\x1b[31m${t('terminal.subscribeFailed')}: ${errorMessage(err)}\x1b[0m\r\n`
           );
         }
         return;
@@ -301,16 +302,16 @@
         status = 'connected';
         fit.fit();
         void sshResize(opened.sessionId, terminal.cols, terminal.rows).catch((err) =>
-          reportFailure('Resize failed', err)
+          reportFailure(t('terminal.resizeFailed'), err)
         );
-        terminal.write(`\r\n\x1b[32mconnected\x1b[0m (session ${opened.sessionId})\r\n`);
+        terminal.write(`\r\n\x1b[32m${t('terminal.connected')}\x1b[0m (${t('terminal.session')} ${opened.sessionId})\r\n`);
 
         for (const chunk of early.get(opened.sessionId) ?? []) terminal.write(chunk);
         early.clear();
       } catch (err) {
         if (disposed) return;
         status = 'offline';
-        terminal.write(`\r\n\x1b[31mSSH connection failed: ${errorMessage(err)}\x1b[0m\r\n`);
+        terminal.write(`\r\n\x1b[31m${t('terminal.sshFailed')}: ${errorMessage(err)}\x1b[0m\r\n`);
       }
     })();
 
@@ -348,7 +349,7 @@
     terminal.onData((data) => {
       // Send keystroke to the real Rust SSH PTY backend
       if (session) {
-        void sshWrite(session.sessionId, data).catch((err) => reportFailure('Send failed', err));
+        void sshWrite(session.sessionId, data).catch((err) => reportFailure(t('terminal.sendFailed'), err));
       }
 
       // Track active line buffer for smart autocomplete
@@ -438,26 +439,26 @@
       <!-- Autocomplete toggle button -->
       <button
         onclick={() => { autocompleteEnabled = !autocompleteEnabled; if (!autocompleteEnabled) suggestions = []; }}
-        class="px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors flex items-center gap-1 {autocompleteEnabled ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-400 border border-transparent'}"
-        title="Toggle Smart Autocomplete (Tab to complete)"
-        aria-label="Toggle Smart Autocomplete"
+        class="px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors flex items-center gap-1 {autocompleteEnabled ? 'bg-sky-500/15 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 border border-sky-500/30' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400 border border-transparent'}"
+        title={t('terminal.toggleAutocompleteTitle')}
+        aria-label={t('terminal.toggleAutocomplete')}
       >
         <span class="w-1.5 h-1.5 rounded-full {autocompleteEnabled ? 'bg-sky-400' : 'bg-neutral-500'}"></span>
-        <span>Auto-complete</span>
+        <span>{t('terminal.autocomplete')}</span>
       </button>
 
       {#if onSplitRight}
-        <button onclick={onSplitRight} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Right (Vertical)" aria-label="Split Right">
+        <button onclick={onSplitRight} class="hover:text-sky-600 dark:hover:text-sky-400 p-0.5 rounded transition-colors" title={t('terminal.splitRightTitle')} aria-label={t('terminal.splitRight')}>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
         </button>
       {/if}
       {#if onSplitDown}
-        <button onclick={onSplitDown} class="hover:text-sky-400 p-0.5 rounded transition-colors" title="Split Down (Horizontal)" aria-label="Split Down">
+        <button onclick={onSplitDown} class="hover:text-sky-600 dark:hover:text-sky-400 p-0.5 rounded transition-colors" title={t('terminal.splitDownTitle')} aria-label={t('terminal.splitDown')}>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3 12h18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
         </button>
       {/if}
       {#if onClose}
-        <button onclick={onClose} class="hover:text-rose-400 p-0.5 rounded transition-colors" title="Close Pane" aria-label="Close Pane">
+        <button onclick={onClose} class="hover:text-rose-600 dark:hover:text-rose-400 p-0.5 rounded transition-colors" title={t('terminal.closePane')} aria-label={t('terminal.closePane')}>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       {/if}

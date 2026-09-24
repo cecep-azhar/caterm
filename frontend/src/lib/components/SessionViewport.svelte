@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '$lib/i18n/index.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import TerminalPane from '$lib/components/TerminalPane.svelte';
@@ -58,21 +59,21 @@
         if (lastOpened) setSelectedTabId(lastOpened);
       })
       .catch(() => {
-        loadError = 'Tauri backend not detected — unable to load hosts list.';
+        loadError = t('session.backendMissing');
       });
   });
 
   const tabs = $derived(getTabs());
 
   $effect(() => {
-    if (tabs.length > 0 && (!view.selectedTabId || !tabs.some((t) => t.id === view.selectedTabId))) {
+    if (tabs.length > 0 && (!view.selectedTabId || !tabs.some((tab) => tab.id === view.selectedTabId))) {
       setSelectedTabId(tabs[0].id);
     }
   });
 
   const activeTab = $derived.by(() => {
     if (tabs.length === 0) return undefined;
-    return tabs.find((t) => t.id === view.selectedTabId) ?? tabs[0];
+    return tabs.find((tab) => tab.id === view.selectedTabId) ?? tabs[0];
   });
 
   const activeHost = $derived(activeTab?.host);
@@ -107,12 +108,12 @@
 <div class="h-full w-full flex flex-col bg-neutral-100 dark:bg-neutral-950 overflow-hidden">
   <div class="flex-1 w-full min-h-0 overflow-hidden p-1 sm:p-1.5">
     {#if loadError}
-      <div class="p-4 text-sm text-amber-400 bg-neutral-900 border border-neutral-800 rounded">{loadError}</div>
+      <div class="p-4 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-neutral-900 border border-amber-200 dark:border-neutral-800 rounded">{loadError}</div>
     {:else if tabs.length === 0}
-      <div class="h-full flex flex-col items-center justify-center gap-3 text-center border border-dashed border-neutral-800 rounded-lg p-4">
-        <p class="text-neutral-300 font-medium">No active terminal sessions.</p>
-        <p class="text-neutral-500 text-sm max-w-sm">Select a host from the Hosts page (or click Launch All from a Group) to start an SSH session here.</p>
-        <a href="/" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">Go to Hosts</a>
+      <div class="h-full flex flex-col items-center justify-center gap-3 text-center border border-dashed border-neutral-300 dark:border-neutral-800 rounded-lg p-4">
+        <p class="text-neutral-800 dark:text-neutral-300 font-medium">{t('session.emptyTitle')}</p>
+        <p class="text-neutral-500 text-sm max-w-sm">{t('session.emptyBody')}</p>
+        <a href="/" class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">{t('session.goToHosts')}</a>
       </div>
     {:else}
       <div class="flex h-full gap-1 sm:gap-1.5 overflow-hidden">
@@ -122,7 +123,7 @@
               {#each tabs as tab (tab.id)}
                 <button
                   onclick={() => setSelectedTabId(tab.id)}
-                  class="px-2.5 py-1 rounded text-xs font-mono transition-colors shrink-0 flex items-center gap-1.5 {view.selectedTabId === tab.id ? 'bg-sky-600 text-white font-semibold shadow-xs' : 'bg-neutral-900 text-neutral-400 hover:text-neutral-200 border border-neutral-800'}"
+                  class="px-2.5 py-1 rounded text-xs font-mono transition-colors shrink-0 flex items-center gap-1.5 {view.selectedTabId === tab.id ? 'bg-sky-600 text-white font-semibold shadow-xs' : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 border border-neutral-200 dark:border-neutral-800'}"
                 >
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                   <span class="truncate max-w-[120px]">{tabLabel(tab)}</span>
@@ -153,18 +154,18 @@
           <div class="hidden md:block w-80 lg:w-96 shrink-0 h-full overflow-hidden">
             <SessionFileManager
               host={activeHost}
-              availableHosts={tabs.map((t) => t.host)}
-              onSelectHost={(h) => setSelectedTabId(tabs.find((t) => t.host.id === h.id)?.id ?? '')}
+              availableHosts={tabs.map((tab) => tab.host)}
+              onSelectHost={(h) => setSelectedTabId(tabs.find((tab) => tab.host.id === h.id)?.id ?? '')}
               onClose={() => setShowFiles(false)}
             />
           </div>
 
-          <div class="md:hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex flex-col justify-end p-2">
-            <div class="w-full h-full max-h-[94vh] flex flex-col bg-neutral-950 rounded-lg shadow-2xl border border-neutral-800 overflow-hidden">
+          <div class="md:hidden fixed inset-0 z-50 bg-black/40 dark:bg-black/70 backdrop-blur-xs flex flex-col justify-end p-2">
+            <div class="w-full h-full max-h-[94vh] flex flex-col bg-white dark:bg-neutral-950 rounded-lg shadow-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
               <SessionFileManager
                 host={activeHost}
-                availableHosts={tabs.map((t) => t.host)}
-                onSelectHost={(h) => setSelectedTabId(tabs.find((t) => t.host.id === h.id)?.id ?? '')}
+                availableHosts={tabs.map((tab) => tab.host)}
+                onSelectHost={(h) => setSelectedTabId(tabs.find((tab) => tab.host.id === h.id)?.id ?? '')}
                 onClose={() => setShowFiles(false)}
               />
             </div>

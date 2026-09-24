@@ -10,6 +10,8 @@
   import { APP_VERSION } from '$lib/appInfo';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
+  import { t } from '$lib/i18n/index.svelte';
+  import LanguageSwitcher from './LanguageSwitcher.svelte';
 
   export let onUnlocked: () => void;
 
@@ -95,12 +97,13 @@
     }
   }
 
+  // Quote text lives in the dictionaries (`lock.quotes.<key>`) so it follows the chosen language.
   const QUOTES = [
-    { text: "Talk is cheap. Show me the code.", author: "Linus Torvalds" },
-    { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
-    { text: "The most dangerous phrase in the language is, 'We've always done it this way.'", author: "Grace Hopper" },
-    { text: "Simplicity is prerequisite for reliability.", author: "Edsger W. Dijkstra" },
-    { text: "Make it work, make it right, make it fast.", author: "Kent Beck" }
+    { key: 'torvalds', author: 'Linus Torvalds' },
+    { key: 'jobs', author: 'Steve Jobs' },
+    { key: 'hopper', author: 'Grace Hopper' },
+    { key: 'dijkstra', author: 'Edsger W. Dijkstra' },
+    { key: 'beck', author: 'Kent Beck' }
   ];
 
   let currentQuote = QUOTES[0];
@@ -116,11 +119,11 @@
 
   async function handleUnlock() {
     if (!password) {
-      errorMsg = 'Master password cannot be empty.';
+      errorMsg = t('lock.errEmpty');
       return;
     }
     if (password.length < 8) {
-      errorMsg = 'Master password must be at least 8 characters.';
+      errorMsg = t('lock.errMinLength');
       return;
     }
     isLoading = true;
@@ -129,13 +132,13 @@
       await validateVaultPassword(password);
       if (isSetup) {
         saveProfile({ name: setupName, avatar: setupAvatar });
-        showToast('Vault successfully created and encrypted.', 'success');
+        showToast(t('lock.created'), 'success');
       } else {
-        showToast('Vault successfully unlocked.', 'success');
+        showToast(t('lock.unlocked'), 'success');
       }
       onUnlocked();
     } catch (err: any) {
-      errorMsg = typeof err === 'string' ? err : (err?.message || 'Invalid password (minimum 8 characters)');
+      errorMsg = typeof err === 'string' ? err : (err?.message || t('lock.errInvalid'));
       showToast(errorMsg, 'error');
     } finally {
       isLoading = false;
@@ -144,22 +147,22 @@
 
   async function handleReset() {
     const confirmed = await confirmModal(
-      'Resetting the Vault will permanently delete master password, local key, and all stored data. Are you sure?',
-      'Reset Local Vault',
+      t('lock.resetConfirm'),
+      t('lock.resetTitle'),
       true,
-      'Yes, Reset Vault',
-      'Cancel'
+      t('lock.resetYes'),
+      t('common.cancel')
     );
     if (confirmed) {
       try {
         await resetVault();
-        successMsg = 'Vault reset successfully! All database and local keys have been cleared.';
-        showToast('Vault reset successfully! All database records cleared.', 'success');
+        successMsg = t('lock.resetDone');
+        showToast(t('lock.resetToast'), 'success');
         isSetup = true;
         password = '';
         errorMsg = '';
       } catch (err: any) {
-        showToast('Failed to reset vault: ' + String(err), 'error');
+        showToast(t('lock.resetFailed', { error: String(err) }), 'error');
       }
     }
   }
@@ -173,7 +176,7 @@
 
 <div
   data-tauri-drag-region
-  class="fixed inset-0 z-50 flex bg-[#0a0a0a] text-white select-none cursor-default"
+  class="fixed inset-0 z-50 flex bg-neutral-50 dark:bg-[#0a0a0a] text-neutral-900 dark:text-white select-none cursor-default"
   onmousedown={startDragging}
   ondblclick={(e) => {
     const target = e.target as HTMLElement | null;
@@ -195,33 +198,34 @@
     }}
   >
     <div class="flex items-center gap-2 pointer-events-none opacity-80" data-tauri-drag-region>
-      <span class="text-[11px] font-mono text-neutral-400 font-semibold tracking-wider" data-tauri-drag-region>CATERM</span>
-      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono" data-tauri-drag-region>v{APP_VERSION}</span>
+      <span class="text-[11px] font-mono text-neutral-500 dark:text-neutral-400 font-semibold tracking-wider" data-tauri-drag-region>CATERM</span>
+      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/15 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 font-mono" data-tauri-drag-region>v{APP_VERSION}</span>
     </div>
     <!-- Draggable space spanning the rest of the header -->
     <div class="flex-1 h-full" data-tauri-drag-region></div>
-    <div class="flex items-center no-drag">
+    <div class="flex items-center gap-2 no-drag">
+      <LanguageSwitcher />
       <button
         onclick={() => minimizeWindow()}
-        class="p-1.5 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer rounded"
-        title="Minimize"
-        aria-label="Minimize"
+        class="p-1.5 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer rounded"
+        title={t('lock.minimize')}
+        aria-label={t('lock.minimize')}
       >
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
       </button>
       <button
         onclick={() => maximizeWindow()}
-        class="p-1.5 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer rounded"
-        title="Maximize"
-        aria-label="Maximize"
+        class="p-1.5 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors cursor-pointer rounded"
+        title={t('lock.maximize')}
+        aria-label={t('lock.maximize')}
       >
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"></rect></svg>
       </button>
       <button
         onclick={() => closeWindow()}
-        class="p-1.5 hover:bg-rose-600 hover:text-white text-neutral-400 transition-colors cursor-pointer rounded"
-        title="Close"
-        aria-label="Close"
+        class="p-1.5 hover:bg-rose-600 hover:text-white text-neutral-500 dark:text-neutral-400 transition-colors cursor-pointer rounded"
+        title={t('lock.close')}
+        aria-label={t('lock.close')}
       >
         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
@@ -231,7 +235,7 @@
   <!-- Left Panel: Brand & Quote -->
   <div
     data-tauri-drag-region
-    class="hidden lg:flex flex-1 flex-col justify-between p-12 bg-neutral-950 border-r border-neutral-800/60 relative overflow-hidden"
+    class="hidden lg:flex flex-1 flex-col justify-between p-12 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800/60 relative overflow-hidden"
     onmousedown={startDragging}
   >
     <!-- SkyBlue Grid Flow Animation to CATerm Logo -->
@@ -240,67 +244,67 @@
     <div class="relative z-10 flex items-center gap-3">
       <Logo size={40} mode="brand" />
       <div>
-        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v{APP_VERSION}</span></h1>
-        <p class="text-xs text-neutral-400">Enterprise SSH Manager & Prompt Studio</p>
+        <h1 class="text-xl font-bold tracking-wider text-neutral-900 dark:text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 border border-sky-500/30">v{APP_VERSION}</span></h1>
+        <p class="text-xs text-neutral-500 dark:text-neutral-400">{t('lock.tagline')}</p>
       </div>
     </div>
 
     <!-- Quote Container -->
     <div class="relative z-10 my-auto max-w-lg">
-      <div class="mb-4 text-sky-400">
+      <div class="mb-4 text-sky-500 dark:text-sky-400">
         <svg class="w-8 h-8 opacity-60" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
       </div>
-      <blockquote class="text-2xl font-light text-neutral-200 leading-relaxed italic">
-        "{currentQuote.text}"
+      <blockquote class="text-2xl font-light text-neutral-700 dark:text-neutral-200 leading-relaxed italic">
+        "{t(`lock.quotes.${currentQuote.key}`)}"
       </blockquote>
-      <p class="mt-4 text-sm font-semibold text-sky-400">— {currentQuote.author}</p>
+      <p class="mt-4 text-sm font-semibold text-sky-600 dark:text-sky-400">— {currentQuote.author}</p>
 
-      <div class="mt-8 p-4 rounded-xl bg-neutral-900/80 border border-neutral-800 text-xs text-neutral-400 space-y-2">
-        <div class="flex items-center gap-2 text-emerald-400 font-medium">
+      <div class="mt-8 p-4 rounded-xl bg-neutral-50/90 dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 space-y-2">
+        <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          Zero-Knowledge Local Encryption (Argon2id + AES-GCM)
+          {t('lock.zkTitle')}
         </div>
-        <p>Your vault credentials and SSH private keys are encrypted locally. We never store or transmit your master password to any cloud server.</p>
+        <p>{t('lock.zkBody')}</p>
       </div>
     </div>
 
     <!-- Left Panel Footer -->
     <div class="relative z-10 flex items-center justify-between text-xs text-neutral-500">
-      <span>Zero-Knowledge Local Identity</span>
-      <span class="font-mono text-neutral-600">v{APP_VERSION}</span>
+      <span>{t('lock.zkIdentity')}</span>
+      <span class="font-mono text-neutral-400 dark:text-neutral-600">v{APP_VERSION}</span>
     </div>
   </div>
 
   <!-- Right Panel: Master Password Input Form -->
   <div
     data-tauri-drag-region
-    class="flex-1 flex flex-col justify-center items-center p-8 sm:p-16 bg-[#0a0a0a]"
+    class="flex-1 flex flex-col justify-center items-center p-8 sm:p-16 bg-neutral-50 dark:bg-[#0a0a0a]"
     onmousedown={startDragging}
   >
     <div class="w-full max-w-md space-y-8 no-drag">
       <div class="text-center">
         {#if isSetup}
-          <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto mb-4 text-sky-400">
+          <div class="w-16 h-16 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto mb-4 text-sky-500 dark:text-sky-400">
             <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
           </div>
-          <h2 class="text-2xl font-bold text-white">Setup CATerm Vault</h2>
+          <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.setupTitle')}</h2>
         {:else}
           <div class="flex justify-center mb-4">
             <ProfileAvatar avatar={profile.avatar} name={profile.name} size={64} />
           </div>
-          <h2 class="text-2xl font-bold text-white">Welcome back, {profile.name}</h2>
+          <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.welcomeBack', { name: profile.name })}</h2>
         {/if}
-        <p class="text-sm text-neutral-400 mt-1">Local Identity <span class="text-emerald-400 font-mono">(Encrypted)</span></p>
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{t('lock.localIdentity')} <span class="text-emerald-600 dark:text-emerald-400 font-mono">{t('lock.encrypted')}</span></p>
       </div>
 
       {#if successMsg}
-        <div class="p-3 text-xs rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-center">
+        <div class="p-3 text-xs rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-center">
           {successMsg}
         </div>
       {/if}
 
       {#if errorMsg}
-        <div class="p-3 text-xs rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 text-center">
+        <div class="p-3 text-xs rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-center">
           {errorMsg}
         </div>
       {/if}
@@ -308,23 +312,23 @@
       <div class="space-y-4">
         {#if isSetup}
           <div>
-            <label for="profile-name" class="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Your Name</label>
+            <label for="profile-name" class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">{t('lock.yourName')}</label>
             <input
               id="profile-name"
               type="text"
               bind:value={setupName}
               maxlength="48"
               placeholder="CATerm User"
-              class="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
+              class="w-full px-4 py-3 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
             />
           </div>
           <div>
-            <span class="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Profile Picture</span>
+            <span class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">{t('lock.profilePicture')}</span>
             <AvatarPicker bind:value={setupAvatar} size={36} />
           </div>
         {/if}
         <div>
-          <label for="master-password" class="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">{isSetup ? 'Create Master Password' : 'Master Password'}</label>
+          <label for="master-password" class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">{isSetup ? t('lock.createMasterPassword') : t('lock.masterPassword')}</label>
           <div class="relative">
             <input
               id="master-password"
@@ -332,14 +336,14 @@
               bind:value={password}
               onkeydown={handleKeydown}
               placeholder="••••••••••••"
-              class="w-full pl-4 pr-11 py-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
+              class="w-full pl-4 pr-11 py-3 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
             />
             <button
               type="button"
               onclick={() => (showPassword = !showPassword)}
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors p-1"
-              aria-label={showPassword ? 'Hide password' : 'Show password'}
-              title={showPassword ? 'Hide password' : 'Show password'}
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors p-1"
+              aria-label={showPassword ? t('lock.hidePassword') : t('lock.showPassword')}
+              title={showPassword ? t('lock.hidePassword') : t('lock.showPassword')}
             >
               {#if showPassword}
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -362,22 +366,22 @@
         >
           {#if isLoading}
             <svg class="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            {isSetup ? 'Setting up...' : 'Unlocking...'}
+            {isSetup ? t('lock.settingUp') : t('lock.unlocking')}
           {:else}
-            {isSetup ? 'Create Vault' : 'Unlock Vault'}
+            {isSetup ? t('lock.createVault') : t('lock.unlockVault')}
           {/if}
         </button>
       </div>
 
-      <div class="flex items-center justify-between text-xs text-neutral-500 pt-4 border-t border-neutral-900">
+      <div class="flex items-center justify-between text-xs text-neutral-500 pt-4 border-t border-neutral-200 dark:border-neutral-900">
         {#if !isSetup}
-          <button onclick={handleReset} class="hover:text-rose-400 transition-colors cursor-pointer">
-            Reset Vault
+          <button onclick={handleReset} class="hover:text-rose-600 dark:hover:text-rose-400 transition-colors cursor-pointer">
+            {t('lock.resetVault')}
           </button>
         {:else}
           <span></span>
         {/if}
-        <span>Local Vault: Encrypted</span>
+        <span>{t('lock.vaultEncrypted')}</span>
       </div>
     </div>
   </div>

@@ -57,6 +57,13 @@ export function setLocale(next: Locale) {
   }
 }
 
+const INTL_TAGS: Record<Locale, string> = { en: 'en-US', id: 'id-ID' };
+
+/** BCP 47 tag for `Intl`/`toLocaleString`, so dates and numbers follow the chosen language too. */
+export function intlLocale(): string {
+  return INTL_TAGS[locale];
+}
+
 /** Dot-path lookup, e.g. `resolve(dict, 'hosts.title')`. */
 function resolve(dict: Dictionary, path: string): unknown {
   return path.split('.').reduce<unknown>((node, key) => {

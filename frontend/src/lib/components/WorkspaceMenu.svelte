@@ -13,6 +13,7 @@
   import { getTabs } from '$lib/stores/sessionTabs.svelte';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
+  import { t, intlLocale } from '$lib/i18n/index.svelte';
 
   interface Props {
     hostIds?: string[];
@@ -90,27 +91,27 @@
   function getLayoutName(l: number): string {
     switch (l) {
       case 2:
-        return 'Split Horizontal';
+        return t('workspaces.layoutSplitH');
       case 3:
-        return 'Split Vertical';
+        return t('workspaces.layoutSplitV');
       case 4:
-        return 'Grid 2x2';
+        return t('workspaces.layoutGrid');
       default:
-        return 'Single';
+        return t('workspaces.layoutSingle');
     }
   }
 
   function formatTimeAgo(ts: number): string {
     if (!ts) return '';
     const sec = Math.floor((Date.now() - ts) / 1000);
-    if (sec < 60) return 'just now';
+    if (sec < 60) return t('time.justNow');
     const min = Math.floor(sec / 60);
-    if (min < 60) return `${min}m ago`;
+    if (min < 60) return t('time.minutesAgo', { n: min });
     const hrs = Math.floor(min / 60);
-    if (hrs < 24) return `${hrs}h ago`;
+    if (hrs < 24) return t('time.hoursAgo', { n: hrs });
     const days = Math.floor(hrs / 24);
-    if (days < 7) return `${days}d ago`;
-    return new Date(ts).toLocaleDateString();
+    if (days < 7) return t('time.daysAgo', { n: days });
+    return new Date(ts).toLocaleDateString(intlLocale());
   }
 
   function getHostLabels(ids: string[]): string[] {
@@ -134,12 +135,12 @@
   async function handleSaveWorkspace() {
     const trimmed = workspaceName.trim();
     if (!trimmed) {
-      showToast('Please enter a workspace name', 'error');
+      showToast(t('workspaces.errName'), 'error');
       return;
     }
 
     if (activeHostIds.length === 0) {
-      showToast('No active hosts in this workspace to save', 'error');
+      showToast(t('workspaces.errNoHosts'), 'error');
       return;
     }
 
@@ -153,12 +154,12 @@
       );
 
       closeSaveModal();
-      showToast(`Workspace "${saved.name}" saved successfully`, 'success');
+      showToast(t('workspaces.saved', { name: saved.name }), 'success');
 
       if (onSave) onSave(saved);
       if (onSaveWorkspace) onSaveWorkspace(saved);
     } catch (err: any) {
-      showToast(err?.message || 'Failed to save workspace', 'error');
+      showToast(err?.message || t('workspaces.saveFailed'), 'error');
     } finally {
       isSaving = false;
     }
@@ -170,16 +171,16 @@
     try {
       const result = await restoreWorkspace(ws);
       if (result.openedCount === 0) {
-        showToast(`Workspace "${ws.name}" not loaded: none of its hosts exist anymore.`, 'error');
+        showToast(t('workspaces.notLoaded', { name: ws.name }), 'error');
         return;
       }
       if (result.missingCount > 0) {
         showToast(
-          `Workspace "${ws.name}" loaded ${result.openedCount} of ${ws.hostIds.length} hosts (${result.missingCount} no longer exist).`,
+          t('workspaces.partial', { name: ws.name, opened: result.openedCount, total: ws.hostIds.length, missing: result.missingCount }),
           'info'
         );
       } else {
-        showToast(`Workspace "${ws.name}" loaded (${result.openedCount} hosts)`, 'success');
+        showToast(t('workspaces.loaded', { name: ws.name, count: result.openedCount }), 'success');
       }
 
       if (onLoad) onLoad(ws);
@@ -192,7 +193,7 @@
         await goto('/session');
       }
     } catch (err: any) {
-      showToast(err?.message || 'Failed to load workspace', 'error');
+      showToast(err?.message || t('workspaces.loadFailed'), 'error');
     } finally {
       isLoadingWs = false;
     }
@@ -200,15 +201,15 @@
 
   async function handleDeleteWorkspace(ws: Workspace) {
     const confirmed = await confirmModal(
-      `Are you sure you want to delete workspace "${ws.name}"?`,
-      'Delete Workspace',
+      t('workspaces.deleteConfirm', { name: ws.name }),
+      t('workspaces.deleteHeading'),
       true,
-      'Delete',
-      'Cancel'
+      t('common.delete'),
+      t('common.cancel')
     );
     if (confirmed) {
       deleteWorkspace(ws.id);
-      showToast(`Workspace "${ws.name}" deleted`, 'info');
+      showToast(t('workspaces.deleted', { name: ws.name }), 'info');
     }
   }
 
@@ -233,7 +234,7 @@
     class="px-2.5 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {isOpen
       ? 'bg-sky-600/15 text-sky-600 dark:text-sky-400 border-sky-500/30'
       : 'bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-400 dark:hover:border-neutral-700'}"
-    title="Manage saved session workspaces"
+    title={t('workspaces.manage')}
     aria-expanded={isOpen}
     aria-haspopup="true"
   >
@@ -246,7 +247,7 @@
         d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
       />
     </svg>
-    <span class="font-medium hidden sm:inline">Workspaces</span>
+    <span class="font-medium hidden sm:inline">{t('workspaces.title')}</span>
     {#if workspaces.length > 0}
       <span
         class="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold bg-sky-500/15 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30"
@@ -285,7 +286,7 @@
               d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
             />
           </svg>
-          <span class="text-xs font-semibold text-neutral-900 dark:text-white">Workspaces</span>
+          <span class="text-xs font-semibold text-neutral-900 dark:text-white">{t('workspaces.title')}</span>
         </div>
         <button
           type="button"
@@ -295,7 +296,7 @@
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
-          <span>Save Current</span>
+          <span>{t('workspaces.saveCurrent')}</span>
         </button>
       </div>
 
@@ -308,9 +309,9 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
               </svg>
             </div>
-            <p class="font-medium text-neutral-800 dark:text-neutral-200">No saved workspaces</p>
+            <p class="font-medium text-neutral-800 dark:text-neutral-200">{t('workspaces.emptyTitle')}</p>
             <p class="text-[11px] text-neutral-400 dark:text-neutral-500 max-w-[220px] mx-auto">
-              Save your open hosts, split layout, and file manager state to quickly resume later.
+              {t('workspaces.emptyBody')}
             </p>
           </div>
         {:else}
@@ -324,7 +325,7 @@
                 </div>
                 <div class="text-[10px] text-neutral-500 dark:text-neutral-400 flex items-center flex-wrap gap-1.5 mt-0.5">
                   <span class="px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-mono">
-                    {ws.hostIds.length} {ws.hostIds.length === 1 ? 'host' : 'hosts'}
+                    {t('workspaces.hostCount', { count: ws.hostIds.length })}
                   </span>
                   <span>•</span>
                   <span>{getLayoutName(ws.layout)}</span>
@@ -339,16 +340,16 @@
                   onclick={() => handleLoadWorkspace(ws)}
                   disabled={isLoadingWs}
                   class="px-2 py-1 bg-sky-600/10 hover:bg-sky-600 text-sky-600 hover:text-white dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white border border-sky-500/30 rounded text-xs font-medium transition-colors shadow-xs"
-                  title="Load workspace {ws.name}"
+                  title={t('workspaces.loadTitle', { name: ws.name })}
                 >
-                  Load
+                  {t('workspaces.load')}
                 </button>
                 <button
                   type="button"
                   onclick={() => handleDeleteWorkspace(ws)}
                   class="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors"
-                  title="Delete workspace {ws.name}"
-                  aria-label="Delete workspace {ws.name}"
+                  title={t('workspaces.deleteTitle', { name: ws.name })}
+                  aria-label={t('workspaces.deleteTitle', { name: ws.name })}
                 >
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -371,7 +372,7 @@
 <!-- "Save Workspace" Modal / Form -->
 {#if isSaveModalOpen}
   <div
-    class="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+    class="fixed inset-0 z-[99999] bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
   >
     <div
       class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 max-w-md w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
@@ -388,15 +389,15 @@
             </svg>
           </div>
           <div>
-            <h3 id="save-workspace-title" class="font-bold text-neutral-900 dark:text-white text-base">Save Workspace</h3>
-            <p class="text-[11px] text-neutral-500 dark:text-neutral-400">Preserve active session hosts, layout, and panels.</p>
+            <h3 id="save-workspace-title" class="font-bold text-neutral-900 dark:text-white text-base">{t('workspaces.saveTitle')}</h3>
+            <p class="text-[11px] text-neutral-500 dark:text-neutral-400">{t('workspaces.saveSubtitle')}</p>
           </div>
         </div>
         <button
           type="button"
           onclick={closeSaveModal}
           class="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          aria-label="Close dialog"
+          aria-label={t('workspaces.closeDialog')}
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -408,14 +409,14 @@
       <div class="space-y-3 pt-1">
         <div>
           <label for="workspace-name-input" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-            Workspace Name *
+            {t('workspaces.nameLabel')}
           </label>
           <input
             id="workspace-name-input"
             type="text"
             bind:value={workspaceName}
             onkeydown={(e) => e.key === 'Enter' && handleSaveWorkspace()}
-            placeholder="e.g. Dev VPS + Database"
+            placeholder={t('workspaces.namePlaceholder')}
             class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500 transition-colors"
           />
         </div>
@@ -423,9 +424,9 @@
         <!-- Current Workspace Summary Card -->
         <div class="p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800/80 rounded-xl space-y-2">
           <div class="flex items-center justify-between text-xs">
-            <span class="text-neutral-500 dark:text-neutral-400">Active Hosts:</span>
+            <span class="text-neutral-500 dark:text-neutral-400">{t('workspaces.activeHosts')}</span>
             <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30">
-              {activeHostIds.length} {activeHostIds.length === 1 ? 'host' : 'hosts'}
+              {t('workspaces.hostCount', { count: activeHostIds.length })}
             </span>
           </div>
 
@@ -439,21 +440,21 @@
             </div>
           {:else}
             <div class="p-2 rounded bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs">
-              No active hosts currently open in session. Open one or more hosts first before saving.
+              {t('workspaces.noActiveHosts')}
             </div>
           {/if}
 
           <div class="grid grid-cols-2 gap-2 pt-1 border-t border-neutral-200 dark:border-neutral-800/60 text-[11px]">
             <div>
-              <span class="text-neutral-400">Layout:</span>
+              <span class="text-neutral-500 dark:text-neutral-400">{t('workspaces.layout')}</span>
               <span class="font-medium text-neutral-700 dark:text-neutral-300 ml-1">
                 {getLayoutName(effectiveLayout)}
               </span>
             </div>
             <div>
-              <span class="text-neutral-400">Files Panel:</span>
+              <span class="text-neutral-500 dark:text-neutral-400">{t('workspaces.filesPanel')}</span>
               <span class="font-medium text-neutral-700 dark:text-neutral-300 ml-1">
-                {effectiveShowFiles ? 'Open' : 'Closed'}
+                {effectiveShowFiles ? t('workspaces.open') : t('workspaces.closed')}
               </span>
             </div>
           </div>
@@ -467,7 +468,7 @@
           onclick={closeSaveModal}
           class="px-3.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-medium transition-colors"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           type="button"
@@ -478,7 +479,7 @@
           {#if isSaving}
             <span class="animate-spin text-xs">●</span>
           {/if}
-          <span>Save Workspace</span>
+          <span>{t('workspaces.saveTitle')}</span>
         </button>
       </div>
     </div>

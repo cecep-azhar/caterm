@@ -3,6 +3,7 @@
 import { checkForAppUpdate, installAppUpdate, isTauriRuntime, type Update } from '$lib/api/updater';
 import { errorText } from '$lib/errors';
 import { showToast } from '$lib/stores/uiNotifications.svelte';
+import { t } from '$lib/i18n/index.svelte';
 
 export type UpdateStatus =
   | 'idle'
@@ -75,7 +76,7 @@ export async function installUpdate(): Promise<void> {
   } catch (err) {
     errorMessage = errorText(err);
     status = 'error';
-    showToast(`Update failed: ${errorMessage}`, 'error');
+    showToast(t('updater.failed', { error: errorMessage }), 'error');
   }
 }
 

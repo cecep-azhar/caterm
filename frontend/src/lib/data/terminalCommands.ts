@@ -1,3 +1,14 @@
+import { getLocale, type Locale } from '$lib/i18n/index.svelte';
+import ID_DESCRIPTIONS from './terminalCommands.id';
+
+// Per-language description overlays keyed by the English `desc` (English itself needs none).
+const DESCRIPTION_OVERLAYS: Partial<Record<Locale, Record<string, string>>> = { id: ID_DESCRIPTIONS };
+
+/** A command's description in the active language, falling back to English. */
+export function commandDescription(cmd: { desc: string }): string {
+  return DESCRIPTION_OVERLAYS[getLocale()]?.[cmd.desc] ?? cmd.desc;
+}
+
 export interface AutocompleteItem {
   text: string;
   type: 'command' | 'snippet' | 'history';

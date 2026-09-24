@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '$lib/i18n/index.svelte';
   import type { AutocompleteItem } from '$lib/data/terminalCommands';
 
   let {
@@ -56,15 +57,15 @@
     <div class="px-2.5 py-1.5 bg-neutral-100/90 dark:bg-neutral-900/80 border-b border-neutral-200 dark:border-neutral-700/50 flex items-center justify-between text-[10px] text-neutral-600 dark:text-neutral-400">
       <div class="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-300">
         <span class="w-1.5 h-1.5 rounded-full bg-sky-500 dark:bg-sky-400 animate-pulse"></span>
-        <span>Smart Autocomplete</span>
+        <span>{t('terminal.smartAutocomplete')}</span>
       </div>
       <div class="flex items-center gap-2">
-        <span class="text-[9px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700/50 text-neutral-700 dark:text-neutral-300">Tab / Enter to complete</span>
+        <span class="text-[9px] px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-700/50 text-neutral-700 dark:text-neutral-300">{t('terminal.tabToComplete')}</span>
         <button
           onclick={onClose}
           class="hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors p-0.5 rounded"
-          title="Dismiss"
-          aria-label="Dismiss"
+          title={t('terminal.dismiss')}
+          aria-label={t('terminal.dismiss')}
         >
           ✕
         </button>
@@ -83,15 +84,15 @@
             <!-- Badge type -->
             {#if item.type === 'history'}
               <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
-                HIST
+                {t('terminal.badgeHistory')}
               </span>
             {:else if item.type === 'snippet'}
               <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shrink-0">
-                SNIP
+                {t('terminal.badgeSnippet')}
               </span>
             {:else}
               <span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30 shrink-0">
-                CMD
+                {t('terminal.badgeCommand')}
               </span>
             {/if}
 

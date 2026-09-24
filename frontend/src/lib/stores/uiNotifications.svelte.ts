@@ -1,4 +1,5 @@
 // Elegant, unified UI Notifications & Confirm Dialog store (Zero browser alert/confirm).
+import { t } from '$lib/i18n/index.svelte';
 
 export interface Toast {
   id: string;
@@ -39,7 +40,7 @@ export function showToast(message: string, type: 'success' | 'error' | 'info' = 
 }
 
 export function removeToast(id: string) {
-  toasts = toasts.filter((t) => t.id !== id);
+  toasts = toasts.filter((toast) => toast.id !== id);
 }
 
 export function getConfirmDialog(): ConfirmDialogState {
@@ -48,10 +49,11 @@ export function getConfirmDialog(): ConfirmDialogState {
 
 export function confirmModal(
   message: string,
-  title = 'Confirm Action',
+  // Defaults resolve at call time, so they follow the language active when the dialog opens.
+  title = t('notify.confirmTitle'),
   danger = false,
-  confirmText = 'Continue',
-  cancelText = 'Cancel'
+  confirmText = t('notify.continue'),
+  cancelText = t('common.cancel')
 ): Promise<boolean> {
   return new Promise((resolve) => {
     confirmDialog = {

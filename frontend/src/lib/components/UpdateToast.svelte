@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '$lib/i18n/index.svelte';
   import { getUpdater, installUpdate, dismissUpdateToast } from '$lib/stores/updater.svelte';
   import { releaseNotesUrl } from '$lib/appInfo';
 
@@ -19,10 +20,10 @@
         <path fill-rule="evenodd" d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 9a1 1 0 112 0v5a1 1 0 11-2 0v-5zm1-4a1.25 1.25 0 100 2.5A1.25 1.25 0 0012 7z" clip-rule="evenodd" />
       </svg>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-semibold text-neutral-900 dark:text-white">Update available: v{updater.version}</p>
+        <p class="text-sm font-semibold text-neutral-900 dark:text-white">{t('updater.available', { version: updater.version })}</p>
         <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-          CATerm v{updater.version} is ready with stability improvements.
-          <a href={releaseNotesUrl(updater.version)} class="underline underline-offset-2 hover:text-neutral-900 dark:hover:text-white">Changelog</a>
+          {t('updater.readyBody', { version: updater.version })}
+          <a href={releaseNotesUrl(updater.version)} class="underline underline-offset-2 hover:text-neutral-900 dark:hover:text-white">{t('updater.changelog')}</a>
         </p>
       </div>
       {#if updater.status !== 'downloading'}
@@ -30,7 +31,7 @@
           type="button"
           onclick={dismissUpdateToast}
           class="p-1 -mt-1 -mr-1 rounded-md text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          aria-label="Dismiss update notice"
+          aria-label={t('updater.dismiss')}
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
@@ -49,7 +50,7 @@
           onclick={installUpdate}
           class="px-3 py-1.5 rounded-md text-xs font-semibold bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors"
         >
-          Install &amp; restart
+          {t('updater.installRestart')}
         </button>
       {/if}
     </div>
