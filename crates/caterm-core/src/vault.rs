@@ -165,13 +165,20 @@ fn rekey_database(
 }
 
 pub fn lock_vault() -> Result<(), CatermError> {
-    let mut guard = ACTIVE_VAULT_KEY.write();
-    if let Some(mut key) = guard.take() {
-        key.zeroize();
-    }
+    // Audit first: once the key is gone the database can no longer be opened to record it.
+    let _ = crate::audit::log_event("VAULT_LOCK", None, "Vault locked");
     // Also stop all active tunnels on lock for Zero-Knowledge containment
     let _ = crate::tunnels::stop_all_tunnels();
-    let _ = crate::audit::log_event("VAULT_LOCK", None, "Vault locked");
+
+    // Scoped so the write guard is released before returning. `parking_lot::RwLock` is not
+    // reentrant: holding it across `log_event` (which reads the key to open the database)
+    // deadlocked every lock, and every unlock queued behind it hung forever.
+    {
+        let mut guard = ACTIVE_VAULT_KEY.write();
+        if let Some(mut key) = guard.take() {
+            key.zeroize();
+        }
+    }
     Ok(())
 }
 
@@ -292,6 +299,11 @@ mod tests {
         assert!(is_unlocked().unwrap());
         assert!(lock_vault().is_ok());
         assert!(!is_unlocked().unwrap());
+        // Regression: lock_vault used to keep the key's write lock while logging, so it never
+        // returned and this second unlock blocked forever.
+        assert!(unlock_vault("12345678").is_ok());
+        assert!(is_unlocked().unwrap());
+        assert!(lock_vault().is_ok());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
