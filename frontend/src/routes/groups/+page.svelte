@@ -3,6 +3,8 @@
   import { openSession } from '$lib/nav';
   import { listGroups, saveGroup, deleteGroup, type GroupRecord } from '$lib/api/groups';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
+  import { t } from '$lib/i18n/index.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
 
   let isAddModalOpen = $state(false);
   let backendAvailable = $state(true);
@@ -84,21 +86,24 @@
 </script>
 
 <div class="max-w-5xl mx-auto space-y-6">
-  <div class="flex justify-between items-center pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
-    <div>
-      <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Host Groups</h1>
-      <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">Organize servers into logical clusters for batch actions and multi-pane management.</p>
-      {#if !backendAvailable}
-        <p class="text-amber-500 text-xs mt-1">Tauri backend not detected — changes won't be saved to disk.</p>
-      {/if}
-    </div>
-    <button
-      onclick={openAddModal}
-      class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-2 shadow shadow-sky-600/20">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-      Create Group
-    </button>
-  </div>
+  <PageHeader
+    icon={['M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z']}
+    accent="indigo"
+    title={t('groups.title')}
+    subtitle={t('groups.subtitle')}
+  >
+    {#snippet actions()}
+      <button
+        onclick={openAddModal}
+        class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-2 shadow shadow-sky-600/20">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        {t('groups.createGroup')}
+      </button>
+    {/snippet}
+  </PageHeader>
+  {#if !backendAvailable}
+    <p class="text-amber-500 text-xs -mt-4">{t('common.backendUnavailable')}</p>
+  {/if}
 
   <!-- Groups Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -109,7 +114,7 @@
             <span class="w-4 h-4 rounded-full inline-block" style="background-color: {group.color}"></span>
             <h3 class="font-semibold text-neutral-900 dark:text-white text-lg">{group.name}</h3>
           </div>
-          <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-2">{group.hostIds.length} hosts assigned</p>
+          <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-2">{t('groups.hostsAssigned', { count: group.hostIds.length })}</p>
           {#if group.hostIds.length > 0}
             <div class="flex gap-1 flex-wrap mt-2">
               {#each group.hostIds as hostId}
@@ -119,10 +124,10 @@
           {/if}
         </div>
         <div class="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex justify-end gap-2">
-          <button onclick={() => openEditModal(group)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">Edit</button>
-          <button onclick={() => removeGroup(group.id)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">Delete</button>
+          <button onclick={() => openEditModal(group)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">{t('common.edit')}</button>
+          <button onclick={() => removeGroup(group.id)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">{t('common.delete')}</button>
           {#if group.hostIds.length > 0}
-            <button onclick={() => openSession(group.hostIds)} class="px-3 py-1 bg-sky-600/10 dark:bg-sky-600/20 text-sky-600 dark:text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">Launch All</button>
+            <button onclick={() => openSession(group.hostIds)} class="px-3 py-1 bg-sky-600/10 dark:bg-sky-600/20 text-sky-600 dark:text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">{t('groups.launchAll')}</button>
           {/if}
         </div>
       </div>
@@ -134,16 +139,16 @@
 {#if isAddModalOpen}
   <div class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-6 max-w-lg w-full space-y-4 shadow-2xl">
-      <h3 class="text-xl font-bold text-neutral-900 dark:text-white">{editingId ? 'Edit Host Group' : 'Create Host Group'}</h3>
+      <h3 class="text-xl font-bold text-neutral-900 dark:text-white">{editingId ? t('groups.editGroup') : t('groups.createGroup')}</h3>
       
       <form onsubmit={createGroup} class="space-y-4">
         <div>
-          <label for="group-name" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">Group Name</label>
-          <input id="group-name" bind:value={newGroup.name} required placeholder="e.g. Database Cluster" class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500" />
+          <label for="group-name" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">{t('groups.groupName')}</label>
+          <input id="group-name" bind:value={newGroup.name} required placeholder={t('groups.groupNamePlaceholder')} class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500" />
         </div>
 
         <div>
-          <span class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">Color Swatch</span>
+          <span class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">{t('groups.color')}</span>
           <div class="flex gap-2">
             {#each colors as c}
               <button 
@@ -158,7 +163,7 @@
         </div>
 
         <div>
-          <span class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">Assign Hosts</span>
+          <span class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">{t('groups.hostsInGroup')}</span>
           <div class="space-y-1 max-h-40 overflow-y-auto p-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded">
             {#each availableHosts as h}
               <label class="flex items-center gap-2 p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded cursor-pointer text-sm text-neutral-700 dark:text-neutral-300">
@@ -179,12 +184,12 @@
             type="button"
             onclick={() => isAddModalOpen = false} 
             class="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded text-sm font-medium">
-            Cancel
+            {t('common.cancel')}
           </button>
           <button 
             type="submit"
             class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded text-sm font-medium">
-            Save Group
+            {t('groups.saveGroup')}
           </button>
         </div>
       </form>
