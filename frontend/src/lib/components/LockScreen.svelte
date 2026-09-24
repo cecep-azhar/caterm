@@ -3,7 +3,7 @@
   import { isVaultInitialized, validateVaultPassword, resetVault } from '$lib/api/vault';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import Logo from './Logo.svelte';
-  import SnakeFlowBackground from './SnakeFlowBackground.svelte';
+  import GridFlowBackground from './GridFlowBackground.svelte';
   import ProfileAvatar from './ProfileAvatar.svelte';
   import AvatarPicker from './AvatarPicker.svelte';
   import { getProfile, saveProfile, DEFAULT_AVATAR } from '$lib/stores/profile.svelte';
@@ -234,11 +234,8 @@
     class="hidden lg:flex flex-1 flex-col justify-between p-12 bg-neutral-950 border-r border-neutral-800/60 relative overflow-hidden"
     onmousedown={startDragging}
   >
-    <!-- Ambient Grid Effect -->
-    <div class="absolute inset-0 bg-[linear-gradient(to_right,#1f293715_1px,transparent_1px),linear-gradient(to_bottom,#1f293715_1px,transparent_1px)] bg-[size:4rem_4rem]"></div>
-    
-    <!-- White Snake Flow Animation to CATerm Logo -->
-    <SnakeFlowBackground targetX={70} targetY={70} count={18} />
+    <!-- SkyBlue Grid Flow Animation to CATerm Logo -->
+    <GridFlowBackground targetX={64} targetY={64} count={17} />
 
     <div class="relative z-10 flex items-center gap-3">
       <Logo size={40} mode="brand" />
@@ -267,9 +264,10 @@
       </div>
     </div>
 
-    <!-- Dedication Footer -->
-    <div class="relative z-10 text-xs text-neutral-500">
-      Dedication: <span class="text-neutral-300 font-medium italic">To the Five Lights of My Life: Fatih, Harun, Ibrahim, Khadijah, Maryam, and My Beloved Wife Rini..</span>
+    <!-- Left Panel Footer -->
+    <div class="relative z-10 flex items-center justify-between text-xs text-neutral-500">
+      <span>Zero-Knowledge Local Identity</span>
+      <span class="font-mono text-neutral-600">v{APP_VERSION}</span>
     </div>
   </div>
 
