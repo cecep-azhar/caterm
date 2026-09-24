@@ -21,8 +21,10 @@ pub fn open_encrypted(data_dir: &Path, passphrase: &str) -> Result<Connection, C
     // PRAGMA key doesn't support bound parameters; escape single quotes defensively so a
     // passphrase containing one can't break out of the string literal.
     let escaped = passphrase.replace('\'', "''");
-    conn.execute_batch(&format!("PRAGMA key = '{escaped}';"))
-        .map_err(|e| CatermError::Db(DbError::Generic(format!("failed to set vault key: {e}"))))?;
+    conn.execute_batch(&format!(
+    	"PRAGMA key = '{escaped}';\nPRAGMA journal_mode = WAL;\nPRAGMA synchronous = NORMAL;"
+    ))
+    .map_err(|e| CatermError::Db(DbError::Generic(format!("failed to set vault key: {e}"))))?;
 
     conn.query_row("SELECT count(*) FROM sqlite_master", [], |_| Ok(()))
         .map_err(|_| {

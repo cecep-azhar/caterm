@@ -25,12 +25,11 @@ impl Default for PerformancePrefs {
     }
 }
 
-/// Never fails: a missing, unreadable or corrupt file falls back to defaults, because a bad
+/// If anything fails: missing, unreadable or corrupt file falls back to defaults, because a bad
 /// preferences file must not be able to stop the app from opening its window.
-pub fn load_performance_prefs() -> PerformancePrefs {
-    resolve_data_dir()
-        .map(|info| load_from(&info.path))
-        .unwrap_or_default()
+pub fn load_performance_prefs() -> Result<PerformancePrefs, CatermError> {
+	let info = resolve_data_dir()?;
+	Ok(load_from(&info.path))
 }
 
 pub fn save_performance_prefs(prefs: &PerformancePrefs) -> Result<(), CatermError> {

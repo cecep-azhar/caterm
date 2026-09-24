@@ -1,8 +1,10 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { Terminal } from 'xterm';
+  import { Terminal } from '@xterm/xterm';
   import { FitAddon } from '@xterm/addon-fit';
-  import 'xterm/css/xterm.css';
+  import { WebglAddon } from '@xterm/addon-webgl';
+  import { CanvasAddon } from '@xterm/addon-canvas';
+  import '@xterm/xterm/css/xterm.css';
   import type { UnlistenFn } from '@tauri-apps/api/event';
   import {
     sshConnect,
@@ -237,6 +239,23 @@
     fitAddon = fit;
     terminal.loadAddon(fit);
     terminal.open(terminalContainer);
+
+    // Hardware-accelerated terminal renderer with graceful fallbacks: WebGL -> Canvas -> DOM
+    try {
+    	const webgl = new WebglAddon();
+    	webgl.onContextLoss(() => {
+    		webgl.dispose();
+    	});
+    	terminal.loadAddon(webgl);
+    } catch {
+    	try {
+    		const canvasAddon = new CanvasAddon();
+    		terminal.loadAddon(canvasAddon);
+    	} catch {
+    		// Fall back to default DOM renderer
+    	}
+    }
+
     fit.fit();
 
     let disposed = false;

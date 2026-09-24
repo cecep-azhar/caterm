@@ -17,6 +17,8 @@
   let width = 0;
   let height = 0;
   let isVisible = true;
+  let lastFrameTime = 0;
+  const TARGET_FRAME_MS = 1000 / 30; // 30 FPS throttle to save memory & GPU
 
   interface Streamer {
     id: number;
@@ -321,141 +323,152 @@
     ctx.restore();
   }
 
-  function updateAndDraw() {
-    if (!ctx || !width || !height) {
-      if (isVisible) animId = requestAnimationFrame(updateAndDraw);
-      return;
-    }
+  function updateAndDraw(timestamp: number = performance.now()) {
+  	if (!isVisible) return;
+  	if (timestamp - lastFrameTime < TARGET_FRAME_MS) {
+  		animId = requestAnimationFrame(updateAndDraw);
+  		return;
+  	}
+  	lastFrameTime = timestamp;
 
-    ctx.clearRect(0, 0, width, height);
-    drawGrid();
+  	if (!ctx || !width || !height) {
+  		if (isVisible) animId = requestAnimationFrame(updateAndDraw);
+  		return;
+  	}
 
-    // 1. Draw and update Streamers
-    for (let i = 0; i < streamers.length; i++) {
-      const s = streamers[i];
+  	ctx.clearRect(0, 0, width, height);
+  	drawGrid();
 
-      if (
-        (s.reachedTarget && s.fade <= 0) ||
-        s.x < -100 ||
-        s.y < -100 ||
-        s.x > width + 100 ||
-        s.y > height + 100
-      ) {
-        streamers[i] = createStreamer(s.id, false);
-        continue;
-      }
+  	// 1. Draw and update Streamers
+  	for (let i = 0; i < streamers.length; i++) {
+  		const s = streamers[i];
 
-      stepStreamer(s);
+  		if (
+  			(s.reachedTarget && s.fade <= 0) ||
+  			s.x < -100 ||
+  			s.y < -100 ||
+  			s.x > width + 100 ||
+  			s.y > height + 100
+  		) {
+  			streamers[i] = createStreamer(s.id, false);
+  			continue;
+  		}
 
-      if (s.history.length < 2 || s.fade <= 0) continue;
+  		stepStreamer(s);
 
-      const head = s.history[0];
-      const tail = s.history[s.history.length - 1];
-      const gDist = Math.hypot(head.x - tail.x, head.y - tail.y);
+  		if (s.history.length < 2 || s.fade <= 0) continue;
 
-      let grad: CanvasGradient;
-      if (gDist > 4) {
-        grad = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
-      } else {
-        grad = ctx.createLinearGradient(
-          head.x,
-          head.y,
-          head.x + (s.dirX !== 0 ? s.dirX : 1) * 24,
-          head.y + (s.dirY !== 0 ? s.dirY : 1) * 24
-        );
-      }
+  		const head = s.history[0];
+  		const tail = s.history[s.history.length - 1];
+  		const gDist = Math.hypot(head.x - tail.x, head.y - tail.y);
 
-      const alpha = s.baseAlpha * Math.max(0, s.fade);
-      grad.addColorStop(0, `rgba(224, 242, 254, ${alpha.toFixed(3)})`);
-      grad.addColorStop(0.3, `rgba(56, 189, 248, ${(alpha * 0.85).toFixed(3)})`);
-      grad.addColorStop(0.7, `rgba(14, 165, 233, ${(alpha * 0.35).toFixed(3)})`);
-      grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+  		let grad: CanvasGradient;
+  		if (gDist > 4) {
+  			grad = ctx.createLinearGradient(head.x, head.y, tail.x, tail.y);
+  		} else {
+  			grad = ctx.createLinearGradient(
+  				head.x,
+  				head.y,
+  				head.x + (s.dirX !== 0 ? s.dirX : 1) * 24,
+  				head.y + (s.dirY !== 0 ? s.dirY : 1) * 24
+  			);
+  		}
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(head.x, head.y);
-      for (let j = 1; j < s.history.length; j++) {
-        ctx.lineTo(s.history[j].x, s.history[j].y);
-      }
+  		const alpha = s.baseAlpha * Math.max(0, s.fade);
+  		grad.addColorStop(0, `rgba(224, 242, 254, ${alpha.toFixed(3)})`);
+  		grad.addColorStop(0.3, `rgba(56, 189, 248, ${(alpha * 0.85).toFixed(3)})`);
+  		grad.addColorStop(0.7, `rgba(14, 165, 233, ${(alpha * 0.35).toFixed(3)})`);
+  		grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
 
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = s.lineWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 5;
-      ctx.stroke();
+  		ctx.save();
+  		ctx.beginPath();
+  		ctx.moveTo(head.x, head.y);
+  		for (let j = 1; j < s.history.length; j++) {
+  			ctx.lineTo(s.history[j].x, s.history[j].y);
+  		}
 
-      const headAlpha = alpha * 0.95;
-      ctx.beginPath();
-      ctx.arc(head.x, head.y, Math.max(s.lineWidth * 0.9, 1.6), 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(224, 242, 254, ${headAlpha.toFixed(3)})`;
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 8;
-      ctx.fill();
+  		ctx.strokeStyle = grad;
+  		ctx.lineWidth = s.lineWidth;
+  		ctx.lineCap = 'round';
+  		ctx.lineJoin = 'round';
+  		ctx.stroke();
 
-      ctx.restore();
-    }
+  		const headAlpha = alpha * 0.95;
+  		ctx.beginPath();
+  		ctx.arc(head.x, head.y, Math.max(s.lineWidth * 0.9, 1.6), 0, Math.PI * 2);
+  		ctx.fillStyle = `rgba(224, 242, 254, ${headAlpha.toFixed(3)})`;
+  		ctx.fill();
 
-    // 2. Draw and update Explosion Sparks
-    for (let i = sparks.length - 1; i >= 0; i--) {
-      const p = sparks[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vx *= 0.94;
-      p.vy *= 0.94;
-      p.alpha -= p.decay;
+  		ctx.restore();
+  	}
 
-      if (p.alpha <= 0) {
-        sparks.splice(i, 1);
-        continue;
-      }
+  	// 2. Draw and update Explosion Sparks
+  	for (let i = sparks.length - 1; i >= 0; i--) {
+  		const p = sparks[i];
+  		p.x += p.vx;
+  		p.y += p.vy;
+  		p.vx *= 0.94;
+  		p.vy *= 0.94;
+  		p.alpha -= p.decay;
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = Math.max(0, p.alpha);
-      ctx.shadowColor = '#38bdf8';
-      ctx.shadowBlur = 6;
-      ctx.fill();
-      ctx.restore();
-    }
+  		if (p.alpha <= 0) {
+  			sparks.splice(i, 1);
+  			continue;
+  		}
 
-    if (isVisible) {
-      animId = requestAnimationFrame(updateAndDraw);
-    }
+  		ctx.save();
+  		ctx.beginPath();
+  		ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+  		ctx.fillStyle = p.color;
+  		ctx.globalAlpha = Math.max(0, p.alpha);
+  		ctx.fill();
+  		ctx.restore();
+  	}
+
+  	if (isVisible) {
+  		animId = requestAnimationFrame(updateAndDraw);
+  	}
   }
 
-  function handleVisibilityChange() {
-    if (document.hidden) {
-      isVisible = false;
-      cancelAnimationFrame(animId);
-    } else {
-      if (!isVisible) {
-        isVisible = true;
-        animId = requestAnimationFrame(updateAndDraw);
-      }
-    }
+  function handleVisibility(visible: boolean) {
+  	if (!visible) {
+  		isVisible = false;
+  		cancelAnimationFrame(animId);
+  	} else {
+  		if (!isVisible) {
+  			isVisible = true;
+  			lastFrameTime = performance.now();
+  			animId = requestAnimationFrame(updateAndDraw);
+  		}
+  	}
   }
+
+  const onVisibilityChange = () => handleVisibility(!document.hidden);
+  const onBlur = () => handleVisibility(false);
+  const onFocus = () => handleVisibility(true);
 
   onMount(() => {
-    ctx = canvas.getContext('2d');
-    resize();
-    initStreamers();
-    animId = requestAnimationFrame(updateAndDraw);
+  	ctx = canvas.getContext('2d');
+  	resize();
+  	initStreamers();
+  	lastFrameTime = performance.now();
+  	animId = requestAnimationFrame(updateAndDraw);
 
-    const ro = new ResizeObserver(() => {
-      resize();
-    });
-    ro.observe(canvas);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+  	const ro = new ResizeObserver(() => {
+  		resize();
+  	});
+  	ro.observe(canvas);
+  	document.addEventListener('visibilitychange', onVisibilityChange);
+  	window.addEventListener('blur', onBlur);
+  	window.addEventListener('focus', onFocus);
 
-    return () => {
-      cancelAnimationFrame(animId);
-      ro.disconnect();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
+  	return () => {
+  		cancelAnimationFrame(animId);
+  		ro.disconnect();
+  		document.removeEventListener('visibilitychange', onVisibilityChange);
+  		window.removeEventListener('blur', onBlur);
+  		window.removeEventListener('focus', onFocus);
+  	};
   });
 
   onDestroy(() => {

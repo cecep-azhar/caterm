@@ -454,7 +454,7 @@ dependencies = [
 
 [[package]]
 name = "caterm-app"
-version = "2.1.9"
+version = "2.1.10"
 dependencies = [
  "async-trait",
  "caterm-core",
@@ -477,7 +477,7 @@ dependencies = [
 
 [[package]]
 name = "caterm-cli"
-version = "2.1.9"
+version = "2.1.10"
 dependencies = [
  "caterm-core",
  "clap",
@@ -489,7 +489,7 @@ dependencies = [
 
 [[package]]
 name = "caterm-core"
-version = "2.1.9"
+version = "2.1.10"
 dependencies = [
  "aes-gcm",
  "argon2",
@@ -5327,7 +5327,6 @@ dependencies = [
  "bytes",
  "libc",
  "mio",
- "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
  "socket2",

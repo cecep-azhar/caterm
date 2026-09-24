@@ -608,7 +608,7 @@ pub async fn list_watches() -> Result<Vec<sync::WatchInfo>, CatermError> {
 /// applies after a restart — the Settings page says so and offers to relaunch.
 #[tauri::command]
 pub fn get_performance_prefs() -> prefs::PerformancePrefs {
-    prefs::load_performance_prefs()
+	prefs::load_performance_prefs().unwrap_or_default()
 }
 
 #[tauri::command]

@@ -22,7 +22,7 @@ pub fn create_main_window(app: &tauri::App) -> tauri::Result<WebviewWindow> {
         .ok_or(tauri::Error::WindowNotFound)?;
 
     let mut builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
-    if !prefs::load_performance_prefs().gpu_acceleration {
+    if !prefs::load_performance_prefs().map(|p| p.gpu_acceleration).unwrap_or(true) {
         let base = config.additional_browser_args.clone().unwrap_or_default();
         builder = builder.additional_browser_args(&format!("{base} {NO_GPU_ARGS}"));
     }
@@ -105,7 +105,69 @@ mod memory {
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "linux")]
 mod memory {
-    pub fn install(_window: &tauri::WebviewWindow) {}
+	use std::sync::atomic::{AtomicU64, Ordering};
+	use std::sync::Arc;
+	use std::time::Duration;
+	use tauri::{WebviewWindow, WindowEvent};
+	use webkit2gtk::{WebContextExt, WebViewExt, WebsiteDataManagerExtManual};
+
+	/// Visible but unfocused for this long counts as "in background". Minimizing is
+	/// immediate. SSH sessions keep running either way; this only trims caches.
+	const BACKGROUND_AFTER: Duration = Duration::from_secs(15);
+
+	fn set_low_memory(window: &WebviewWindow, low: bool) {
+		let _ = window.with_webview(move |webview| {
+			let inner = webview.inner();
+			if let Some(context) = inner.context() {
+				if low {
+					context.set_cache_model(webkit2gtk::CacheModel::DocumentViewer);
+					context.clear_cache();
+					if let Some(dm) = context.website_data_manager() {
+						dm.clear(
+							webkit2gtk::WebsiteDataTypes::MEMORY_CACHE
+								| webkit2gtk::WebsiteDataTypes::DISK_CACHE,
+							webkit2gtk::glib::TimeSpan::from_seconds(0),
+							webkit2gtk::gio::Cancellable::NONE,
+							|_| {},
+						);
+					}
+				} else {
+					context.set_cache_model(webkit2gtk::CacheModel::WebBrowser);
+				}
+			}
+		});
+	}
+
+	pub fn install(window: &WebviewWindow) {
+		let generation = Arc::new(AtomicU64::new(0));
+		let handle = window.clone();
+		window.on_window_event(move |event| match event {
+			WindowEvent::Focused(true) => {
+				generation.fetch_add(1, Ordering::SeqCst);
+				set_low_memory(&handle, false);
+			}
+			WindowEvent::Focused(false) => {
+				let ticket = generation.fetch_add(1, Ordering::SeqCst) + 1;
+				let (generation, window) = (generation.clone(), handle.clone());
+				tauri::async_runtime::spawn(async move {
+					tokio::time::sleep(BACKGROUND_AFTER).await;
+					if generation.load(Ordering::SeqCst) == ticket {
+						set_low_memory(&window, true);
+					}
+				});
+			}
+			WindowEvent::Resized(_) if handle.is_minimized().unwrap_or(false) => {
+				generation.fetch_add(1, Ordering::SeqCst);
+				set_low_memory(&handle, true);
+			}
+			_ => {}
+		});
+	}
+}
+
+#[cfg(not(any(windows, target_os = "linux")))]
+mod memory {
+	pub fn install(_window: &tauri::WebviewWindow) {}
 }
