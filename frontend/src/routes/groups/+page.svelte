@@ -103,26 +103,26 @@
   <!-- Groups Grid -->
   <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
     {#each groups as group}
-      <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-5 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+      <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-5 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors shadow-sm dark:shadow-none">
         <div>
           <div class="flex items-center gap-3">
             <span class="w-4 h-4 rounded-full inline-block" style="background-color: {group.color}"></span>
-            <h3 class="font-semibold text-white text-lg">{group.name}</h3>
+            <h3 class="font-semibold text-neutral-900 dark:text-white text-lg">{group.name}</h3>
           </div>
-          <p class="text-neutral-400 text-sm mt-2">{group.hostIds.length} hosts assigned</p>
+          <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-2">{group.hostIds.length} hosts assigned</p>
           {#if group.hostIds.length > 0}
             <div class="flex gap-1 flex-wrap mt-2">
               {#each group.hostIds as hostId}
-                <span class="px-2 py-0.5 bg-neutral-800 border border-neutral-700 text-neutral-400 rounded text-xs">{hostLabel(hostId)}</span>
+                <span class="px-2 py-0.5 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 rounded text-xs">{hostLabel(hostId)}</span>
               {/each}
             </div>
           {/if}
         </div>
-        <div class="mt-4 pt-3 border-t border-neutral-800/80 flex justify-end gap-2">
-          <button onclick={() => openEditModal(group)} class="px-3 py-1 bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Edit</button>
-          <button onclick={() => removeGroup(group.id)} class="px-3 py-1 bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Delete</button>
+        <div class="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex justify-end gap-2">
+          <button onclick={() => openEditModal(group)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">Edit</button>
+          <button onclick={() => removeGroup(group.id)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">Delete</button>
           {#if group.hostIds.length > 0}
-            <button onclick={() => openSession(group.hostIds)} class="px-3 py-1 bg-sky-600/20 text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">Launch All</button>
+            <button onclick={() => openSession(group.hostIds)} class="px-3 py-1 bg-sky-600/10 dark:bg-sky-600/20 text-sky-600 dark:text-sky-400 hover:bg-sky-600 hover:text-white rounded text-xs transition-colors">Launch All</button>
           {/if}
         </div>
       </div>
@@ -132,18 +132,18 @@
 
 <!-- Create Group Modal -->
 {#if isAddModalOpen}
-  <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 max-w-lg w-full space-y-4">
-      <h3 class="text-xl font-bold text-white">{editingId ? 'Edit Host Group' : 'Create Host Group'}</h3>
+  <div class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-6 max-w-lg w-full space-y-4 shadow-2xl">
+      <h3 class="text-xl font-bold text-neutral-900 dark:text-white">{editingId ? 'Edit Host Group' : 'Create Host Group'}</h3>
       
       <form onsubmit={createGroup} class="space-y-4">
         <div>
-          <label for="group-name" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Group Name</label>
-          <input id="group-name" bind:value={newGroup.name} required placeholder="e.g. Database Cluster" class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
+          <label for="group-name" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">Group Name</label>
+          <input id="group-name" bind:value={newGroup.name} required placeholder="e.g. Database Cluster" class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500" />
         </div>
 
         <div>
-          <span class="block text-xs font-medium text-neutral-400 uppercase mb-2">Color Swatch</span>
+          <span class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">Color Swatch</span>
           <div class="flex gap-2">
             {#each colors as c}
               <button 
@@ -158,15 +158,15 @@
         </div>
 
         <div>
-          <span class="block text-xs font-medium text-neutral-400 uppercase mb-2">Assign Hosts</span>
-          <div class="space-y-1 max-h-40 overflow-y-auto p-2 bg-neutral-950 border border-neutral-800 rounded">
+          <span class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-2">Assign Hosts</span>
+          <div class="space-y-1 max-h-40 overflow-y-auto p-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded">
             {#each availableHosts as h}
-              <label class="flex items-center gap-2 p-1.5 hover:bg-neutral-900 rounded cursor-pointer text-sm text-neutral-300">
+              <label class="flex items-center gap-2 p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-900 rounded cursor-pointer text-sm text-neutral-700 dark:text-neutral-300">
                 <input 
                   type="checkbox" 
                   checked={newGroup.selectedHosts.includes(h.id)} 
                   onchange={() => toggleHost(h.id)}
-                  class="rounded bg-neutral-900 border-neutral-700 text-sky-600 focus:ring-sky-500"
+                  class="rounded bg-white dark:bg-neutral-900 border-neutral-300 dark:border-neutral-700 text-sky-600 focus:ring-sky-500"
                 />
                 <span>{h.label}</span>
               </label>
@@ -178,7 +178,7 @@
           <button 
             type="button"
             onclick={() => isAddModalOpen = false} 
-            class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-sm font-medium">
+            class="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded text-sm font-medium">
             Cancel
           </button>
           <button 

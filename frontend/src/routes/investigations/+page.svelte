@@ -108,31 +108,31 @@
 
   <div class="grid grid-cols-1 gap-4">
     {#each investigations as inv}
-      <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-5 flex flex-col justify-between hover:border-neutral-700 transition-colors">
+      <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-5 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors shadow-sm dark:shadow-none">
         <div>
           <div class="flex justify-between items-start">
-            <h3 class="font-semibold text-white text-lg">{inv.title}</h3>
-            <span class="px-2 py-1 text-xs rounded border {inv.status === 'OPEN' ? 'border-amber-500/50 text-amber-500' : 'border-green-500/50 text-green-500'}">
+            <h3 class="font-semibold text-neutral-900 dark:text-white text-lg">{inv.title}</h3>
+            <span class="px-2 py-1 text-xs rounded border {inv.status === 'OPEN' ? 'border-amber-500/50 text-amber-600 dark:text-amber-500' : 'border-green-500/50 text-green-600 dark:text-green-500'}">
               {inv.status}
             </span>
           </div>
-          <p class="text-neutral-400 text-sm mt-1">Host: {hostLabel(inv.host_id)}</p>
-          <p class="text-neutral-500 text-xs mt-1">Opened: {formatDate(inv.created_at)}</p>
+          <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">Host: {hostLabel(inv.host_id)}</p>
+          <p class="text-neutral-400 dark:text-neutral-500 text-xs mt-1">Opened: {formatDate(inv.created_at)}</p>
           {#if inv.notes}
-            <div class="mt-3 p-3 bg-neutral-950 border border-neutral-800 rounded text-neutral-300 text-sm whitespace-pre-wrap">{inv.notes}</div>
+            <div class="mt-3 p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded text-neutral-700 dark:text-neutral-300 text-sm whitespace-pre-wrap">{inv.notes}</div>
           {/if}
           <div class="mt-3 flex gap-2">
-            <span class="text-xs text-neutral-400 border border-neutral-700 px-2 py-1 rounded">Evidence attached: {inv.evidence !== '[]' ? 'Yes' : 'None'}</span>
+            <span class="text-xs text-neutral-500 dark:text-neutral-400 border border-neutral-300 dark:border-neutral-700 px-2 py-1 rounded">Evidence attached: {inv.evidence !== '[]' ? 'Yes' : 'None'}</span>
           </div>
         </div>
-        <div class="mt-4 pt-3 border-t border-neutral-800/80 flex justify-end gap-2">
-          <button onclick={() => openEditModal(inv)} class="px-3 py-1 bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Edit</button>
-          <button onclick={() => removeInvestigation(inv.id)} class="px-3 py-1 bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-300 transition-colors">Delete</button>
+        <div class="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex justify-end gap-2">
+          <button onclick={() => openEditModal(inv)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">Edit</button>
+          <button onclick={() => removeInvestigation(inv.id)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">Delete</button>
         </div>
       </div>
     {/each}
     {#if investigations.length === 0}
-      <div class="text-center py-10 text-neutral-500 border border-dashed border-neutral-800 rounded-lg">
+      <div class="text-center py-10 text-neutral-500 dark:text-neutral-500 border border-dashed border-neutral-300 dark:border-neutral-800 rounded-lg">
         No investigations found.
       </div>
     {/if}
@@ -140,19 +140,19 @@
 </div>
 
 {#if isAddModalOpen}
-  <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto">
-      <h3 class="text-xl font-bold text-white">{editingId ? 'Edit Investigation' : 'New Investigation'}</h3>
+  <div class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-6 max-w-lg w-full space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
+      <h3 class="text-xl font-bold text-neutral-900 dark:text-white">{editingId ? 'Edit Investigation' : 'New Investigation'}</h3>
       
       <form onsubmit={createInvestigation} class="space-y-4">
         <div>
-          <label for="inv-title" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Incident Title</label>
-          <input id="inv-title" bind:value={newInvestigation.title} required placeholder="e.g. Unauthorized login attempt" class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
+          <label for="inv-title" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">Incident Title</label>
+          <input id="inv-title" bind:value={newInvestigation.title} required placeholder="e.g. Unauthorized login attempt" class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500" />
         </div>
 
         <div>
-          <label for="inv-host" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Target Host</label>
-          <select id="inv-host" bind:value={newInvestigation.host_id} class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500">
+          <label for="inv-host" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">Target Host</label>
+          <select id="inv-host" bind:value={newInvestigation.host_id} class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500">
             <option value="">-- Global / Multiple Hosts --</option>
             {#each availableHosts as h}
               <option value={h.id}>{h.label}</option>
@@ -161,8 +161,8 @@
         </div>
 
         <div>
-          <label for="inv-status" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Status</label>
-          <select id="inv-status" bind:value={newInvestigation.status} class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500">
+          <label for="inv-status" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">Status</label>
+          <select id="inv-status" bind:value={newInvestigation.status} class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500">
             <option value="OPEN">Open</option>
             <option value="IN_PROGRESS">In Progress</option>
             <option value="CLOSED">Closed</option>
@@ -170,20 +170,20 @@
         </div>
 
         <div>
-          <label for="inv-notes" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Manual Notes</label>
-          <textarea id="inv-notes" bind:value={newInvestigation.notes} placeholder="Analyst notes, timeline details, etc." rows="4" class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500"></textarea>
+          <label for="inv-notes" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">Manual Notes</label>
+          <textarea id="inv-notes" bind:value={newInvestigation.notes} placeholder="Analyst notes, timeline details, etc." rows="4" class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500"></textarea>
         </div>
 
         <div>
-          <label for="inv-evidence" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Evidence Payload (JSON)</label>
-          <textarea id="inv-evidence" bind:value={newInvestigation.evidence} placeholder="[]" rows="2" class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-neutral-400 font-mono focus:outline-none focus:border-sky-500"></textarea>
+          <label for="inv-evidence" class="block text-xs font-medium text-neutral-500 dark:text-neutral-400 uppercase mb-1">Evidence Payload (JSON)</label>
+          <textarea id="inv-evidence" bind:value={newInvestigation.evidence} placeholder="[]" rows="2" class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-500 dark:text-neutral-400 font-mono focus:outline-none focus:border-sky-500"></textarea>
         </div>
 
-        <div class="flex justify-end gap-2 pt-2 border-t border-neutral-800 mt-4">
+        <div class="flex justify-end gap-2 pt-2 border-t border-neutral-200 dark:border-neutral-800 mt-4">
           <button 
             type="button"
             onclick={() => isAddModalOpen = false} 
-            class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded text-sm font-medium mt-2">
+            class="px-4 py-2 bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded text-sm font-medium mt-2">
             Cancel
           </button>
           <button 
