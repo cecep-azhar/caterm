@@ -8,7 +8,7 @@
   import SessionViewport from '$lib/components/SessionViewport.svelte';
   import { getAiChatState, toggleAiChat, closeAiChat } from '$lib/stores/aiChat.svelte';
   import { page } from '$app/state';
-  import { getTabs, closeTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
+  import { getTabs, closeTab, closeAllTabs, renameTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
     setLayout,
@@ -19,12 +19,17 @@
   import {
     getTheme,
     initTheme,
-    toggleTheme
+    setTheme
   } from '$lib/stores/theme.svelte';
   import { getToasts, showToast } from '$lib/stores/uiNotifications.svelte';
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
-import FeedbackWidget from '$lib/components/FeedbackWidget.svelte';
-import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
+  import FeedbackWidget from '$lib/components/FeedbackWidget.svelte';
+  import ProfileMenu from '$lib/components/ProfileMenu.svelte';
+  import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
+  import { checkForUpdates } from '$lib/stores/updater.svelte';
+  import { lockVault } from '$lib/api/vault';
+  import { APP_VERSION } from '$lib/appInfo';
+  import { goto } from '$app/navigation';
   import { onMount, onDestroy } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
@@ -54,6 +59,18 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
   onMount(() => {
     startMonitoring();
     initTheme();
+    // One quiet check per launch; failures (offline, no release yet) stay silent. Skipped under
+    // `vite dev`, where there is no installed build to update.
+    if (!import.meta.env.DEV) void checkForUpdates({ silent: true });
+
+    // Phone in landscape (including rotating into it): height is the scarce axis, so switch
+    // to the icon-only sidebar. Leaving landscape keeps whatever the user picked.
+    const shortViewport = window.matchMedia('(max-height: 500px)');
+    const collapseWhenShort = () => {
+      if (shortViewport.matches) isCollapsed = true;
+    };
+    collapseWhenShort();
+    shortViewport.addEventListener('change', collapseWhenShort);
 
     const handleGlobalClick = (e: MouseEvent) => {
       const target = (e.target as HTMLElement)?.closest('a');
@@ -69,8 +86,22 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
     };
     window.addEventListener('click', handleGlobalClick, true);
 
+    // No stray WebView context menu ("Save link as", "Inspect"...). Right-click only does
+    // something where CATerm defines its own menu (session tabs, SFTP file lists) — those
+    // handlers still run, this only suppresses the native one. Text fields keep the native
+    // cut/copy/paste menu; the terminal's hidden xterm textarea does not.
+    const handleContextMenu = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const editable = target?.closest('input, textarea, [contenteditable="true"]');
+      if (editable && !editable.closest('.xterm')) return;
+      e.preventDefault();
+    };
+    document.addEventListener('contextmenu', handleContextMenu, true);
+
     return () => {
       window.removeEventListener('click', handleGlobalClick, true);
+      document.removeEventListener('contextmenu', handleContextMenu, true);
+      shortViewport.removeEventListener('change', collapseWhenShort);
     };
   });
 
@@ -184,6 +215,38 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
     }
   ];
 
+  // Session tab right-click menu + inline rename
+  let tabMenu = $state<{ tabId: string; x: number; y: number } | null>(null);
+  let renamingTabId = $state<string | null>(null);
+  let renameDraft = $state('');
+
+  function openTabMenu(e: MouseEvent, tabId: string) {
+    e.preventDefault();
+    // Keep the menu inside the viewport on narrow windows.
+    tabMenu = { tabId, x: Math.min(e.clientX, window.innerWidth - 176), y: e.clientY };
+  }
+
+  function startRename(tabId: string) {
+    const tab = sessionTabs.find((t) => t.id === tabId);
+    tabMenu = null;
+    if (!tab) return;
+    renameDraft = tabLabel(tab);
+    renamingTabId = tabId;
+  }
+
+  function commitRename() {
+    if (renamingTabId) renameTab(renamingTabId, renameDraft);
+    renamingTabId = null;
+  }
+
+  function focusAndSelect(node: HTMLInputElement) {
+    // Next frame: bind:value fills the input after actions run, and select() needs the text.
+    requestAnimationFrame(() => {
+      node.focus();
+      node.select();
+    });
+  }
+
   /** A session tab is "current" only while the Session route is showing it. */
   function isSessionTabActive(tabId: string): boolean {
     if (!page.url.pathname.startsWith('/session')) return false;
@@ -253,14 +316,28 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
     return page.url.pathname.startsWith(href);
   }
 
-  // Maximize real estate on /session or active connections
-  let isSessionActive = $derived(page.url.pathname.startsWith('/session') || sessionTabs.length > 0);
+  /**
+   * Lock keeps open session tabs (they reconnect after unlock); sign out also closes them.
+   * Both drop the vault key from backend memory, not just the UI.
+   */
+  function lockApp() {
+    isUnlocked = false;
+    lockVault().catch((err) => console.warn('lock_vault failed:', err));
+  }
+
+  async function signOut() {
+    closeAllTabs();
+    isUnlocked = false;
+    await goto('/');
+    lockVault().catch((err) => console.warn('lock_vault failed:', err));
+    showToast('Signed out', 'info');
+  }
 
   const navItems = [
     {
       href: '/',
       label: 'Hosts',
-      path: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'
+      path: 'M4 17l6-5-6-5M12 19h8'
     },
     {
       href: '/sftp',
@@ -318,14 +395,32 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
       path: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z'
     }
   ];
+
+  const settingsItem = {
+    href: '/settings',
+    label: 'Settings',
+    path: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z'
+  };
+
+  /** The page the title-bar chip names. From a terminal it points back to Hosts. */
+  const currentSection = $derived(
+    page.url.pathname.startsWith('/session')
+      ? navItems[0]
+      : ([...navItems, settingsItem].find((item) => isActive(item.href)) ?? navItems[0])
+  );
 </script>
 
 <svelte:window
   onkeydown={(e) => {
     if (e.key !== 'Escape') return;
     mobileDrawerOpen = false;
+    tabMenu = null;
     closeAiChat();
   }}
+  onpointerdown={(e) => {
+    if (tabMenu && !(e.target as HTMLElement | null)?.closest('[data-tab-menu]')) tabMenu = null;
+  }}
+  onresize={() => (tabMenu = null)}
 />
 
 <NotificationCenter />
@@ -333,139 +428,306 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
 {#if !isUnlocked}
   <LockScreen onUnlocked={() => isUnlocked = true} />
 {:else}
-<div class="flex h-screen bg-neutral-100 dark:bg-[#0e0e0e] text-neutral-800 dark:text-neutral-300 font-sans transition-colors duration-150">
-  <!-- Mobile Slide-out Drawer Backdrop -->
-  {#if mobileDrawerOpen}
-    <button
-      type="button"
-      onclick={() => mobileDrawerOpen = false}
-      class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity border-0 p-0 cursor-default"
-      aria-label="Close menu backdrop"
-    ></button>
-  {/if}
-
-  <!-- Mobile Slide-out Drawer Navigation -->
-  <aside
-    class="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-white dark:bg-[#0e0e0e] border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between shadow-2xl md:hidden transform transition-transform duration-200 ease-in-out {mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'}"
-    aria-label="Mobile Navigation"
+<!-- Shell: one title bar across the full width, then sidebar + content panel. Title bar and
+     sidebar share the app background with no dividers; the content sits on a raised panel with
+     a left/top hairline and a rounded top-left corner. -->
+<div class="flex flex-col h-screen bg-neutral-100 dark:bg-[#0e0e0e] text-neutral-800 dark:text-neutral-300 font-sans transition-colors duration-150">
+  <!-- Title bar. Also hosts the terminal workspace controls (session tabs, Files, AI, split)
+       so a session never costs a second stacked header row. -->
+  <header
+    class="h-12 flex items-center gap-1 md:gap-2 pl-2 pr-1 md:pl-3 shrink-0 select-none cursor-default"
+    data-tauri-drag-region
+    onmousedown={startDragging}
+    ondblclick={(e) => {
+      const target = e.target as HTMLElement | null;
+      if (!target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) {
+        maximizeWindow();
+      }
+    }}
   >
-    <div>
-      <div class="h-11 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between px-4">
-        <div class="flex items-center gap-2">
-          <Logo size={22} mode="brand" />
-          <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide">CATerm</span>
-          <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">v2.1.7</span>
-        </div>
-        <button
-          onclick={() => mobileDrawerOpen = false}
-          class="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
-          aria-label="Close navigation"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
+    <!-- Left: current section + session tabs -->
+    <div class="flex items-center gap-1 min-w-0 flex-1" data-tauri-drag-region>
+      <button
+        type="button"
+        onclick={() => mobileDrawerOpen = true}
+        class="md:hidden p-1 rounded text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800 transition-colors shrink-0"
+        title="Open navigation menu"
+        aria-label="Open navigation menu"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      <div class="flex gap-1 text-xs items-center overflow-x-auto scrollbar-none min-w-0" data-tauri-drag-region>
+        <!-- Where you are, like a breadcrumb. Hidden while a terminal is showing: there the
+             session tabs are the context. -->
+        {#if !page.url.pathname.startsWith('/session')}
+          <span class="px-2 py-1 text-xs font-semibold shrink-0 hidden sm:flex items-center gap-1.5 text-neutral-900 dark:text-white" data-tauri-drag-region>
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={currentSection.path} />
+            </svg>
+            {currentSection.label}
+          </span>
+        {/if}
+        {#each sessionTabs as tab (tab.id)}
+          <!-- Hidden on phones: the Session route renders its own full-width tab switcher
+               there, and two competing strips in a 375px row leaves both unusable. -->
+          <div
+            role="group"
+            aria-label="Session {tabLabel(tab)}"
+            oncontextmenu={(e) => openTabMenu(e, tab.id)}
+            class="hidden sm:flex items-center rounded-md shrink-0 transition-colors {isSessionTabActive(tab.id) ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/70 dark:hover:bg-neutral-800/60'}"
+          >
+            {#if renamingTabId === tab.id}
+              <span class="py-0.5 pl-2 pr-1 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                <input
+                  use:focusAndSelect
+                  bind:value={renameDraft}
+                  maxlength="40"
+                  aria-label="Rename session tab"
+                  onkeydown={(e) => {
+                    if (e.key === 'Enter') commitRename();
+                    else if (e.key === 'Escape') { e.stopPropagation(); renamingTabId = null; }
+                  }}
+                  onblur={commitRename}
+                  class="w-28 md:w-36 px-1 py-0.5 rounded bg-white dark:bg-neutral-950 border border-sky-500 text-xs text-neutral-900 dark:text-white focus:outline-none"
+                />
+              </span>
+            {:else}
+              <a
+                href="/session"
+                onclick={() => setSelectedTabId(tab.id)}
+                ondblclick={() => startRename(tab.id)}
+                class="py-1 pl-2 pr-1 flex items-center gap-1.5 truncate max-w-[110px] md:max-w-[160px]"
+                title="{tabLabel(tab)} ({tab.host.address}) — right-click to rename"
+              >
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                <span class="truncate">{tabLabel(tab)}</span>
+              </a>
+            {/if}
+            <button
+              onclick={() => closeTab(tab.id)}
+              class="p-0.5 mr-1 rounded hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-rose-600 dark:hover:text-rose-400"
+              title="Close session {tabLabel(tab)}"
+              aria-label="Close session {tabLabel(tab)}"
+            >
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        {/each}
       </div>
 
-      <nav class="p-3 space-y-1 overflow-y-auto max-h-[calc(100vh-160px)] text-sm font-medium">
-        {#each navItems as item}
-          <a
-            href={item.href}
-            onclick={() => mobileDrawerOpen = false}
-            title={item.label}
-            class="p-2.5 rounded-lg flex items-center gap-3 transition-colors {isActive(item.href) ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
-          >
-            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={item.path} />
-            </svg>
-            <span class="truncate">{item.label}</span>
-          </a>
-        {/each}
-      </nav>
-    </div>
-
-    <!-- Mobile Drawer Footer -->
-    <div class="p-3 space-y-2 border-t border-neutral-200 dark:border-neutral-800/80">
+      <!-- New session: the Hosts page is where a connection is actually picked. Kept outside
+           the scrolling tab strip so it stays reachable once the tabs overflow. -->
       <a
-        href="/settings"
-        onclick={() => mobileDrawerOpen = false}
-        title="Settings"
-        class="p-2.5 rounded-lg flex items-center gap-3 transition-colors {isActive('/settings') ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
+        href="/"
+        class="p-1 rounded shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800 transition-colors"
+        title="New session (select host)"
+        aria-label="New session"
       >
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-        <span class="truncate text-sm font-medium">Settings</span>
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
       </a>
 
-      <div class="p-2 rounded-lg bg-neutral-100 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800/50 flex items-center justify-between">
-        <div class="flex items-center gap-2 overflow-hidden">
-          <div class="w-8 h-8 rounded-full shrink-0 bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-          <div class="truncate text-xs flex flex-col justify-center">
-            <div class="flex items-center gap-1.5">
-              <span class="font-medium text-neutral-900 dark:text-white truncate">Vault Admin</span>
-              <span class="text-[9px] font-bold px-1 py-0.5 bg-emerald-600 text-white rounded">LOCAL</span>
-            </div>
-            <p class="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">Encrypted Local Vault</p>
-          </div>
-        </div>
+      <!-- Draggable blank space spanning remaining left area -->
+      <div class="flex-1 h-full min-w-[20px]" data-tauri-drag-region></div>
+    </div>
+
+    <div class="flex items-center gap-1 md:gap-2 text-neutral-500 dark:text-neutral-400 shrink-0" data-tauri-drag-region>
+      <!-- Session view controls: only meaningful while terminals are open -->
+      {#if sessionTabs.length > 0}
         <button
-          onclick={() => { mobileDrawerOpen = false; isUnlocked = false; }}
-          title="Lock Vault"
-          aria-label="Lock Vault"
-          class="p-1.5 text-neutral-500 hover:text-amber-600 dark:text-neutral-400 dark:hover:text-amber-400 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded transition-colors shrink-0"
+          onclick={handleFilesToggle}
+          class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {view.showFiles ? 'bg-sky-600/20 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
+          title={view.showFiles ? 'Hide Remote Files (SFTP)' : 'Show Remote Files (SFTP)'}
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
+          </svg>
+          <span class="hidden lg:inline">Files</span>
+        </button>
+      {/if}
+
+      <!-- Right next to Files because they share the same column: opening one closes the other -->
+      <button
+        onclick={handleAiToggle}
+        class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
+        title={aiChat.open ? 'Close AI Assistant' : 'AI Assistant — discuss and run'}
+        aria-pressed={aiChat.open}
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+        </svg>
+        <span class="hidden lg:inline">AI</span>
+      </button>
+
+      <!-- Split Controls: ONLY shown when more than one host is open -->
+      {#if sessionTabs.length > 1}
+        <div class="hidden sm:flex items-center gap-0.5 p-0.5 rounded border border-neutral-200 dark:border-neutral-800">
+          {#each splitOptions as option}
+            <button
+              onclick={() => setLayout(option.value)}
+              disabled={sessionTabs.length < option.minTabs}
+              class="p-1 rounded transition-colors disabled:opacity-30 {view.layout === option.value ? 'bg-sky-600/25 text-sky-600 dark:text-sky-400' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
+              title={option.title}
+              aria-label={option.title}
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {#if option.value === 1}
+                  <rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"></rect>
+                {:else}
+                  <path stroke-width="2" d={option.path}></path>
+                {/if}
+              </svg>
+            </button>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="w-px h-4 bg-neutral-200 dark:bg-neutral-800 hidden sm:block"></div>
+
+      <!-- Workspaces Menu -->
+      <WorkspaceMenu />
+
+      <!-- Notification Bell -->
+      <button onclick={() => showToast('No new system notifications.', 'info')} class="p-1.5 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800 rounded-md transition-colors relative" title="Notifications" aria-label="Notifications">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+        {#if unreadCount > 0}
+          <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-rose-500 rounded-full border border-white dark:border-[#0e0e0e] animate-pulse"></span>
+        {/if}
+      </button>
+
+      <!-- Theme: segmented light / dark -->
+      <div class="flex items-center p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-800" role="group" aria-label="Theme">
+        <button
+          onclick={() => setTheme('light')}
+          aria-pressed={!isDarkTheme}
+          class="p-1 rounded-md transition-colors {!isDarkTheme ? 'bg-white text-amber-500 shadow-sm' : 'hover:text-neutral-900 dark:hover:text-white'}"
+          title="Light theme"
+          aria-label="Light theme"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        </button>
+        <button
+          onclick={() => setTheme('dark')}
+          aria-pressed={isDarkTheme}
+          class="p-1 rounded-md transition-colors {isDarkTheme ? 'bg-neutral-800 text-white' : 'hover:text-neutral-900'}"
+          title="Dark theme"
+          aria-label="Dark theme"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+        </button>
+      </div>
+
+      <!-- Live Status Indicator -->
+      <div class="hidden sm:flex items-center gap-1.5 text-xs" data-tauri-drag-region>
+        <span class="text-emerald-500 animate-pulse text-[10px]" class:opacity-50={monitorState.isPolling}>●</span>
+        <span class="text-neutral-600 dark:text-neutral-400 hidden lg:inline">{timeAgo}</span>
+      </div>
+
+      <!-- Custom Window Controls -->
+      <div class="hidden sm:flex items-center no-drag">
+        <button onclick={() => minimizeWindow()} class="p-2 rounded-md hover:bg-neutral-200/70 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors" title="Minimize" aria-label="Minimize">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+        </button>
+        <button onclick={() => maximizeWindow()} class="p-2 rounded-md hover:bg-neutral-200/70 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors" title="Maximize" aria-label="Maximize">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"></rect></svg>
+        </button>
+        <button onclick={() => closeWindow()} class="p-2 rounded-md hover:bg-rose-500 hover:text-white text-neutral-500 dark:text-neutral-400 transition-colors" title="Close" aria-label="Close">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       </div>
     </div>
-  </aside>
+  </header>
 
-  <!-- Desktop Sidebar -->
-  <aside
-    class="hidden md:flex flex-col justify-between shrink-0 bg-white dark:bg-[#0e0e0e] border-r border-neutral-200 dark:border-neutral-800 transition-all duration-200 ease-in-out {isCollapsed ? 'w-16' : 'w-64'}"
-    aria-label="Sidebar"
-  >
-    <div>
-      <!-- Sidebar Header -->
-      <div
-        data-tauri-drag-region
-        class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center {isCollapsed ? 'justify-center px-2' : 'justify-between px-3'} transition-all cursor-default select-none"
-        onmousedown={startDragging}
-        ondblclick={(e) => {
-          const target = e.target as HTMLElement | null;
-          if (!target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) {
-            maximizeWindow();
-          }
-        }}
-      >
+  <div class="flex flex-1 min-h-0">
+    <!-- Mobile Slide-out Drawer Backdrop -->
+    {#if mobileDrawerOpen}
+      <button
+        type="button"
+        onclick={() => mobileDrawerOpen = false}
+        class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity border-0 p-0 cursor-default"
+        aria-label="Close menu backdrop"
+      ></button>
+    {/if}
+
+    <!-- Mobile Slide-out Drawer Navigation -->
+    <aside
+      class="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-neutral-100 dark:bg-[#0e0e0e] border-r border-neutral-200 dark:border-neutral-800 flex flex-col justify-between shadow-2xl md:hidden transform transition-transform duration-200 ease-in-out {mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full'}"
+      aria-label="Mobile Navigation"
+    >
+      <div class="min-h-0 flex flex-col">
+        <div class="h-12 flex items-center justify-between px-4">
+          <div class="flex items-center gap-2">
+            <Logo size={22} mode="brand" />
+            <span class="font-bold text-neutral-900 dark:text-white text-base tracking-tight">CATerm</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 font-mono">v{APP_VERSION}</span>
+          </div>
+          <button
+            onclick={() => mobileDrawerOpen = false}
+            class="p-1.5 rounded-lg hover:bg-neutral-200/70 dark:hover:bg-neutral-800 text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white transition-colors"
+            aria-label="Close navigation"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <p class="px-5 pt-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">Workspace</p>
+        <nav class="px-2 space-y-0.5 overflow-y-auto scrollbar-none text-sm">
+          {#each navItems as item}
+            <a
+              href={item.href}
+              onclick={() => mobileDrawerOpen = false}
+              title={item.label}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              class="px-2.5 py-2 rounded-lg flex items-center gap-3 transition-colors {isActive(item.href) ? 'bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium' : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/40 hover:text-neutral-900 dark:hover:text-white'}"
+            >
+              <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d={item.path} />
+              </svg>
+              <span class="truncate">{item.label}</span>
+            </a>
+          {/each}
+        </nav>
+      </div>
+
+      <div class="p-2">
+        <ProfileMenu onLock={lockApp} onSignOut={signOut} onNavigate={() => (mobileDrawerOpen = false)} />
+      </div>
+    </aside>
+
+    <!-- Desktop Sidebar -->
+    <aside
+      class="hidden md:flex flex-col shrink-0 transition-all duration-200 ease-in-out {isCollapsed ? 'w-16' : 'w-60'}"
+      aria-label="Sidebar"
+    >
+      <!-- Brand + collapse -->
+      <div class="flex items-center pt-3 pb-4 {isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'}">
         {#if isCollapsed}
           <button
             type="button"
             onclick={toggleSidebar}
             title="Expand sidebar"
             aria-label="Expand sidebar"
-            class="p-1 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            class="p-1.5 rounded-lg hover:bg-neutral-200/70 dark:hover:bg-neutral-800 transition-colors"
           >
             <Logo size={22} mode="brand" />
           </button>
         {:else}
-          <div class="flex items-center gap-2 overflow-hidden min-w-0" data-tauri-drag-region>
+          <div class="flex items-center gap-2 min-w-0">
             <Logo size={22} mode="brand" />
-            <span class="font-bold text-neutral-900 dark:text-white text-base tracking-wide truncate" data-tauri-drag-region>CATerm</span>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono shrink-0" data-tauri-drag-region>v2.1.7</span>
+            <span class="font-bold text-neutral-900 dark:text-white text-lg tracking-tight truncate">CATerm</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-500 dark:text-neutral-400 font-mono shrink-0">v{APP_VERSION}</span>
           </div>
           <button
             type="button"
             onclick={toggleSidebar}
             title="Collapse sidebar"
             aria-label="Collapse sidebar"
-            class="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors shrink-0"
+            class="p-1 rounded-md hover:bg-neutral-200/70 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors shrink-0"
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
@@ -473,17 +735,24 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
           </button>
         {/if}
       </div>
-      
-      <!-- Nav Links -->
-      <nav class="p-2 space-y-1 text-sm font-medium">
+
+      {#if !isCollapsed}
+        <p class="px-5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">Workspace</p>
+      {/if}
+      <nav class="flex-1 min-h-0 overflow-y-auto scrollbar-none px-2 space-y-0.5 text-sm">
         {#each navItems as item}
           <a
             href={item.href}
             title={item.label}
-            class="p-2.5 rounded-lg flex items-center {isCollapsed ? 'justify-center' : 'gap-3'} transition-colors {isActive(item.href) ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
+            aria-current={isActive(item.href) ? 'page' : undefined}
+            class="relative px-2.5 py-2 rounded-lg flex items-center {isCollapsed ? 'justify-center' : 'gap-3'} transition-colors {isActive(item.href) ? 'bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium' : 'text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/40 hover:text-neutral-900 dark:hover:text-white'}"
           >
-            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={item.path} />
+            {#if isActive(item.href)}
+              <!-- Active marker pinned to the window's left edge -->
+              <span class="absolute -left-2 top-1.5 bottom-1.5 w-[3px] rounded-r bg-neutral-900 dark:bg-white" aria-hidden="true"></span>
+            {/if}
+            <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d={item.path} />
             </svg>
             {#if !isCollapsed}
               <span class="truncate">{item.label}</span>
@@ -491,262 +760,23 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
           </a>
         {/each}
       </nav>
-    </div>
 
-    <!-- Desktop Bottom Actions: Settings, Lock & Manual Collapse Toggle -->
-    <div class="p-2 space-y-1 border-t border-neutral-200 dark:border-neutral-800/80">
-      <a
-        href="/settings"
-        title="Settings"
-        class="p-2.5 rounded-lg flex items-center {isCollapsed ? 'justify-center' : 'gap-3'} transition-colors {isActive('/settings') ? 'bg-neutral-200/70 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 hover:text-neutral-900 dark:hover:text-white'}"
-      >
-        <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-        {#if !isCollapsed}
-          <span class="truncate">Settings</span>
-        {/if}
-      </a>
-
-      <!-- Profile & Lock Button -->
-      <div class="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800/50 flex items-center {isCollapsed ? 'justify-center' : 'justify-between'}">
-        {#if !isCollapsed}
-          <div class="flex items-center gap-2 overflow-hidden">
-            <div class="w-7 h-7 rounded-full shrink-0 bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-600 dark:text-sky-400">
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            <div class="truncate text-xs flex flex-col justify-center">
-              <div class="flex items-center gap-1.5">
-                <span class="font-medium text-neutral-900 dark:text-white truncate">Vault Admin</span>
-                <span class="text-[8px] font-bold px-1 py-0.5 bg-emerald-600 text-white rounded leading-none">LOCAL</span>
-              </div>
-              <p class="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">Encrypted Local Vault</p>
-            </div>
-          </div>
-        {/if}
-        <button
-          onclick={() => isUnlocked = false}
-          title="Lock Vault"
-          aria-label="Lock Vault"
-          class="p-1.5 text-neutral-500 hover:text-amber-600 dark:text-neutral-400 dark:hover:text-amber-400 hover:bg-neutral-200 dark:hover:bg-neutral-800 rounded transition-colors shrink-0"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-        </button>
+      <div class="p-2">
+        <ProfileMenu collapsed={isCollapsed} onLock={lockApp} onSignOut={signOut} />
       </div>
+    </aside>
 
-      <!-- Manual Collapse Toggle Button -->
-      <button
-        type="button"
-        onclick={toggleSidebar}
-        title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-        class="w-full p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center {isCollapsed ? 'justify-center' : 'gap-3'} transition-colors text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white"
-      >
-        {#if isCollapsed}
-          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-          </svg>
-        {:else}
-          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          </svg>
-          <span class="text-xs font-medium truncate">Collapse sidebar</span>
-        {/if}
-      </button>
-    </div>
-  </aside>
-
-  <!-- Main Content -->
-  <main class="flex-1 flex flex-col h-screen overflow-hidden bg-neutral-100 dark:bg-[#0a0a0a] transition-colors duration-150">
-    <!-- Single Top Bar. Everything that used to live in a second, session-only header row
-         (host chip, Files toggle, split controls, a duplicate Workspaces menu) is folded in
-         here: two stacked 40-44px bars cost ~84px of vertical space to show one row of
-         information. Per-pane host/address now lives on each TerminalPane's own strip. -->
-    <header
-      class="h-10 border-b border-neutral-200 dark:border-neutral-800 flex items-center pl-1 pr-1 md:pl-2 bg-white dark:bg-neutral-900 shrink-0 select-none transition-colors duration-150 gap-1 md:gap-2 cursor-default"
-      data-tauri-drag-region
-      onmousedown={startDragging}
-      ondblclick={(e) => {
-        const target = e.target as HTMLElement | null;
-        if (!target?.closest('button, input, textarea, a, select, [role="button"], .no-drag')) {
-          maximizeWindow();
-        }
-      }}
-    >
-      <!-- Left: navigation + session tabs -->
-      <div class="flex items-center gap-1 min-w-0 flex-1" data-tauri-drag-region>
-        <!-- Mobile Menu Hamburger Button -->
-        <button
-          type="button"
-          onclick={() => mobileDrawerOpen = true}
-          class="md:hidden p-1 rounded text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
-          title="Open navigation menu"
-          aria-label="Open navigation menu"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-
-        <!-- Sessions Tab System -->
-        <div class="flex gap-1 text-xs items-center overflow-x-auto scrollbar-none min-w-0" data-tauri-drag-region>
-          <a
-            href="/"
-            class="px-2.5 py-1 rounded text-xs font-medium shrink-0 transition-colors {isActive('/') ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 hover:text-neutral-900 dark:hover:text-white'}"
-          >
-            Dashboard
-          </a>
-          {#each sessionTabs as tab (tab.id)}
-            <!-- Hidden on phones: the Session route renders its own full-width tab switcher
-                 there, and two competing strips in a 375px row leaves both unusable. -->
-            <div
-              class="hidden sm:flex items-center rounded shrink-0 transition-colors {isSessionTabActive(tab.id) ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
-            >
-              <a
-                href="/session"
-                onclick={() => setSelectedTabId(tab.id)}
-                class="py-1 pl-2 pr-1 flex items-center gap-1.5 truncate max-w-[110px] md:max-w-[160px]"
-                title="{tabLabel(tab)} ({tab.host.address})"
-              >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
-                <span class="truncate">{tabLabel(tab)}</span>
-              </a>
-              <button
-                onclick={() => closeTab(tab.id)}
-                class="p-0.5 mr-1 rounded hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-rose-600 dark:hover:text-rose-400"
-                title="Close session {tabLabel(tab)}"
-                aria-label="Close session {tabLabel(tab)}"
-              >
-                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
-              </button>
-            </div>
-          {/each}
-
-        </div>
-
-        <!-- New session: the Hosts page is where a connection is actually picked. Kept outside
-             the scrolling tab strip so it stays reachable once the tabs overflow. -->
-        <a
-          href="/"
-          class="p-1 rounded shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          title="New session (select host)"
-          aria-label="New session"
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        </a>
-
-        <!-- Draggable blank space spanning remaining left area -->
-        <div class="flex-1 h-full min-w-[20px]" data-tauri-drag-region></div>
-      </div>
-
-      <div class="flex items-center gap-1 md:gap-2 text-neutral-500 dark:text-neutral-400 shrink-0" data-tauri-drag-region>
-        <!-- Session view controls: only meaningful while terminals are open -->
-        {#if sessionTabs.length > 0}
-          <button
-            onclick={handleFilesToggle}
-            class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {view.showFiles ? 'bg-sky-600/20 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
-            title={view.showFiles ? 'Hide Remote Files (SFTP)' : 'Show Remote Files (SFTP)'}
-          >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-            </svg>
-            <span class="hidden lg:inline">Files</span>
-          </button>
-        {/if}
-
-        <!-- Right next to Files because they share the same column: opening one closes the other -->
-        <button
-          onclick={handleAiToggle}
-          class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
-          title={aiChat.open ? 'Close AI Assistant' : 'AI Assistant — discuss and run'}
-          aria-pressed={aiChat.open}
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-          <span class="hidden lg:inline">AI</span>
-        </button>
-
-        <!-- Split Controls: ONLY shown when more than one host is open -->
-        {#if sessionTabs.length > 1}
-          <div class="hidden sm:flex items-center gap-0.5 p-0.5 rounded border border-neutral-200 dark:border-neutral-800">
-            {#each splitOptions as option}
-              <button
-                onclick={() => setLayout(option.value)}
-                disabled={sessionTabs.length < option.minTabs}
-                class="p-1 rounded transition-colors disabled:opacity-30 {view.layout === option.value ? 'bg-sky-600/25 text-sky-600 dark:text-sky-400' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
-                title={option.title}
-                aria-label={option.title}
-              >
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  {#if option.value === 1}
-                    <rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"></rect>
-                  {:else}
-                    <path stroke-width="2" d={option.path}></path>
-                  {/if}
-                </svg>
-              </button>
-            {/each}
-          </div>
-        {/if}
-
-        <div class="w-px h-4 bg-neutral-200 dark:bg-neutral-700 hidden sm:block"></div>
-
-        <!-- Workspaces Menu -->
-        <WorkspaceMenu />
-
-        <!-- Live Status Indicator -->
-        <div class="flex items-center gap-1.5 text-xs" data-tauri-drag-region>
-          <span class="text-green-500 animate-pulse text-[10px]" class:opacity-50={monitorState.isPolling}>●</span>
-          <span class="font-mono text-neutral-700 dark:text-neutral-300 hidden lg:inline">{timeAgo}</span>
-        </div>
-
-        <!-- Theme Toggle -->
-        <button onclick={toggleTheme} class="p-1.5 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors" title="Toggle Theme ({isDarkTheme ? 'Dark' : 'Light'})" aria-label="Toggle Theme">
-          {#if isDarkTheme}
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-          {:else}
-            <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-          {/if}
-        </button>
-
-        <!-- Notification Bell -->
-        <button onclick={() => showToast('No new system notifications.', 'info')} class="p-1.5 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 rounded transition-colors relative" title="Notifications" aria-label="Notifications">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-          {#if unreadCount > 0}
-            <span class="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full border border-white dark:border-neutral-900 animate-pulse"></span>
-          {/if}
-        </button>
-
-        <!-- Custom Window Controls -->
-        <div class="hidden sm:flex items-center no-drag">
-          <button onclick={() => minimizeWindow()} class="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors" title="Minimize" aria-label="Minimize">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
-          </button>
-          <button onclick={() => maximizeWindow()} class="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors" title="Maximize" aria-label="Maximize">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="2"></rect></svg>
-          </button>
-          <button onclick={() => closeWindow()} class="p-2 hover:bg-rose-500 hover:text-white text-neutral-500 dark:text-neutral-400 transition-colors" title="Close" aria-label="Close">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-          </button>
-        </div>
-      </div>
-    </header>
-    
-    <!-- Content Area (Screen Real Estate Optimized). The AI panel is a docked column beside
-         the page rather than an overlay, so it behaves like the Files panel: the content
-         narrows instead of being covered. Both never show at once — see handleAiToggle. -->
-    <div class="flex-1 flex min-h-0 overflow-hidden relative">
+    <!-- Content panel. The AI panel is a docked column beside the page rather than an overlay,
+         so it behaves like the Files panel: the content narrows instead of being covered. Both
+         never show at once — see handleAiToggle. -->
+    <main class="flex-1 min-w-0 flex overflow-hidden relative bg-white dark:bg-[#161616] border-t border-neutral-200 dark:border-neutral-800 md:border-l md:rounded-tl-xl transition-colors duration-150">
       <!-- Session Viewport: Persisted across routes so SSH terminals are never unmounted -->
       <div class="flex-1 min-w-0 h-full relative {page.url.pathname.startsWith('/session') ? 'flex' : 'hidden'}">
         <SessionViewport />
       </div>
 
       <!-- Other pages routed via SvelteKit children -->
-      <div class="flex-1 min-w-0 overflow-auto bg-neutral-100 dark:bg-[#0a0a0a] text-neutral-900 dark:text-neutral-100 relative transition-colors duration-150 {isSessionActive ? 'p-0 md:p-1' : 'p-3 md:p-6'} {page.url.pathname.startsWith('/session') ? 'hidden' : 'z-10'}">
+      <div class="flex-1 min-w-0 overflow-auto text-neutral-900 dark:text-neutral-100 relative px-4 py-6 md:px-10 md:py-10 [@media(max-height:500px)]:py-4 bg-[linear-gradient(to_right,#0000000a_1px,transparent_1px),linear-gradient(to_bottom,#0000000a_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:56px_56px] {page.url.pathname.startsWith('/session') ? 'hidden' : 'z-10'}">
         {@render children()}
       </div>
 
@@ -755,7 +785,8 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
       {/if}
 
       {#if feedbackPrompt.show}
-        <!-- Contextual feedback prompt after 3rd SSH session close. Dismissible, opt-in only. -->
+        <!-- Feedback form: auto-prompted after the 3rd closed session, or opened from the
+             profile menu (Report bug). Dismissible. -->
         <div class="absolute bottom-5 right-5 z-50 w-[400px] max-w-[calc(100vw-2.5rem)] shadow-2xl">
           <FeedbackWidget
             dismissible={true}
@@ -764,7 +795,37 @@ import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
           />
         </div>
       {/if}
-    </div>
-  </main>
+    </main>
+  </div>
 </div>
+
+{#if tabMenu}
+  {@const menuTab = sessionTabs.find((t) => t.id === tabMenu?.tabId)}
+  {#if menuTab}
+    <div
+      data-tab-menu
+      role="menu"
+      aria-label="Session tab"
+      class="fixed z-[200] w-44 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#141414] shadow-2xl py-1 text-sm"
+      style="left: {tabMenu.x}px; top: {tabMenu.y}px;"
+    >
+      <button
+        role="menuitem"
+        onclick={() => startRename(menuTab.id)}
+        class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.9 4.1a2.1 2.1 0 013 3L8.5 18.5 4 20l1.5-4.5z" /></svg>
+        Rename
+      </button>
+      <button
+        role="menuitem"
+        onclick={() => { const id = menuTab.id; tabMenu = null; closeTab(id); }}
+        class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+      >
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12" /></svg>
+        Close session
+      </button>
+    </div>
+  {/if}
+{/if}
 {/if}

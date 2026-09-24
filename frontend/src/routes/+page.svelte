@@ -2,11 +2,15 @@
   import { onMount, onDestroy } from 'svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput, type ConnectionProtocol } from '$lib/api/hosts';
+  import { listGroups } from '$lib/api/groups';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
   import HostDetailPanel from '$lib/components/HostDetailPanel.svelte';
   import OsIcon from '$lib/components/OsIcon.svelte';
   import { openSession } from '$lib/nav';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
+  import { isFavorite, toggleFavorite, lastUsedAt } from '$lib/stores/hostPrefs.svelte';
+  import { getTabs } from '$lib/stores/sessionTabs.svelte';
+  import { monitorState } from '$lib/stores/monitorStore.svelte';
 
   let hosts = $state<HostRecord[]>([]);
   let vaultKeys = $state<KeyRecord[]>([]);
@@ -113,6 +117,7 @@
     try {
       hosts = await listHosts();
       vaultKeys = await listKeys();
+      groupCount = (await listGroups()).length;
     } catch (e: any) {
       errorMsg = String(e);
     }
@@ -220,55 +225,234 @@
     }
   }
 
-  let filteredHosts = $derived(
-    hosts.filter(h => 
-      h.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      h.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      h.username.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  );
+  // --- List: search, filters, sort ------------------------------------------------------------
+  type SortKey = 'name' | 'lastUsed' | 'ip';
+  let groupCount = $state(0);
+  let sortBy = $state<SortKey>('name');
+  let starredOnly = $state(false);
+  let connectedOnly = $state(false);
+  let filterOpen = $state(false);
+  let openMenuId = $state<string | null>(null);
+  let focusedIndex = $state(0);
+  let searchInput: HTMLInputElement | undefined = $state();
+
+  const sessionTabs = $derived(getTabs());
+
+  function sessionCount(hostId: string): number {
+    return sessionTabs.filter((t) => t.host.id === hostId).length;
+  }
+
+  function matchesSearch(h: HostRecord, q: string): boolean {
+    if (!q) return true;
+    return (
+      h.label.toLowerCase().includes(q) ||
+      h.address.toLowerCase().includes(q) ||
+      h.username.toLowerCase().includes(q) ||
+      h.tags.some((t) => t.toLowerCase().includes(q))
+    );
+  }
+
+  const byName = (a: HostRecord, b: HostRecord) => a.label.localeCompare(b.label, undefined, { sensitivity: 'base' });
+  const comparators: Record<SortKey, (a: HostRecord, b: HostRecord) => number> = {
+    name: byName,
+    lastUsed: (a, b) => (lastUsedAt(b.id) ?? 0) - (lastUsedAt(a.id) ?? 0) || byName(a, b),
+    // `numeric` orders 10.0.0.9 before 10.0.0.10.
+    ip: (a, b) => a.address.localeCompare(b.address, undefined, { numeric: true }) || byName(a, b)
+  };
+
+  // Starred hosts always lead, then the chosen order.
+  let filteredHosts = $derived.by(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return hosts
+      .filter((h) => matchesSearch(h, q))
+      .filter((h) => !starredOnly || isFavorite(h.id))
+      .filter((h) => !connectedOnly || sessionCount(h.id) > 0)
+      .sort((a, b) => Number(isFavorite(b.id)) - Number(isFavorite(a.id)) || comparators[sortBy](a, b));
+  });
+
+  const activeIndex = $derived(filteredHosts.length === 0 ? -1 : Math.min(focusedIndex, filteredHosts.length - 1));
+  const filtersActive = $derived(starredOnly || connectedOnly);
+
+  // --- Card status ------------------------------------------------------------------------------
+  const OS_LABELS: Record<string, string> = {
+    ubuntu: 'Ubuntu', debian: 'Debian', fedora: 'Fedora', redhat: 'Red Hat', centos: 'CentOS',
+    rocky: 'Rocky Linux', almalinux: 'AlmaLinux', arch: 'Arch Linux', manjaro: 'Manjaro',
+    alpine: 'Alpine Linux', opensuse: 'openSUSE', mint: 'Linux Mint', kali: 'Kali Linux',
+    popos: 'Pop!_OS', raspberry: 'Raspberry Pi OS', amazon: 'Amazon Linux', oracle: 'Oracle Linux',
+    freebsd: 'FreeBSD', openbsd: 'OpenBSD', netbsd: 'NetBSD', mikrotik: 'RouterOS', cisco: 'Cisco IOS',
+    windows: 'Windows', macos: 'macOS', android: 'Android', linux: 'Linux'
+  };
+
+  /** Live metrics give the full distro string ("Debian GNU/Linux 12 (bookworm)") while connected. */
+  function osName(host: HostRecord): string | null {
+    const live = monitorState.metrics.find((m) => m.host_id === host.id)?.os_name;
+    if (live) return live;
+    if (!host.os) return null;
+    return OS_LABELS[host.os] ?? host.os.charAt(0).toUpperCase() + host.os.slice(1);
+  }
+
+  function relativeTime(ts: number): string {
+    const minutes = Math.floor((Date.now() - ts) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return days < 30 ? `${days}d ago` : new Date(ts).toLocaleDateString();
+  }
+
+  function hostStatus(host: HostRecord): { live: boolean; text: string } {
+    const sessions = sessionCount(host.id);
+    if (sessions > 0) {
+      const uptime = monitorState.metrics.find((m) => m.host_id === host.id)?.uptime;
+      const label = sessions > 1 ? `${sessions} sessions` : 'Connected';
+      return { live: true, text: uptime ? `${label} · up ${uptime}` : label };
+    }
+    const used = lastUsedAt(host.id);
+    return { live: false, text: used ? `Used ${relativeTime(used)}` : 'Never connected' };
+  }
+
+  function hostAddress(host: HostRecord): string {
+    return `${host.username}@${host.address}${host.port !== 22 ? `:${host.port}` : ''}`;
+  }
+
+  // --- Keyboard: ↑↓ select, ↵ connect, ⇧↵ details ------------------------------------------------
+  function handleListKeydown(e: KeyboardEvent) {
+    if (e.key === 'Escape' && isAddModalOpen) {
+      isAddModalOpen = false;
+      return;
+    }
+    if (isAddModalOpen || detailHost) return;
+    const target = e.target instanceof Element ? e.target : null;
+    const typing = target?.closest('input, textarea, select, [contenteditable="true"]');
+    if (typing && target !== searchInput) return;
+    if (filteredHosts.length === 0) return;
+
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      focusedIndex = Math.max(0, Math.min(filteredHosts.length - 1, activeIndex + step));
+      document.getElementById(`host-card-${filteredHosts[focusedIndex]?.id}`)?.scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      const host = filteredHosts[activeIndex];
+      if (!host) return;
+      e.preventDefault();
+      if (e.shiftKey) detailHost = host;
+      else void openSession(host.id);
+    }
+  }
+
+  const kbdClass =
+    'px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 font-mono text-[10px] text-neutral-600 dark:text-neutral-300';
+  const menuItemBase = 'w-full flex items-center px-3 py-1.5 text-left transition-colors';
+  const menuItem = `${menuItemBase} text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60`;
+
+  function handleOutsidePointer(e: PointerEvent) {
+    const target = e.target instanceof Element ? e.target : null;
+    if (openMenuId && !target?.closest('[data-host-menu]')) openMenuId = null;
+    if (filterOpen && !target?.closest('[data-filter-menu]')) filterOpen = false;
+  }
 </script>
 
-<div class="max-w-6xl mx-auto space-y-6">
-  <!-- Header & Actions -->
-  <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
+<svelte:window onkeydown={handleListKeydown} onpointerdown={handleOutsidePointer} />
+
+<div class="max-w-6xl mx-auto">
+  <!-- Header -->
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Hosts Management</h1>
-      <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Manage saved SSH hosts, connection profiles, and credentials.</p>
+      <h1 class="text-3xl font-bold tracking-tight text-neutral-900 dark:text-white">Hosts</h1>
+      <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1.5">
+        {hosts.length} saved {hosts.length === 1 ? 'host' : 'hosts'} across {groupCount} {groupCount === 1 ? 'group' : 'groups'}
+      </p>
     </div>
-    
-    <div class="flex items-center gap-3 w-full sm:w-auto">
-      <div class="relative flex-1 sm:w-64">
-        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-        <input 
-          type="text"
-          bind:value={searchQuery}
-          placeholder="Search hosts..."
-          class="w-full pl-9 pr-4 py-2 bg-white dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-800 rounded-lg text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
-        />
-      </div>
 
-      <button 
+    <div class="flex items-center gap-2">
+      <button
         onclick={() => openSession('local')}
-        class="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 shrink-0"
-        title="Open Local Shell (PowerShell / cmd)">
-        <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-        Local Terminal
+        class="w-10 h-10 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+        title="Open local terminal"
+        aria-label="Open local terminal"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" stroke-width="1.8" /><path stroke-linecap="round" stroke-width="1.8" d="M8 20h8M12 16v4" /></svg>
       </button>
-
-      <button 
+      <button
         onclick={openAddModal}
-        class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg shadow-lg shadow-sky-600/20 transition-colors flex items-center gap-2 shrink-0">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        Add Host
+        class="h-10 px-4 flex items-center gap-2 rounded-lg text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5" /></svg>
+        Add host
       </button>
     </div>
+  </div>
+
+  <!-- Search + filter -->
+  <div class="mt-8 flex gap-2">
+    <div class="relative flex-1">
+      <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+      <input
+        bind:this={searchInput}
+        type="text"
+        bind:value={searchQuery}
+        oninput={() => (focusedIndex = 0)}
+        placeholder="Search by label, host, username, or tag"
+        aria-label="Search hosts"
+        class="w-full h-11 pl-10 pr-4 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950/70 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-neutral-400 dark:focus:border-neutral-600 transition-colors"
+      />
+    </div>
+
+    <div class="relative" data-filter-menu>
+      <button
+        onclick={() => (filterOpen = !filterOpen)}
+        aria-haspopup="true"
+        aria-expanded={filterOpen}
+        class="relative w-11 h-11 flex items-center justify-center rounded-lg border bg-white dark:bg-neutral-950/70 transition-colors {filterOpen || filtersActive ? 'border-neutral-400 dark:border-neutral-600 text-neutral-900 dark:text-white' : 'border-neutral-200 dark:border-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
+        title="Filter hosts"
+        aria-label="Filter hosts"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M3 5h18l-7 8.5V19l-4 2v-7.5z" /></svg>
+        {#if filtersActive}
+          <span class="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+        {/if}
+      </button>
+      {#if filterOpen}
+        <div class="absolute right-0 top-full mt-2 z-30 w-52 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#141414] shadow-2xl p-1.5 text-sm">
+          <p class="px-2.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Show</p>
+          <label class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-200 cursor-pointer">
+            <input type="checkbox" bind:checked={starredOnly} class="rounded" />
+            Starred only
+          </label>
+          <label class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-200 cursor-pointer">
+            <input type="checkbox" bind:checked={connectedOnly} class="rounded" />
+            Connected only
+          </label>
+        </div>
+      {/if}
+    </div>
+  </div>
+
+  <!-- Keyboard hints + sort -->
+  <div class="mt-3 flex items-center gap-4 text-[11px] text-neutral-500 dark:text-neutral-400">
+    <!-- Keyboard hints are noise on touch-only phones. -->
+    <span class="hidden md:flex items-center gap-1.5"><kbd class={kbdClass}>↑↓</kbd> select</span>
+    <span class="hidden md:flex items-center gap-1.5"><kbd class={kbdClass}>↵</kbd> connect</span>
+    <span class="hidden md:flex items-center gap-1.5"><kbd class={kbdClass}>⇧↵</kbd> details</span>
+    <label class="ml-auto flex items-center gap-1.5">
+      Sort
+      <select
+        bind:value={sortBy}
+        class="bg-transparent text-neutral-700 dark:text-neutral-200 font-medium focus:outline-none cursor-pointer"
+      >
+        <option value="name">Name</option>
+        <option value="lastUsed">Last used</option>
+        <option value="ip">IP address</option>
+      </select>
+    </label>
   </div>
 
   <!-- Bulk actions: only present once at least one host is ticked, so the page stays quiet
        when you are not doing a multi-host operation. -->
   {#if selectedIds.length > 0}
-    <div class="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900">
+    <div class="mt-4 flex flex-wrap items-center gap-3 p-3 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-900">
       <span class="text-sm font-medium text-sky-800 dark:text-sky-300">
         {selectedIds.length} host(s) selected
       </span>
@@ -295,123 +479,129 @@
     </div>
   {/if}
 
-  <!-- Hosts Table / Cards -->
-  {#if filteredHosts.length === 0}
-    <div class="p-12 border border-neutral-200 dark:border-neutral-800 rounded-xl bg-white/70 dark:bg-neutral-900/30 text-center flex flex-col items-center justify-center shadow-sm dark:shadow-none">
+  <!-- Host cards -->
+  {#if hosts.length === 0}
+    <div class="mt-6 p-12 border border-dashed border-neutral-300 dark:border-neutral-800 rounded-xl text-center flex flex-col items-center justify-center">
       <div class="w-12 h-12 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-400 dark:text-neutral-500 mb-4">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path></svg>
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 17l6-5-6-5M12 19h8" /></svg>
       </div>
-      <h3 class="text-lg font-medium text-neutral-900 dark:text-white mb-1">No saved hosts found</h3>
-      <p class="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm mb-6">Create your first host entry to connect via interactive SSH PTY terminal.</p>
-      <button 
+      <h3 class="text-lg font-medium text-neutral-900 dark:text-white mb-1">No saved hosts yet</h3>
+      <p class="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm mb-6">Add your first host to connect over SSH in an interactive terminal.</p>
+      <button
         onclick={openAddModal}
-        class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-lg transition-colors">
-        + Add Host
+        class="h-10 px-4 rounded-lg text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors">
+        + Add host
+      </button>
+    </div>
+  {:else if filteredHosts.length === 0}
+    <div class="mt-6 p-10 border border-dashed border-neutral-300 dark:border-neutral-800 rounded-xl text-center">
+      <p class="text-sm text-neutral-500 dark:text-neutral-400">No hosts match the current search or filters.</p>
+      <button
+        onclick={() => { searchQuery = ''; starredOnly = false; connectedOnly = false; }}
+        class="mt-3 text-sm font-medium text-sky-600 dark:text-sky-400 hover:underline">
+        Clear search and filters
       </button>
     </div>
   {:else}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {#each filteredHosts as host (host.id)}
-        <div class="p-5 bg-white dark:bg-neutral-900 border rounded-xl shadow-sm dark:shadow-none transition-colors flex flex-col justify-between group {isSelected(host.id) ? 'border-sky-500 dark:border-sky-500 ring-1 ring-sky-500/40' : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700'}">
-          <div>
-            <div class="flex items-center gap-2 min-w-0 mb-2">
-              <OsIcon os={host.os} name={host.label} tags={host.tags} address={host.address} size={18} />
-              <span class="font-bold text-neutral-900 dark:text-white text-base truncate">{host.label}</span>
+    <div class="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-3" role="listbox" aria-label="Hosts">
+      {#each filteredHosts as host, i (host.id)}
+        {@const status = hostStatus(host)}
+        {@const os = osName(host)}
+        {@const focused = i === activeIndex}
+        <div
+          id="host-card-{host.id}"
+          role="option"
+          aria-selected={focused}
+          tabindex="-1"
+          onpointerdown={() => (focusedIndex = i)}
+          ondblclick={(e) => { if (!(e.target as HTMLElement).closest('button, a')) void openSession(host.id); }}
+          class="group rounded-xl border p-4 transition-colors bg-white dark:bg-neutral-900/40 {isSelected(host.id) ? 'border-sky-500 ring-1 ring-sky-500/40' : focused ? 'border-neutral-900 dark:border-neutral-200' : 'border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700'}"
+        >
+          <!-- Identity -->
+          <div class="flex items-start gap-3">
+            <span class="w-10 h-10 rounded-lg bg-neutral-100 dark:bg-white flex items-center justify-center shrink-0">
+              <OsIcon os={host.os} name={host.label} tags={host.tags} address={host.address} size={22} />
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="font-semibold text-neutral-900 dark:text-white truncate">{host.label}</p>
+              <p class="text-xs font-mono text-neutral-500 dark:text-neutral-400 truncate" title="{host.username}@{host.address}:{host.port}">{hostAddress(host)}</p>
             </div>
-
-            <div class="space-y-1 font-mono text-xs text-neutral-500 dark:text-neutral-400">
-              <p><span class="text-neutral-400 dark:text-neutral-500">Address:</span> <span class="text-sky-600 dark:text-sky-400">{host.username}@{host.address}:{host.port}</span></p>
-              <p><span class="text-neutral-400 dark:text-neutral-500">Auth:</span> <span class="text-neutral-700 dark:text-neutral-300">{host.authMethod.type}</span> {#if host.hasSecret}<span class="text-emerald-600 dark:text-emerald-500">• saved</span>{:else}<span class="text-amber-600 dark:text-amber-500">• no password</span>{/if}</p>
-            </div>
-
-            {#if host.tags.length > 0}
-              <div class="flex flex-wrap gap-1 mt-3">
-                {#each host.tags as tag}
-                  <span class="px-2 py-0.5 rounded text-[10px] bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-700">{tag}</span>
-                {/each}
-              </div>
-            {/if}
+            <button
+              onclick={() => toggleFavorite(host.id)}
+              aria-pressed={isFavorite(host.id)}
+              class="p-1.5 -mr-1 -mt-1 rounded-md transition-colors {isFavorite(host.id) ? 'text-amber-500' : 'text-neutral-300 dark:text-neutral-600 hover:text-amber-500'}"
+              title={isFavorite(host.id) ? 'Unstar' : 'Star'}
+              aria-label={isFavorite(host.id) ? `Unstar ${host.label}` : `Star ${host.label}`}
+            >
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill={isFavorite(host.id) ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z" /></svg>
+            </button>
           </div>
 
-          <div class="pt-4 mt-4 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-              <!-- 1. Connect: Lightning SVG, primary button -->
-              <button
-                onclick={() => openSession(host.id)}
-                class="w-8 h-8 flex items-center justify-center bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-semibold shadow-sm transition-all shrink-0"
-                title="Connect"
-                aria-label="Connect"
-              >
-                <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                  <path d="M13 2L3 14h7v8l11-12h-8l1-8z" />
-                </svg>
-              </button>
+          <!-- OS + status + tags -->
+          <div class="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+            {#if os}
+              <span class="inline-flex items-center gap-1.5 max-w-[16rem] px-2 py-0.5 rounded-md border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300" title={os}>
+                <OsIcon os={host.os} name={host.label} tags={host.tags} address={host.address} size={12} />
+                <span class="truncate">{os}</span>
+              </span>
+            {/if}
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md {status.live ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'text-neutral-500 dark:text-neutral-400'}">
+              <span class="w-1.5 h-1.5 rounded-full {status.live ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-300 dark:bg-neutral-600'}"></span>
+              {status.text}
+            </span>
+            {#each host.tags.slice(0, 3) as tag}
+              <span class="px-1.5 py-0.5 rounded text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800/70">#{tag}</span>
+            {/each}
+          </div>
 
-              <!-- 2. Clone: Duplicate/Copy SVG -->
-              <button
-                onclick={() => handleClone(host)}
-                class="w-8 h-8 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-semibold border border-neutral-300 dark:border-neutral-700 transition-all shrink-0 shadow-sm"
-                title="Clone Host"
-                aria-label="Clone Host"
-              >
-                <svg class="w-4 h-4 text-sky-600 dark:text-sky-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
+          <!-- Actions -->
+          <div class="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex items-center gap-1.5">
+            <span class="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
+              {host.authMethod.type === 'password' ? 'Password' : 'SSH key'} · {host.hasSecret ? 'saved' : host.authMethod.type === 'password' ? 'not saved' : 'no passphrase'}
+            </span>
 
-              <!-- 3. Check: Select checkbox SVG -->
-              <button
-                onclick={() => toggleSelected(host.id)}
-                aria-pressed={isSelected(host.id)}
-                class="w-8 h-8 flex items-center justify-center rounded-lg text-xs font-medium border transition-all shrink-0 {isSelected(host.id) ? 'bg-sky-600 border-sky-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
-                title="Select for batch action"
-                aria-label="Select for batch action"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-              </button>
+            <button
+              onclick={() => openEditModal(host)}
+              class="ml-auto w-8 h-8 flex items-center justify-center rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              title="Edit host"
+              aria-label="Edit {host.label}"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.9 4.1a2.1 2.1 0 013 3L8.5 18.5 4 20l1.5-4.5z" /></svg>
+            </button>
 
-              <!-- 4. Folder: SFTP File Manager SVG -->
-              <a
-                href="/sftp?host={host.id}"
-                class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
-                title="Files (SFTP)"
-                aria-label="Files (SFTP)"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
-              </a>
-
-              <!-- 5. Info: Host Details SVG -->
+            <div class="relative" data-host-menu>
               <button
-                onclick={() => (detailHost = host)}
-                class="w-8 h-8 flex items-center justify-center text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white rounded-lg text-xs font-medium border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
-                title="Host Details"
-                aria-label="Host Details"
+                onclick={() => (openMenuId = openMenuId === host.id ? null : host.id)}
+                aria-haspopup="menu"
+                aria-expanded={openMenuId === host.id}
+                class="w-8 h-8 flex items-center justify-center rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                title="More actions"
+                aria-label="More actions for {host.label}"
               >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
               </button>
+              {#if openMenuId === host.id}
+                <div role="menu" class="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#141414] shadow-2xl py-1 text-sm">
+                  <a role="menuitem" href="/sftp?host={host.id}" class={menuItem}>Files (SFTP)</a>
+                  <button role="menuitem" onclick={() => { openMenuId = null; detailHost = host; }} class={menuItem}>Details</button>
+                  <button role="menuitem" onclick={() => { openMenuId = null; handleClone(host); }} class={menuItem}>Clone</button>
+                  <button role="menuitem" onclick={() => { openMenuId = null; toggleSelected(host.id); }} class={menuItem}>
+                    {isSelected(host.id) ? 'Deselect' : 'Select for batch'}
+                  </button>
+                  <div class="my-1 border-t border-neutral-100 dark:border-neutral-800"></div>
+                  <button role="menuitem" onclick={() => { openMenuId = null; handleDelete(host.id); }} class="{menuItemBase} text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30">Delete</button>
+                </div>
+              {/if}
             </div>
 
-            <div class="flex items-center gap-1.5">
-              <!-- Edit Host -->
-              <button
-                onclick={() => openEditModal(host)}
-                class="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-700/80 text-neutral-400 hover:text-sky-500 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all shrink-0"
-                title="Edit Host"
-                aria-label="Edit Host"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-              </button>
-
-              <!-- Delete Host -->
-              <button
-                onclick={() => handleDelete(host.id)}
-                class="w-8 h-8 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-700/80 text-neutral-400 hover:text-rose-500 hover:border-rose-200 dark:hover:border-rose-800/60 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all shrink-0"
-                title="Delete Host"
-                aria-label="Delete Host"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-              </button>
-            </div>
+            <button
+              onclick={() => openSession(host.id)}
+              class="h-8 px-3 flex items-center gap-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold transition-colors"
+              title="Connect to {host.label}"
+            >
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 7l5 5-5 5M13 17h6" /></svg>
+              Connect
+            </button>
           </div>
         </div>
       {/each}
@@ -423,10 +613,21 @@
   <HostDetailPanel host={detailHost} onClose={() => (detailHost = null)} />
 {/if}
 
-<!-- Add Host Modal -->
 {#if isAddModalOpen}
-  <div class="fixed inset-0 bg-black/60 dark:bg-black/80 flex items-center justify-center p-4 z-50">
-    <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
+  <!-- Add / edit host drawer -->
+  <div class="fixed inset-0 z-50 flex justify-end">
+    <button
+      type="button"
+      class="absolute inset-0 bg-black/50 dark:bg-black/70 cursor-default"
+      aria-label="Close host editor"
+      onclick={() => (isAddModalOpen = false)}
+    ></button>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={editingId ? 'Edit host' : 'Add host'}
+      class="relative h-full w-full max-w-lg overflow-y-auto bg-white dark:bg-[#141414] border-l border-neutral-200 dark:border-neutral-800 p-6 space-y-4 shadow-2xl"
+    >
       <div class="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-3">
         <h3 class="text-lg font-bold text-neutral-900 dark:text-white">{editingId ? 'Edit SSH Host' : 'Add New SSH Host'}</h3>
         <button onclick={() => isAddModalOpen = false} class="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 text-xl font-bold">×</button>

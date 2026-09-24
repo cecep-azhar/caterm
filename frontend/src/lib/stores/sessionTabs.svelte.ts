@@ -10,6 +10,8 @@
 
 import type { HostRecord } from '$lib/api/hosts';
 import { recordSessionClosed } from '$lib/stores/feedbackStore.svelte';
+import { markHostUsed } from '$lib/stores/hostPrefs.svelte';
+import { setShowFiles } from '$lib/stores/sessionView.svelte';
 
 export interface SessionTab {
   /** Unique per open session. Never the host id — a host may have several tabs. */
@@ -17,6 +19,8 @@ export interface SessionTab {
   host: HostRecord;
   /** 1-based position among the currently open tabs for this same host. */
   seq: number;
+  /** Name the user gave this tab (right-click > Rename). Unset = derived from the host. */
+  title?: string;
 }
 
 let tabs = $state<SessionTab[]>([]);
@@ -46,6 +50,9 @@ export function openTab(host: HostRecord): string {
     seq: nextSeq(host.id)
   };
   tabs = [...tabs, tab];
+  markHostUsed(host.id);
+  // A new connection lands on a full-width terminal; Files opens only when asked for.
+  setShowFiles(false);
   return tab.id;
 }
 
@@ -60,11 +67,21 @@ export function closeTab(id: string) {
   recordSessionClosed();
 }
 
+/**
+ * Blank or whitespace-only resets the tab to its host-derived label. Mutates in place rather
+ * than replacing the tab object, so nothing keyed on the object (the live terminal) re-runs.
+ */
+export function renameTab(id: string, title: string) {
+  const tab = tabs.find((t) => t.id === id);
+  if (tab) tab.title = title.trim() || undefined;
+}
+
 export function closeAllTabs() {
   tabs = [];
 }
 
 /** What the tab strip shows: plain label for the first, numbered for additional sessions. */
 export function tabLabel(tab: SessionTab): string {
+  if (tab.title) return tab.title;
   return tab.seq > 1 ? `${tab.host.label} (${tab.seq})` : tab.host.label;
 }

@@ -1,15 +1,46 @@
 <script lang="ts">
-  import { validateVaultPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
+  import { page } from '$app/state';
+  import { changeMasterPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
   import { exportEncryptedBackup, importEncryptedBackup } from '$lib/api/backup';
   import AiSettingsForm from '$lib/components/AiSettingsForm.svelte';
   import FeedbackWidget from '$lib/components/FeedbackWidget.svelte';
+  import ProfileAvatar from '$lib/components/ProfileAvatar.svelte';
+  import AvatarPicker from '$lib/components/AvatarPicker.svelte';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
+  import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
+  import { getUpdater, checkForUpdates, installUpdate } from '$lib/stores/updater.svelte';
+  import { APP_VERSION, releaseNotesUrl } from '$lib/appInfo';
+  import { errorText } from '$lib/errors';
 
-  let activeTab = $state('updates'); // 'updates' | 'ai' | 'subscription' | 'sync' | 'security' | 'backup' | 'shortcuts' | 'feedback'
-  let vaultPassword = $state('');
-  let showVaultPassword = $state(false);
-  let vaultMessage = $state('');
-  let vaultMessageKind = $state<'success' | 'error'>('success');
+  const TABS = ['profile', 'updates', 'ai', 'subscription', 'sync', 'security', 'backup', 'shortcuts', 'feedback'];
+  // `?tab=` lets the profile menu deep-link straight to a tab.
+  const requestedTab = page.url.searchParams.get('tab') ?? '';
+  let activeTab = $state(TABS.includes(requestedTab) ? requestedTab : 'profile');
+
+  const updater = getUpdater();
+  const downloadPercent = $derived(
+    updater.progress.total ? Math.round((updater.progress.downloaded / updater.progress.total) * 100) : null
+  );
+
+  // Profile (Free plan: display name + preset avatar)
+  const profile = getProfile();
+  let profileName = $state(profile.name);
+  let profileAvatar = $state(profile.avatar);
+  const profileDirty = $derived(profileName.trim() !== profile.name || profileAvatar !== profile.avatar);
+
+  function handleSaveProfile(e: Event) {
+    e.preventDefault();
+    saveProfile({ name: profileName, avatar: profileAvatar });
+    profileName = profile.name;
+    showToast('Profile updated.', 'success');
+  }
+
+  // Master password change (re-keys the encrypted database)
+  let currentPassword = $state('');
+  let newPassword = $state('');
+  let confirmPassword = $state('');
+  let showPasswords = $state(false);
+  let isChangingPassword = $state(false);
 
   let backupPassphrase = $state('');
   let showBackupPassphrase = $state(false);
@@ -82,17 +113,27 @@
     }
   }
 
-  async function updateVaultPassword(e: Event) {
+  async function handleChangeMasterPassword(e: Event) {
     e.preventDefault();
+    if (newPassword.length < MIN_VAULT_PASSWORD_LEN) {
+      showToast(`New master password must be at least ${MIN_VAULT_PASSWORD_LEN} characters.`, 'error');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      showToast('New password and confirmation do not match.', 'error');
+      return;
+    }
+    isChangingPassword = true;
     try {
-      await validateVaultPassword(vaultPassword);
-      showToast('Master password verified and saved.', 'success');
-      vaultPassword = '';
+      await changeMasterPassword(currentPassword, newPassword);
+      currentPassword = '';
+      newPassword = '';
+      confirmPassword = '';
+      showToast('Master password changed. Use the new password next time you unlock.', 'success');
     } catch (err) {
-      const msg =
-        (err as { message?: string })?.message ??
-        `Vault password must be at least ${MIN_VAULT_PASSWORD_LEN} characters.`;
-      showToast(msg, 'error');
+      showToast(errorText(err), 'error');
+    } finally {
+      isChangingPassword = false;
     }
   }
 </script>
@@ -105,6 +146,11 @@
 
   <!-- Settings Tabs -->
   <div class="border-b border-neutral-800 flex gap-4 overflow-x-auto">
+    <button
+      onclick={() => activeTab = 'profile'}
+      class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'profile' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
+      Profile
+    </button>
     <button 
       onclick={() => activeTab = 'updates'} 
       class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'updates' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
@@ -147,17 +193,101 @@
     </button>
   </div>
 
-  {#if activeTab === 'updates'}
-    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-4">
-      <div class="flex justify-between items-center">
-        <div>
-          <h2 class="text-lg font-semibold text-white">Application Updates</h2>
-          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v2.1.7</span></p>
+  {#if activeTab === 'profile'}
+    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-6">
+      <div class="flex items-center gap-4">
+        <ProfileAvatar avatar={profileAvatar} name={profileName} size={56} />
+        <div class="min-w-0">
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold text-white truncate">{profileName.trim() || profile.name}</h2>
+            <span class="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded border border-neutral-700 text-neutral-400">FREE</span>
+          </div>
+          <p class="text-neutral-400 text-sm">Local profile — stored on this device only, no account or email needed.</p>
         </div>
-        <button class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium rounded-md transition-colors">
-          Check for Updates
+      </div>
+
+      <form onsubmit={handleSaveProfile} class="space-y-5 max-w-md">
+        <div>
+          <label for="profile-name" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Display name</label>
+          <input
+            id="profile-name"
+            type="text"
+            maxlength="48"
+            bind:value={profileName}
+            placeholder="CATerm User"
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+        <div>
+          <span class="block text-xs font-medium text-neutral-400 uppercase mb-2">Profile picture</span>
+          <AvatarPicker bind:value={profileAvatar} size={40} />
+        </div>
+        <button
+          type="submit"
+          disabled={!profileDirty}
+          class="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:hover:bg-sky-600 text-white text-sm font-medium rounded-md transition-colors">
+          Save profile
+        </button>
+      </form>
+
+      <div class="pt-5 border-t border-neutral-800 flex items-center justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium text-white">Master password</p>
+          <p class="text-xs text-neutral-400">Unlocks and encrypts your local vault.</p>
+        </div>
+        <button
+          onclick={() => (activeTab = 'security')}
+          class="px-3 py-1.5 text-xs font-medium rounded-md border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition-colors">
+          Change master password
         </button>
       </div>
+    </div>
+  {:else if activeTab === 'updates'}
+    <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-4">
+      <div class="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h2 class="text-lg font-semibold text-white">Application Updates</h2>
+          <p class="text-neutral-400 text-sm">Current installed version: <span class="font-mono text-sky-400">v{APP_VERSION}</span></p>
+        </div>
+        {#if updater.status === 'available'}
+          <button
+            onclick={installUpdate}
+            class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-md transition-colors">
+            Download and Install Update
+          </button>
+        {:else}
+          <button
+            onclick={() => checkForUpdates()}
+            disabled={updater.status === 'checking' || updater.status === 'downloading'}
+            class="px-4 py-2 bg-sky-600 hover:bg-sky-500 disabled:opacity-60 text-white text-sm font-medium rounded-md transition-colors flex items-center gap-2">
+            {#if updater.status === 'checking'}
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+              Checking for updates...
+            {:else}
+              Check for Updates
+            {/if}
+          </button>
+        {/if}
+      </div>
+
+      {#if updater.status === 'up-to-date'}
+        <div class="flex items-center gap-2 p-3 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm">
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+          You are on the latest version (v{APP_VERSION}).
+        </div>
+      {:else if updater.status === 'available'}
+        <div class="p-3 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-300 text-sm">
+          Version <span class="font-mono">v{updater.version}</span> is available.
+          <a href={releaseNotesUrl(updater.version)} class="underline underline-offset-2 hover:text-white">Read the changelog</a>
+        </div>
+      {:else if updater.status === 'downloading'}
+        <div class="p-3 rounded-md bg-sky-500/10 border border-sky-500/30 text-sky-300 text-sm">
+          Downloading v{updater.version}{downloadPercent === null ? '...' : ` (${downloadPercent}%)`} — CATerm restarts when the install finishes.
+        </div>
+      {:else if updater.status === 'error'}
+        <div class="p-3 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm">
+          {updater.error}
+        </div>
+      {/if}
     </div>
   {:else if activeTab === 'ai'}
     <div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-4">
@@ -266,43 +396,52 @@
       <h2 class="text-lg font-semibold text-white">Zero-Knowledge Vault Configuration</h2>
       <p class="text-neutral-400 text-sm">CATerm enforces local-first encryption for host records, passwords, and private keys.</p>
 
-      <form onsubmit={updateVaultPassword} class="max-w-md space-y-4 pt-2">
+      <form onsubmit={handleChangeMasterPassword} class="max-w-md space-y-4 pt-2">
+        <p class="text-xs text-neutral-400">
+          Changing the master password re-encrypts the whole local database with a key derived from the new password.
+          Keep the app open until it finishes.
+        </p>
         <div>
-          <label for="vault-pass" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Master Vault Password (min. {MIN_VAULT_PASSWORD_LEN} chars)</label>
-          <div class="relative">
-            <input
-              id="vault-pass"
-              type={showVaultPassword ? 'text' : 'password'}
-              minlength={MIN_VAULT_PASSWORD_LEN}
-              required
-              bind:value={vaultPassword}
-              placeholder="••••••••••••"
-              class="w-full pl-3 pr-10 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
-            <button
-              type="button"
-              onclick={() => (showVaultPassword = !showVaultPassword)}
-              class="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-white transition-colors p-1"
-              aria-label={showVaultPassword ? 'Hide password' : 'Show password'}
-              title={showVaultPassword ? 'Hide password' : 'Show password'}
-            >
-              {#if showVaultPassword}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                </svg>
-              {:else}
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              {/if}
-            </button>
-          </div>
+          <label for="current-pass" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Current master password</label>
+          <input
+            id="current-pass"
+            type={showPasswords ? 'text' : 'password'}
+            required
+            autocomplete="current-password"
+            bind:value={currentPassword}
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
         </div>
-        {#if vaultMessage}
-          <p class="text-xs {vaultMessageKind === 'success' ? 'text-emerald-500' : 'text-red-500'}">{vaultMessage}</p>
-        {/if}
-        <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-md transition-colors">
-          Update Vault Master Password
+        <div>
+          <label for="new-pass" class="block text-xs font-medium text-neutral-400 uppercase mb-1">New master password (min. {MIN_VAULT_PASSWORD_LEN} chars)</label>
+          <input
+            id="new-pass"
+            type={showPasswords ? 'text' : 'password'}
+            required
+            minlength={MIN_VAULT_PASSWORD_LEN}
+            autocomplete="new-password"
+            bind:value={newPassword}
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+        <div>
+          <label for="confirm-pass" class="block text-xs font-medium text-neutral-400 uppercase mb-1">Confirm new master password</label>
+          <input
+            id="confirm-pass"
+            type={showPasswords ? 'text' : 'password'}
+            required
+            minlength={MIN_VAULT_PASSWORD_LEN}
+            autocomplete="new-password"
+            bind:value={confirmPassword}
+            class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded text-sm text-white focus:outline-none focus:border-sky-500" />
+        </div>
+        <label class="flex items-center gap-2 text-xs text-neutral-400">
+          <input type="checkbox" bind:checked={showPasswords} class="rounded" />
+          Show passwords
+        </label>
+        <button
+          type="submit"
+          disabled={isChangingPassword}
+          class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-sm font-medium rounded-md transition-colors">
+          {isChangingPassword ? 'Re-encrypting vault...' : 'Change Master Password'}
         </button>
       </form>
     </div>

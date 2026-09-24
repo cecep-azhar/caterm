@@ -73,6 +73,8 @@
     "allow-validate-vault-password",
     "allow-is-vault-initialized",
     "allow-reset-vault",
+    "allow-lock-vault",
+    "allow-change-master-password",
     "allow-get-command-logs",
     "allow-ssh-connect",
     "allow-ssh-write",
@@ -86,6 +88,7 @@
     "allow-ai-chat",
     "allow-ai-execute-step",
     "allow-trim-memory",
-    "allow-submit-feedback"
+    "allow-submit-feedback",
+    "process:allow-restart"
   ]
 }

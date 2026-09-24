@@ -4,6 +4,10 @@
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import Logo from './Logo.svelte';
   import SnakeFlowBackground from './SnakeFlowBackground.svelte';
+  import ProfileAvatar from './ProfileAvatar.svelte';
+  import AvatarPicker from './AvatarPicker.svelte';
+  import { getProfile, saveProfile, DEFAULT_AVATAR } from '$lib/stores/profile.svelte';
+  import { APP_VERSION } from '$lib/appInfo';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
 
@@ -15,6 +19,11 @@
   let successMsg = '';
   let isLoading = false;
   let isSetup = false;
+
+  // First-run profile (Free plan: name + preset avatar, no email).
+  const profile = getProfile();
+  let setupName = '';
+  let setupAvatar = DEFAULT_AVATAR;
 
   const isTauri = typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__);
   const appWindow = isTauri ? getCurrentWindow() : null;
@@ -119,6 +128,7 @@
     try {
       await validateVaultPassword(password);
       if (isSetup) {
+        saveProfile({ name: setupName, avatar: setupAvatar });
         showToast('Vault successfully created and encrypted.', 'success');
       } else {
         showToast('Vault successfully unlocked.', 'success');
@@ -186,7 +196,7 @@
   >
     <div class="flex items-center gap-2 pointer-events-none opacity-80" data-tauri-drag-region>
       <span class="text-[11px] font-mono text-neutral-400 font-semibold tracking-wider" data-tauri-drag-region>CATERM</span>
-      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono" data-tauri-drag-region>v2.1.8</span>
+      <span class="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-mono" data-tauri-drag-region>v{APP_VERSION}</span>
     </div>
     <!-- Draggable space spanning the rest of the header -->
     <div class="flex-1 h-full" data-tauri-drag-region></div>
@@ -233,7 +243,7 @@
     <div class="relative z-10 flex items-center gap-3">
       <Logo size={40} mode="brand" />
       <div>
-        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v2.1.8</span></h1>
+        <h1 class="text-xl font-bold tracking-wider text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 border border-sky-500/30">v{APP_VERSION}</span></h1>
         <p class="text-xs text-neutral-400">Enterprise SSH Manager & Prompt Studio</p>
       </div>
     </div>
@@ -271,10 +281,17 @@
   >
     <div class="w-full max-w-md space-y-8 no-drag">
       <div class="text-center">
-        <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto mb-4 text-sky-400">
-          <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-        </div>
-        <h2 class="text-2xl font-bold text-white">{isSetup ? 'Setup CATerm Vault' : 'Unlock CATerm Vault'}</h2>
+        {#if isSetup}
+          <div class="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mx-auto mb-4 text-sky-400">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          </div>
+          <h2 class="text-2xl font-bold text-white">Setup CATerm Vault</h2>
+        {:else}
+          <div class="flex justify-center mb-4">
+            <ProfileAvatar avatar={profile.avatar} name={profile.name} size={64} />
+          </div>
+          <h2 class="text-2xl font-bold text-white">Welcome back, {profile.name}</h2>
+        {/if}
         <p class="text-sm text-neutral-400 mt-1">Local Identity <span class="text-emerald-400 font-mono">(Encrypted)</span></p>
       </div>
 
@@ -291,6 +308,23 @@
       {/if}
 
       <div class="space-y-4">
+        {#if isSetup}
+          <div>
+            <label for="profile-name" class="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Your Name</label>
+            <input
+              id="profile-name"
+              type="text"
+              bind:value={setupName}
+              maxlength="48"
+              placeholder="CATerm User"
+              class="w-full px-4 py-3 bg-neutral-900 border border-neutral-800 rounded-lg text-white placeholder-neutral-600 focus:outline-none focus:border-sky-500 transition-colors"
+            />
+          </div>
+          <div>
+            <span class="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">Profile Picture</span>
+            <AvatarPicker bind:value={setupAvatar} size={36} />
+          </div>
+        {/if}
         <div>
           <label for="master-password" class="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-2">{isSetup ? 'Create Master Password' : 'Master Password'}</label>
           <div class="relative">

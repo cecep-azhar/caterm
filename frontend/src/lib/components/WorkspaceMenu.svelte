@@ -233,7 +233,7 @@
         d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
       />
     </svg>
-    <span class="font-medium">Workspaces</span>
+    <span class="font-medium hidden sm:inline">Workspaces</span>
     {#if workspaces.length > 0}
       <span
         class="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold bg-sky-500/15 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30"
@@ -315,10 +315,6 @@
                   </span>
                   <span>•</span>
                   <span>{getLayoutName(ws.layout)}</span>
-                  {#if ws.showFiles}
-                    <span>•</span>
-                    <span class="text-emerald-600 dark:text-emerald-400 font-medium">Files</span>
-                  {/if}
                   {#if ws.updatedAt}
                     <span class="text-neutral-400 dark:text-neutral-500">• {formatTimeAgo(ws.updatedAt)}</span>
                   {/if}

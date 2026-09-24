@@ -435,6 +435,19 @@ pub async fn reset_vault() -> Result<(), CatermError> {
 }
 
 #[tauri::command]
+pub async fn lock_vault() -> Result<(), CatermError> {
+    run_blocking(vault::lock_vault).await
+}
+
+#[tauri::command]
+pub async fn change_master_password(
+    current_password: String,
+    new_password: String,
+) -> Result<(), CatermError> {
+    run_blocking(move || vault::change_master_password(&current_password, &new_password)).await
+}
+
+#[tauri::command]
 pub async fn ssh_connect(host_id: String) -> Result<ssh::SshSession, CatermError> {
     run_blocking(move || ssh::connect(&host_id)).await
 }

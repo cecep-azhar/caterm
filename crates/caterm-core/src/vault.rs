@@ -5,13 +5,16 @@
 //!
 //! Includes in-memory zeroization on lock to eliminate forensic RAM leakage.
 
-use crate::error::{CatermError, VaultError};
+use crate::error::{CatermError, DbError, VaultError};
 use argon2::{Argon2, Params, Version};
 use parking_lot::RwLock;
 use std::sync::LazyLock;
 use zeroize::Zeroize;
 
 pub const MIN_PASSWORD_LEN: usize = 8;
+
+const CANARY_FILE: &str = "vault_canary.bin";
+const CANARY_PLAINTEXT: &[u8] = b"CATERM_VAULT_CANARY_V2";
 const ARGON2_M_COST: u32 = 64 * 1024; // 64 MB
 const ARGON2_T_COST: u32 = 3;
 const ARGON2_P_COST: u32 = 4;
@@ -78,9 +81,87 @@ pub fn reset_vault() -> Result<(), CatermError> {
     Ok(())
 }
 
-pub fn change_master_password(password: &str) -> Result<(), CatermError> {
-    unlock_vault(password)?;
+/// Re-keys the vault to a new master password. The password's Argon2id output *is* the
+/// SQLCipher key, so this rewrites every database page (`PRAGMA rekey`) and replaces the
+/// canary. The vault stays unlocked, now on the new key.
+pub fn change_master_password(
+    current_password: &str,
+    new_password: &str,
+) -> Result<(), CatermError> {
+    if current_password == new_password {
+        return Err(vault_err(
+            "Master password baru harus berbeda dari yang lama.",
+        ));
+    }
+    let data_dir = crate::paths::resolve_data_dir()?.path;
+    let canary_path = data_dir.join(CANARY_FILE);
+    if !canary_path.exists() {
+        return Err(vault_err("Vault belum dibuat."));
+    }
+
+    let mut old_key = derive_key(current_password)?;
+    let mut new_key = match derive_key(new_password) {
+        Ok(key) => key,
+        Err(e) => {
+            old_key.zeroize();
+            return Err(e);
+        }
+    };
+
+    let result = rekey(&data_dir, &canary_path, &old_key, &new_key);
+    if result.is_ok() {
+        let mut guard = ACTIVE_VAULT_KEY.write();
+        if let Some(mut previous) = guard.replace(new_key) {
+            previous.zeroize();
+        }
+    }
+    old_key.zeroize();
+    new_key.zeroize();
+    result?;
+
+    let _ = crate::audit::log_event("VAULT_PASSWORD_CHANGE", None, "Master password changed");
     Ok(())
+}
+
+/// Ordering keeps a crash from locking the user out: the new canary is staged beside the old
+/// one, the database is re-keyed, and only then is the staged canary moved into place. If that
+/// last move fails, the database is re-keyed back so the untouched old canary still matches.
+fn rekey(
+    data_dir: &std::path::Path,
+    canary_path: &std::path::Path,
+    old_key: &[u8; 32],
+    new_key: &[u8; 32],
+) -> Result<(), CatermError> {
+    verify_canary(old_key, canary_path)?;
+
+    let staged = canary_path.with_extension("bin.new");
+    let encrypted_canary = crate::secret::encrypt_bytes(new_key, CANARY_PLAINTEXT)?;
+    std::fs::write(&staged, encrypted_canary).map_err(|e| vault_err(e.to_string()))?;
+
+    if let Err(e) = rekey_database(data_dir, old_key, new_key) {
+        let _ = std::fs::remove_file(&staged);
+        return Err(e);
+    }
+
+    if let Err(e) = std::fs::rename(&staged, canary_path) {
+        let _ = rekey_database(data_dir, new_key, old_key);
+        let _ = std::fs::remove_file(&staged);
+        return Err(vault_err(format!("gagal menyimpan canary baru: {e}")));
+    }
+    Ok(())
+}
+
+fn rekey_database(
+    data_dir: &std::path::Path,
+    from: &[u8; 32],
+    to: &[u8; 32],
+) -> Result<(), CatermError> {
+    let conn = crate::db::open_encrypted(data_dir, &hex::encode(from))?;
+    conn.execute_batch(&format!("PRAGMA rekey = '{}';", hex::encode(to)))
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal rekey database: {e}"))))?;
+    drop(conn);
+    // Proves the new key opens the file before the caller switches the canary over.
+    crate::db::open_encrypted(data_dir, &hex::encode(to)).map(drop)
 }
 
 pub fn lock_vault() -> Result<(), CatermError> {
@@ -95,51 +176,20 @@ pub fn lock_vault() -> Result<(), CatermError> {
 }
 
 pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
-    if master_password.len() < MIN_PASSWORD_LEN {
-        return Err(CatermError::Vault(VaultError::Generic(format!(
-            "Master password minimal {} karakter",
-            MIN_PASSWORD_LEN
-        ))));
-    }
-
-    // Derive 32-byte key via Argon2id
-    let mut derived_key = [0u8; 32];
-    let params = Params::new(ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST, Some(32))
-        .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
-    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, Version::V0x13, params);
-
-    // Static application domain salt for local KEK derivation
-    let salt = b"caterm.zero_knowledge.v2.domain_salt_2026";
-    argon2
-        .hash_password_into(master_password.as_bytes(), salt, &mut derived_key)
-        .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
+    let mut derived_key = derive_key(master_password)?;
 
     let data_dir = crate::paths::resolve_data_dir()?.path;
-    let canary_path = data_dir.join("vault_canary.bin");
+    let canary_path = data_dir.join(CANARY_FILE);
 
     if canary_path.exists() {
-        let encrypted_canary = std::fs::read_to_string(&canary_path)
-            .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
-
-        let decrypted =
-            crate::secret::decrypt_bytes(&derived_key, &encrypted_canary).map_err(|_| {
-                CatermError::Vault(VaultError::Generic(
-                    "Master password salah. Silakan coba lagi.".into(),
-                ))
-            })?;
-
-        if decrypted != b"CATERM_VAULT_CANARY_V2" {
-            return Err(CatermError::Vault(VaultError::Generic(
-                "Master password salah. Silakan coba lagi.".into(),
-            )));
+        if let Err(e) = verify_canary(&derived_key, &canary_path) {
+            derived_key.zeroize();
+            return Err(e);
         }
     } else {
-        std::fs::create_dir_all(&data_dir)
-            .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
-        let encrypted_canary =
-            crate::secret::encrypt_bytes(&derived_key, b"CATERM_VAULT_CANARY_V2")?;
-        std::fs::write(&canary_path, encrypted_canary)
-            .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
+        std::fs::create_dir_all(&data_dir).map_err(|e| vault_err(e.to_string()))?;
+        let encrypted_canary = crate::secret::encrypt_bytes(&derived_key, CANARY_PLAINTEXT)?;
+        std::fs::write(&canary_path, encrypted_canary).map_err(|e| vault_err(e.to_string()))?;
     }
 
     {
@@ -149,6 +199,43 @@ pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
 
     let _ = crate::audit::log_event("VAULT_UNLOCK", None, "Vault unlocked");
 
+    Ok(())
+}
+
+fn vault_err(message: impl Into<String>) -> CatermError {
+    CatermError::Vault(VaultError::Generic(message.into()))
+}
+
+/// Argon2id key from the master password — both the canary key and the SQLCipher key.
+fn derive_key(master_password: &str) -> Result<[u8; 32], CatermError> {
+    if master_password.len() < MIN_PASSWORD_LEN {
+        return Err(vault_err(format!(
+            "Master password minimal {MIN_PASSWORD_LEN} karakter"
+        )));
+    }
+
+    let mut derived_key = [0u8; 32];
+    let params = Params::new(ARGON2_M_COST, ARGON2_T_COST, ARGON2_P_COST, Some(32))
+        .map_err(|e| vault_err(e.to_string()))?;
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, Version::V0x13, params);
+
+    // Static application domain salt for local KEK derivation
+    let salt = b"caterm.zero_knowledge.v2.domain_salt_2026";
+    argon2
+        .hash_password_into(master_password.as_bytes(), salt, &mut derived_key)
+        .map_err(|e| vault_err(e.to_string()))?;
+    Ok(derived_key)
+}
+
+fn verify_canary(key: &[u8; 32], canary_path: &std::path::Path) -> Result<(), CatermError> {
+    let wrong_password = || vault_err("Master password salah. Silakan coba lagi.");
+    let encrypted_canary =
+        std::fs::read_to_string(canary_path).map_err(|e| vault_err(e.to_string()))?;
+    let decrypted =
+        crate::secret::decrypt_bytes(key, &encrypted_canary).map_err(|_| wrong_password())?;
+    if decrypted != CANARY_PLAINTEXT {
+        return Err(wrong_password());
+    }
     Ok(())
 }
 
@@ -205,6 +292,44 @@ mod tests {
         assert!(is_unlocked().unwrap());
         assert!(lock_vault().is_ok());
         assert!(!is_unlocked().unwrap());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rekey_moves_database_and_canary_to_the_new_key() {
+        let dir = std::env::temp_dir().join(format!("caterm_vault_rekey_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let canary = dir.join(CANARY_FILE);
+        let (old_key, new_key) = ([7u8; 32], [9u8; 32]);
+
+        std::fs::write(
+            &canary,
+            crate::secret::encrypt_bytes(&old_key, CANARY_PLAINTEXT).unwrap(),
+        )
+        .unwrap();
+        {
+            let conn = crate::db::open_encrypted(&dir, &hex::encode(old_key)).unwrap();
+            conn.execute_batch("CREATE TABLE probe(v TEXT); INSERT INTO probe VALUES ('kept');")
+                .unwrap();
+        }
+
+        assert!(
+            rekey(&dir, &canary, &new_key, &old_key).is_err(),
+            "wrong current key must fail"
+        );
+        rekey(&dir, &canary, &old_key, &new_key).unwrap();
+
+        assert!(verify_canary(&new_key, &canary).is_ok());
+        assert!(verify_canary(&old_key, &canary).is_err());
+        assert!(crate::db::open_encrypted(&dir, &hex::encode(old_key)).is_err());
+        let conn = crate::db::open_encrypted(&dir, &hex::encode(new_key)).unwrap();
+        let kept: String = conn
+            .query_row("SELECT v FROM probe", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(kept, "kept");
+        assert!(!canary.with_extension("bin.new").exists());
+        drop(conn);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

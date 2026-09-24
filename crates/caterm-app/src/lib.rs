@@ -88,8 +88,14 @@ pub fn run_with_start(start: std::time::Instant) {
     // the lint attributes that call to this statement's span.
     #[allow(clippy::expect_used, clippy::disallowed_methods)]
     tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
         .setup(move |app| {
             install_ssh_event_bridge(app.handle());
+
+            // Desktop only: the updater has no mobile implementation (see Dockerfile.android).
+            #[cfg(desktop)]
+            app.handle()
+                .plugin(tauri_plugin_updater::Builder::new().build())?;
 
             #[cfg(target_os = "linux")]
             {
@@ -168,6 +174,8 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::validate_vault_password,
             commands::is_vault_initialized,
             commands::reset_vault,
+            commands::lock_vault,
+            commands::change_master_password,
             commands::get_command_logs,
             commands::ssh_connect,
             commands::ssh_write,

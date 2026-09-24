@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getToasts, removeToast, getConfirmDialog, resolveConfirm } from '$lib/stores/uiNotifications.svelte';
+  import UpdateToast from './UpdateToast.svelte';
 
   const toasts = $derived(getToasts());
   const confirm = $derived(getConfirmDialog());
@@ -37,6 +38,8 @@
       </button>
     </div>
   {/each}
+  <!-- Last in the column so transient toasts stack above it instead of covering it. -->
+  <UpdateToast />
 </div>
 
 <!-- Global Confirm Dialog Modal -->

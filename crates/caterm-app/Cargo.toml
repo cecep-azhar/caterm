@@ -25,6 +25,10 @@ tokio = { version = "1.53.1", features = ["full"] }
 tauri-plugin-shell = "2.3.6"
 tauri-plugin-dialog = "2.7.3"
 mimalloc = { version = "0.1", default-features = false }
+tauri-plugin-process = "2"
+
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
+tauri-plugin-updater = "2"
 
 [target.'cfg(windows)'.dependencies]
 ssh2 = "0.9.6"

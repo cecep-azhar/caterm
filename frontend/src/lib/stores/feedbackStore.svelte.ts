@@ -1,6 +1,7 @@
 const STORAGE_PREFIX = 'caterm_feedback_v2';
 
 let showPrompt = $state(false);
+let openedManually = false;
 
 export function isFeedbackDismissedOrSubmitted(): boolean {
   if (typeof localStorage === 'undefined') return true;
@@ -28,17 +29,22 @@ export function getFeedbackPromptState() {
     get show() {
       return showPrompt;
     },
+    /** Opened on request (profile menu > Report bug), not by the 3rd-session trigger. */
     open() {
+      openedManually = true;
       showPrompt = true;
     },
     close() {
       showPrompt = false;
-      if (typeof localStorage !== 'undefined') {
+      // Closing a form the user asked for is not a "never ask me" for the automatic prompt.
+      if (!openedManually && typeof localStorage !== 'undefined') {
         localStorage.setItem(`${STORAGE_PREFIX}_dismissed`, 'true');
       }
+      openedManually = false;
     },
     markSubmitted() {
       showPrompt = false;
+      openedManually = false;
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(`${STORAGE_PREFIX}_submitted`, 'true');
       }

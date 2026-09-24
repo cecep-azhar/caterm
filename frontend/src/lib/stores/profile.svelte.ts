@@ -1,0 +1,66 @@
+// Local profile shown in the sidebar, the profile menu and the lock screen. Free plan is fully
+// local: no email, no account — just a display name and one of the preset avatars. Kept in
+// localStorage (not the vault) on purpose: the lock screen has to greet the user by name
+// *before* the vault is unlocked.
+//
+// Pro (email login, custom photo, PRO emblem) is not built yet — there is no licensing system
+// to decide who is Pro, so every profile is Free.
+
+const STORAGE_KEY = 'caterm_profile_v1';
+export const DEFAULT_PROFILE_NAME = 'CATerm User';
+export const DEFAULT_AVATAR = 'rocket';
+
+export type Plan = 'free';
+
+interface StoredProfile {
+  name: string;
+  avatar: string;
+}
+
+function load(): StoredProfile | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StoredProfile>;
+    if (typeof parsed.name !== 'string') return null;
+    return { name: parsed.name, avatar: typeof parsed.avatar === 'string' ? parsed.avatar : DEFAULT_AVATAR };
+  } catch {
+    return null;
+  }
+}
+
+const initial = typeof localStorage === 'undefined' ? null : load();
+let name = $state(initial?.name || DEFAULT_PROFILE_NAME);
+let avatar = $state(initial?.avatar || DEFAULT_AVATAR);
+
+export function getProfile() {
+  return {
+    get name() {
+      return name;
+    },
+    get avatar() {
+      return avatar;
+    },
+    get plan(): Plan {
+      return 'free';
+    }
+  };
+}
+
+export function saveProfile(next: { name: string; avatar: string }) {
+  name = next.name.trim() || DEFAULT_PROFILE_NAME;
+  avatar = next.avatar || DEFAULT_AVATAR;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, avatar }));
+  } catch {
+    // Storage blocked: the change still applies for this session.
+  }
+}
+
+export function initialsOf(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  const first = parts[0]?.[0] ?? '';
+  const second = parts.length > 1 ? (parts[1]?.[0] ?? '') : '';
+  return (first + second).toUpperCase();
+}

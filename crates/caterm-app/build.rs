@@ -86,6 +86,8 @@ const COMMANDS: &[&str] = &[
     "validate_vault_password",
     "is_vault_initialized",
     "reset_vault",
+    "lock_vault",
+    "change_master_password",
     // Audit
     "get_command_logs",
     // SSH terminal

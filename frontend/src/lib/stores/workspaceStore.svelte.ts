@@ -176,7 +176,8 @@ export async function restoreWorkspace(workspace: Workspace): Promise<{ openedCo
   }
 
   setCurrentLayout(workspace.layout || 1);
-  setShowFiles(workspace.showFiles ?? true);
+  // Restoring connects every host; like any new connection, Files stays closed until asked for.
+  setShowFiles(false);
 
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('caterm:workspace-loaded', { detail: workspace }));
