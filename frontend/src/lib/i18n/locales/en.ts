@@ -765,6 +765,125 @@ const en = {
     sentToTerminal: 'Sent to active terminal.',
     noOutput: '(no output)',
     stepFailed: 'Step {{step}} failed (exit {{code}}). Execution aborted.'
+  },
+  settings: {
+    title: 'Settings',
+    subtitle: 'Configure global preferences, system updates, and zero-knowledge local security.',
+    nextFeature: 'Next Feature / Disabled',
+    perMonth: '/ mo',
+    perUserMonth: '/ user / mo',
+    tabs: {
+      profile: 'Profile',
+      updates: 'Updates',
+      ai: 'AI Assistant',
+      subscription: 'Subscription',
+      sync: 'Cloud Sync E2EE',
+      security: 'Vault Security',
+      backup: 'Backup & Restore',
+      shortcuts: 'Shortcuts'
+    },
+    profile: {
+      localNote: 'Local profile — stored on this device only, no account or email needed.',
+      displayName: 'Display name',
+      picture: 'Profile picture',
+      save: 'Save profile',
+      saved: 'Profile updated.',
+      masterPassword: 'Master password',
+      masterPasswordBody: 'Unlocks and encrypts your local vault.',
+      changeMasterPassword: 'Change master password'
+    },
+    updates: {
+      title: 'Application Updates',
+      current: 'Current installed version:',
+      install: 'Download and Install Update',
+      checking: 'Checking for updates...',
+      check: 'Check for Updates',
+      latest: 'You are on the latest version (v{{version}}).',
+      available: 'Version v{{version}} is available.',
+      readChangelog: 'Read the changelog',
+      downloading: 'Downloading v{{version}}{{progress}} — CATerm restarts when the install finishes.'
+    },
+    ai: {
+      title: 'AI Ops Assistant',
+      subtitle: 'LLM endpoint, credentials, and model used by AI Chat and Prompt Studio.'
+    },
+    subscription: {
+      title: 'Subscription Plan',
+      subtitle: 'Manage your CATerm plan and usage limits.',
+      freePlan: 'Free Plan',
+      current: 'Current',
+      freeBody: 'Unlimited hosts & snippets, 100% local-first, zero-knowledge encryption.',
+      proPlan: 'Pro Plan',
+      proBody: 'Unlimited hosts & snippets, AI Agent CATerm, priority support, and team collaboration.',
+      proThen: 'then $3/mo, +$1/team member',
+      upgrade: 'Upgrade to Pro ($1/mo, $3 next, +$1/team)',
+      supportTitle: 'Support Independent Open Development',
+      supportBody: 'CATerm is free and local-first. Donations help maintain active development.'
+    },
+    sync: {
+      title: 'Cloud Sync E2EE (End-to-End Encrypted)',
+      subtitle: 'Zero-Knowledge remote backup and cross-device sync. Your vault key never leaves your local hardware.',
+      personalTitle: 'Personal Cloud Sync',
+      personalBody: 'Encrypted backup for up to 5 devices with local key derivation.',
+      teamTitle: 'Team & Org Sync',
+      teamBody: 'Shared team vaults, audit trails, and multi-user access control.'
+    },
+    security: {
+      title: 'Zero-Knowledge Vault Configuration',
+      subtitle: 'CATerm enforces local-first encryption for host records, passwords, and private keys.',
+      rekeyNote: 'Changing the master password re-encrypts the whole local database with a key derived from the new password. Keep the app open until it finishes.',
+      current: 'Current master password',
+      new: 'New master password (min. {{min}} chars)',
+      confirm: 'Confirm new master password',
+      showPasswords: 'Show passwords',
+      reencrypting: 'Re-encrypting vault...',
+      change: 'Change Master Password',
+      errMin: 'New master password must be at least {{min}} characters.',
+      errMismatch: 'New password and confirmation do not match.',
+      changedConfirm: 'Master password changed and the vault re-encrypted. Restart CATerm now and unlock with the new password?',
+      changedTitle: 'Master Password Changed',
+      restartNow: 'Restart now',
+      later: 'Later',
+      changedToast: 'Master password changed. Use the new password next time you unlock.'
+    },
+    audit: {
+      title: 'Audit Trail & Command Logs',
+      body: 'Limit the number of records loaded from the local database. Older records beyond the limit are stored but not shown until the limit is raised.',
+      maxRecords: 'Max Records (default: 1000)',
+      saved: 'Max audit records set to {{count}}',
+      saveFailed: 'Failed to save audit settings'
+    },
+    backup: {
+      title: 'Vault Backup & Restore',
+      subtitle: 'Export your local vault (hosts, snippets, keys) as an encrypted backup file, or restore from one.',
+      exportTitle: 'Export Backup',
+      exportBody: 'Protects your entire configuration using an AES-256-GCM encryption key derived from your passphrase via Argon2id.',
+      exportPassphrase: 'Backup Encryption Passphrase (min 8 chars)',
+      hidePassphrase: 'Hide passphrase',
+      showPassphrase: 'Show passphrase',
+      exportButton: 'Generate Encrypted Backup...',
+      restoreTitle: 'Restore Backup',
+      restoreBody: 'Restoring merges the backup contents with your current vault. Existing records with the same IDs will be updated.',
+      restorePassphrase: 'Backup Decryption Passphrase',
+      restoreButton: 'Select Backup File and Restore...',
+      errPassphrase: 'Passphrase must be at least 8 characters.',
+      creating: 'Creating encrypted backup...',
+      savedToast: 'Backup saved successfully!',
+      exportFailed: 'Failed to export backup',
+      importing: 'Decrypting and importing backup...',
+      restored: 'Restore successful! Restored {{count}} items.',
+      restoreFailed: 'Failed to restore backup'
+    },
+    shortcuts: {
+      title: 'Keyboard Shortcuts',
+      subtitle: 'Global and tab navigation shortcuts.',
+      global: 'Global',
+      sessions: 'Sessions',
+      switchTab: 'Switch to tab',
+      commandPalette: 'Command palette',
+      newSession: 'New session',
+      switchToTab: 'Switch to Tab {{n}}'
+    }
   }
 };
 

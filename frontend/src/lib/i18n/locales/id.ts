@@ -766,6 +766,125 @@ const id: Dictionary = {
     sentToTerminal: 'Terkirim ke terminal aktif.',
     noOutput: '(tanpa output)',
     stepFailed: 'Langkah {{step}} gagal (exit {{code}}). Eksekusi dihentikan.'
+  },
+  settings: {
+    title: 'Pengaturan',
+    subtitle: 'Atur preferensi global, pembaruan sistem, dan keamanan lokal zero-knowledge.',
+    nextFeature: 'Fitur Berikutnya / Nonaktif',
+    perMonth: '/ bln',
+    perUserMonth: '/ pengguna / bln',
+    tabs: {
+      profile: 'Profil',
+      updates: 'Pembaruan',
+      ai: 'Asisten AI',
+      subscription: 'Langganan',
+      sync: 'Cloud Sync E2EE',
+      security: 'Keamanan Vault',
+      backup: 'Cadangkan & Pulihkan',
+      shortcuts: 'Pintasan'
+    },
+    profile: {
+      localNote: 'Profil lokal — hanya tersimpan di perangkat ini, tanpa akun atau email.',
+      displayName: 'Nama tampilan',
+      picture: 'Foto profil',
+      save: 'Simpan profil',
+      saved: 'Profil diperbarui.',
+      masterPassword: 'Master password',
+      masterPasswordBody: 'Membuka dan mengenkripsi vault lokal Anda.',
+      changeMasterPassword: 'Ganti master password'
+    },
+    updates: {
+      title: 'Pembaruan Aplikasi',
+      current: 'Versi terpasang saat ini:',
+      install: 'Unduh dan Pasang Pembaruan',
+      checking: 'Memeriksa pembaruan...',
+      check: 'Periksa Pembaruan',
+      latest: 'Anda sudah memakai versi terbaru (v{{version}}).',
+      available: 'Versi v{{version}} tersedia.',
+      readChangelog: 'Baca catatan rilis',
+      downloading: 'Mengunduh v{{version}}{{progress}} — CATerm akan dimulai ulang setelah pemasangan selesai.'
+    },
+    ai: {
+      title: 'Asisten Operasional AI',
+      subtitle: 'Endpoint LLM, kredensial, dan model yang dipakai AI Chat dan Prompt Studio.'
+    },
+    subscription: {
+      title: 'Paket Langganan',
+      subtitle: 'Kelola paket CATerm dan batas penggunaan Anda.',
+      freePlan: 'Paket Gratis',
+      current: 'Saat ini',
+      freeBody: 'Host & snippet tanpa batas, 100% lokal, enkripsi zero-knowledge.',
+      proPlan: 'Paket Pro',
+      proBody: 'Host & snippet tanpa batas, AI Agent CATerm, dukungan prioritas, dan kolaborasi tim.',
+      proThen: 'lalu $3/bln, +$1/anggota tim',
+      upgrade: 'Upgrade ke Pro ($1/bln, lalu $3, +$1/tim)',
+      supportTitle: 'Dukung Pengembangan Terbuka Independen',
+      supportBody: 'CATerm gratis dan lokal. Donasi membantu pengembangan tetap aktif.'
+    },
+    sync: {
+      title: 'Cloud Sync E2EE (Terenkripsi End-to-End)',
+      subtitle: 'Cadangan remote dan sinkronisasi lintas perangkat zero-knowledge. Kunci vault tidak pernah meninggalkan perangkat Anda.',
+      personalTitle: 'Cloud Sync Pribadi',
+      personalBody: 'Cadangan terenkripsi untuk hingga 5 perangkat dengan derivasi kunci lokal.',
+      teamTitle: 'Sync Tim & Organisasi',
+      teamBody: 'Vault tim bersama, jejak audit, dan kontrol akses multi-pengguna.'
+    },
+    security: {
+      title: 'Konfigurasi Vault Zero-Knowledge',
+      subtitle: 'CATerm menerapkan enkripsi lokal untuk data host, kata sandi, dan kunci privat.',
+      rekeyNote: 'Mengganti master password akan mengenkripsi ulang seluruh database lokal dengan kunci dari kata sandi baru. Biarkan aplikasi tetap terbuka sampai selesai.',
+      current: 'Master password saat ini',
+      new: 'Master password baru (min. {{min}} karakter)',
+      confirm: 'Konfirmasi master password baru',
+      showPasswords: 'Tampilkan kata sandi',
+      reencrypting: 'Mengenkripsi ulang vault...',
+      change: 'Ganti Master Password',
+      errMin: 'Master password baru minimal {{min}} karakter.',
+      errMismatch: 'Kata sandi baru dan konfirmasinya tidak sama.',
+      changedConfirm: 'Master password diganti dan vault sudah dienkripsi ulang. Mulai ulang CATerm sekarang dan buka dengan kata sandi baru?',
+      changedTitle: 'Master Password Diganti',
+      restartNow: 'Mulai ulang sekarang',
+      later: 'Nanti',
+      changedToast: 'Master password diganti. Gunakan kata sandi baru saat membuka berikutnya.'
+    },
+    audit: {
+      title: 'Jejak Audit & Log Perintah',
+      body: 'Batasi jumlah data yang dimuat dari database lokal. Data lama di luar batas tetap tersimpan, tetapi tidak ditampilkan sampai batasnya dinaikkan.',
+      maxRecords: 'Maks. Data (default: 1000)',
+      saved: 'Maks. data audit diatur ke {{count}}',
+      saveFailed: 'Gagal menyimpan pengaturan audit'
+    },
+    backup: {
+      title: 'Cadangkan & Pulihkan Vault',
+      subtitle: 'Ekspor vault lokal (host, snippet, kunci) sebagai file cadangan terenkripsi, atau pulihkan dari file cadangan.',
+      exportTitle: 'Ekspor Cadangan',
+      exportBody: 'Melindungi seluruh konfigurasi dengan kunci enkripsi AES-256-GCM yang diturunkan dari passphrase Anda melalui Argon2id.',
+      exportPassphrase: 'Passphrase Enkripsi Cadangan (min 8 karakter)',
+      hidePassphrase: 'Sembunyikan passphrase',
+      showPassphrase: 'Tampilkan passphrase',
+      exportButton: 'Buat Cadangan Terenkripsi...',
+      restoreTitle: 'Pulihkan Cadangan',
+      restoreBody: 'Pemulihan menggabungkan isi cadangan dengan vault saat ini. Data dengan ID yang sama akan diperbarui.',
+      restorePassphrase: 'Passphrase Dekripsi Cadangan',
+      restoreButton: 'Pilih File Cadangan dan Pulihkan...',
+      errPassphrase: 'Passphrase minimal 8 karakter.',
+      creating: 'Membuat cadangan terenkripsi...',
+      savedToast: 'Cadangan berhasil disimpan!',
+      exportFailed: 'Gagal mengekspor cadangan',
+      importing: 'Mendekripsi dan mengimpor cadangan...',
+      restored: 'Pemulihan berhasil! {{count}} item dipulihkan.',
+      restoreFailed: 'Gagal memulihkan cadangan'
+    },
+    shortcuts: {
+      title: 'Pintasan Keyboard',
+      subtitle: 'Pintasan global dan navigasi tab.',
+      global: 'Global',
+      sessions: 'Sesi',
+      switchTab: 'Pindah ke tab',
+      commandPalette: 'Palet perintah',
+      newSession: 'Sesi baru',
+      switchToTab: 'Pindah ke Tab {{n}}'
+    }
   }
 };
 
