@@ -789,18 +789,15 @@ const en = {
   settings: {
     title: 'Settings',
     subtitle: 'Configure global preferences, system updates, and zero-knowledge local security.',
-    nextFeature: 'Next Feature / Disabled',
-    perMonth: '/ mo',
-    perUserMonth: '/ user / mo',
     tabs: {
       profile: 'Profile',
       updates: 'Updates',
       ai: 'AI Assistant',
       subscription: 'Subscription',
-      sync: 'Cloud Sync E2EE',
       security: 'Vault Security',
       backup: 'Backup & Restore',
-      shortcuts: 'Shortcuts'
+      shortcuts: 'Shortcuts',
+      performance: 'Performance'
     },
     profile: {
       localNote: 'Local profile — stored on this device only, no account or email needed.',
@@ -829,24 +826,30 @@ const en = {
     },
     subscription: {
       title: 'Subscription Plan',
-      subtitle: 'Manage your CATerm plan and usage limits.',
-      freePlan: 'Free Plan',
+      subtitle: 'Everything that runs on this device is free forever. Pro adds what needs Fathforce servers.',
+      freePlan: 'Community (Free)',
       current: 'Current',
-      freeBody: 'Unlimited hosts & snippets, 100% local-first, zero-knowledge encryption.',
-      proPlan: 'Pro Plan',
-      proBody: 'Unlimited hosts & snippets, AI Agent CATerm, priority support, and team collaboration.',
-      proThen: 'then $3/mo, +$1/team member',
-      upgrade: 'Upgrade to Pro ($1/mo, $3 next, +$1/team)',
+      freeBody: 'SSH, SFTP, encrypted local vault, monitoring, port forwarding, audit logs, backups and AI with your own API key — free forever.',
+      proPlan: 'CATerm Pro',
+      introBadge: '{{percent}}% OFF — first {{months}} months',
+      monthly: 'Monthly',
+      yearly: 'Yearly',
+      saveYearly: 'Save {{percent}}%',
+      perMonth: '/month',
+      perYear: '/year',
+      monthlyThen: 'for the first {{months}} months, then {{price}}/month',
+      yearlyThen: 'for the first year (≈{{perMonth}}/month), then {{price}}/year',
+      featureSync: 'Cloud Sync E2EE across up to {{devices}} of your devices',
+      featureAi: 'Hosted AI Ops Copilot — {{requests}} requests/month, no API key needed',
+      featureTeam: 'Invite up to {{extra}} teammates for free ({{members}} people per account)',
+      featureLogs: 'Session logs and snippets synced to the cloud',
+      featureCommunity: 'Everything in Community',
+      startTrial: 'Start {{days}}-day trial',
+      comingSoon: 'Coming soon',
+      subscribe: 'Subscribe',
+      trialNote: 'No credit card needed for the trial. The AI quota is shared by everyone on the account.',
       supportTitle: 'Support Independent Open Development',
       supportBody: 'CATerm is free and local-first. Donations help maintain active development.'
-    },
-    sync: {
-      title: 'Cloud Sync E2EE (End-to-End Encrypted)',
-      subtitle: 'Zero-Knowledge remote backup and cross-device sync. Your vault key never leaves your local hardware.',
-      personalTitle: 'Personal Cloud Sync',
-      personalBody: 'Encrypted backup for up to 5 devices with local key derivation.',
-      teamTitle: 'Team & Org Sync',
-      teamBody: 'Shared team vaults, audit trails, and multi-user access control.'
     },
     security: {
       title: 'Zero-Knowledge Vault Configuration',
@@ -903,6 +906,22 @@ const en = {
       commandPalette: 'Command palette',
       newSession: 'New session',
       switchToTab: 'Switch to Tab {{n}}'
+    },
+    performance: {
+      title: 'Performance',
+      subtitle: 'How CATerm balances memory, CPU and smoothness on this device.',
+      backgroundTitle: 'Automatic background memory saving',
+      backgroundBody: 'When CATerm is minimized, or left in the background for 30 seconds, it asks its rendering engine to release caches and shrink. Everything returns to normal the moment you switch back — SSH sessions keep running the whole time.',
+      alwaysOn: 'Always on',
+      gpuTitle: 'GPU acceleration',
+      gpuBody: 'Uses the graphics card to draw the interface and terminals. Turning it off saves memory but uses more CPU, and scrolling busy terminals can feel less smooth.',
+      recommended: 'Recommended: on',
+      restartNote: 'Takes effect after CATerm restarts.',
+      restartTitle: 'Restart required',
+      restartBody: 'The GPU setting applies after a restart. Restart CATerm now? Open SSH sessions will be closed.',
+      restartNow: 'Restart now',
+      later: 'Later',
+      saveFailed: 'Could not save the performance setting: {{error}}'
     }
   },
   promptStudio: {

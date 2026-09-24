@@ -87,7 +87,8 @@
     "allow-ai-generate-plan",
     "allow-ai-chat",
     "allow-ai-execute-step",
-    "allow-trim-memory",
+    "allow-get-performance-prefs",
+    "allow-set-performance-prefs",
     "allow-submit-feedback",
     "process:allow-restart"
   ]

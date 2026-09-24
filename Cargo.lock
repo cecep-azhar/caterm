@@ -471,7 +471,8 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "webkit2gtk",
- "windows-sys 0.59.0",
+ "webview2-com",
+ "windows-core 0.61.2",
 ]
 
 [[package]]

@@ -604,47 +604,16 @@ pub async fn list_watches() -> Result<Vec<sync::WatchInfo>, CatermError> {
     run_blocking(sync::list_watches).await
 }
 
-#[cfg(target_os = "windows")]
-fn trim_working_set_impl() {
-    unsafe {
-        use windows_sys::Win32::System::ProcessStatus::K32EmptyWorkingSet;
-        use windows_sys::Win32::System::Threading::{GetCurrentProcess, GetCurrentProcessId, OpenProcess, PROCESS_SET_QUOTA, PROCESS_QUERY_INFORMATION};
-        use windows_sys::Win32::System::Diagnostics::ToolHelp::{CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32, TH32CS_SNAPPROCESS};
-
-        let current_proc = GetCurrentProcess();
-        K32EmptyWorkingSet(current_proc);
-
-        let current_pid = GetCurrentProcessId();
-        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-        if snap != windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
-            let mut entry: PROCESSENTRY32 = std::mem::zeroed();
-            entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as u32;
-            if Process32First(snap, &mut entry) != 0 {
-                loop {
-                    if entry.th32ParentProcessID == current_pid {
-                        let child_proc = OpenProcess(PROCESS_SET_QUOTA | PROCESS_QUERY_INFORMATION, 0, entry.th32ProcessID);
-                        if child_proc != 0 as _ {
-                            K32EmptyWorkingSet(child_proc);
-                            windows_sys::Win32::Foundation::CloseHandle(child_proc);
-                        }
-                    }
-                    if Process32Next(snap, &mut entry) == 0 {
-                        break;
-                    }
-                }
-            }
-            windows_sys::Win32::Foundation::CloseHandle(snap);
-        }
-    }
+/// GPU on/off for the WebView. Read by the shell before the window exists, so a change only
+/// applies after a restart — the Settings page says so and offers to relaunch.
+#[tauri::command]
+pub fn get_performance_prefs() -> caterm_core::prefs::PerformancePrefs {
+    caterm_core::prefs::load_performance_prefs()
 }
 
 #[tauri::command]
-pub async fn trim_memory() -> Result<(), CatermError> {
-    run_blocking(|| {
-        #[cfg(target_os = "windows")]
-        trim_working_set_impl();
-        Ok(())
-    }).await
+pub async fn set_performance_prefs(prefs: caterm_core::prefs::PerformancePrefs) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::prefs::save_performance_prefs(&prefs)).await
 }
 
 #[tauri::command]

@@ -103,8 +103,9 @@ const COMMANDS: &[&str] = &[
     "ai_generate_plan",
     "ai_chat",
     "ai_execute_step",
-    // System / Memory
-    "trim_memory",
+    // System / Performance
+    "get_performance_prefs",
+    "set_performance_prefs",
     // Feedback
     "submit_feedback",
 ];

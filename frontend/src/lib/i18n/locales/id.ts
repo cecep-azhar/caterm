@@ -790,18 +790,15 @@ const id: Dictionary = {
   settings: {
     title: 'Pengaturan',
     subtitle: 'Atur preferensi global, pembaruan sistem, dan keamanan lokal zero-knowledge.',
-    nextFeature: 'Fitur Berikutnya / Nonaktif',
-    perMonth: '/ bln',
-    perUserMonth: '/ pengguna / bln',
     tabs: {
       profile: 'Profil',
       updates: 'Pembaruan',
       ai: 'Asisten AI',
       subscription: 'Langganan',
-      sync: 'Cloud Sync E2EE',
       security: 'Keamanan Vault',
       backup: 'Cadangkan & Pulihkan',
-      shortcuts: 'Pintasan'
+      shortcuts: 'Pintasan',
+      performance: 'Performa'
     },
     profile: {
       localNote: 'Profil lokal — hanya tersimpan di perangkat ini, tanpa akun atau email.',
@@ -830,24 +827,30 @@ const id: Dictionary = {
     },
     subscription: {
       title: 'Paket Langganan',
-      subtitle: 'Kelola paket CATerm dan batas penggunaan Anda.',
-      freePlan: 'Paket Gratis',
+      subtitle: 'Semua yang berjalan di perangkat ini gratis selamanya. Pro menambahkan fitur yang butuh server Fathforce.',
+      freePlan: 'Community (Gratis)',
       current: 'Saat ini',
-      freeBody: 'Host & snippet tanpa batas, 100% lokal, enkripsi zero-knowledge.',
-      proPlan: 'Paket Pro',
-      proBody: 'Host & snippet tanpa batas, AI Agent CATerm, dukungan prioritas, dan kolaborasi tim.',
-      proThen: 'lalu $3/bln, +$1/anggota tim',
-      upgrade: 'Upgrade ke Pro ($1/bln, lalu $3, +$1/tim)',
+      freeBody: 'SSH, SFTP, vault lokal terenkripsi, monitoring, port forwarding, log audit, backup, dan AI dengan API key sendiri — gratis selamanya.',
+      proPlan: 'CATerm Pro',
+      introBadge: 'DISKON {{percent}}% — {{months}} bulan pertama',
+      monthly: 'Bulanan',
+      yearly: 'Tahunan',
+      saveYearly: 'Hemat {{percent}}%',
+      perMonth: '/bulan',
+      perYear: '/tahun',
+      monthlyThen: 'untuk {{months}} bulan pertama, lalu {{price}}/bulan',
+      yearlyThen: 'untuk tahun pertama (≈{{perMonth}}/bulan), lalu {{price}}/tahun',
+      featureSync: 'Cloud Sync E2EE hingga {{devices}} perangkat pribadi Anda',
+      featureAi: 'AI Ops Copilot hosted — {{requests}} request/bulan, tanpa API key sendiri',
+      featureTeam: 'Ajak hingga {{extra}} rekan kerja, gratis ({{members}} orang per akun)',
+      featureLogs: 'Log sesi dan snippet tersinkron ke cloud',
+      featureCommunity: 'Semua fitur Community',
+      startTrial: 'Mulai Trial {{days}} Hari',
+      comingSoon: 'Segera hadir',
+      subscribe: 'Berlangganan',
+      trialNote: 'Trial tanpa kartu kredit. Kuota AI dipakai bersama oleh semua anggota akun.',
       supportTitle: 'Dukung Pengembangan Terbuka Independen',
       supportBody: 'CATerm gratis dan lokal. Donasi membantu pengembangan tetap aktif.'
-    },
-    sync: {
-      title: 'Cloud Sync E2EE (Terenkripsi End-to-End)',
-      subtitle: 'Cadangan remote dan sinkronisasi lintas perangkat zero-knowledge. Kunci vault tidak pernah meninggalkan perangkat Anda.',
-      personalTitle: 'Cloud Sync Pribadi',
-      personalBody: 'Cadangan terenkripsi untuk hingga 5 perangkat dengan derivasi kunci lokal.',
-      teamTitle: 'Sync Tim & Organisasi',
-      teamBody: 'Vault tim bersama, jejak audit, dan kontrol akses multi-pengguna.'
     },
     security: {
       title: 'Konfigurasi Vault Zero-Knowledge',
@@ -904,6 +907,22 @@ const id: Dictionary = {
       commandPalette: 'Palet perintah',
       newSession: 'Sesi baru',
       switchToTab: 'Pindah ke Tab {{n}}'
+    },
+    performance: {
+      title: 'Performa',
+      subtitle: 'Cara CATerm menyeimbangkan memori, CPU, dan kelancaran di perangkat ini.',
+      backgroundTitle: 'Hemat memori otomatis di latar belakang',
+      backgroundBody: 'Saat CATerm diminimize, atau dibiarkan di latar belakang selama 30 detik, mesin tampilannya diminta melepas cache dan mengecil. Semuanya kembali normal begitu Anda kembali ke CATerm — sesi SSH tetap berjalan selama itu.',
+      alwaysOn: 'Selalu aktif',
+      gpuTitle: 'Akselerasi GPU',
+      gpuBody: 'Memakai kartu grafis untuk menggambar antarmuka dan terminal. Mematikannya menghemat memori, tapi CPU bekerja lebih keras dan scroll terminal yang ramai bisa terasa kurang mulus.',
+      recommended: 'Disarankan: aktif',
+      restartNote: 'Berlaku setelah CATerm dimulai ulang.',
+      restartTitle: 'Perlu mulai ulang',
+      restartBody: 'Pengaturan GPU berlaku setelah mulai ulang. Mulai ulang CATerm sekarang? Sesi SSH yang terbuka akan ditutup.',
+      restartNow: 'Mulai ulang sekarang',
+      later: 'Nanti',
+      saveFailed: 'Gagal menyimpan pengaturan performa: {{error}}'
     }
   },
   promptStudio: {

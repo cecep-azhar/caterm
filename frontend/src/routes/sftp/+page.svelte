@@ -32,7 +32,7 @@
     type LocalFileEntry
   } from '$lib/api/local_fs';
   import { listHosts, saveHost, type HostRecord, type ConnectionProtocol } from '$lib/api/hosts';
-  import RemoteFileEditor from '$lib/components/RemoteFileEditor.svelte';
+  import type RemoteFileEditorComponent from '$lib/components/RemoteFileEditor.svelte';
   import DirectorySync from '$lib/components/DirectorySync.svelte';
   import PageContainer from '$lib/components/PageContainer.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
@@ -739,10 +739,17 @@
     }
   }
 
+  // CodeMirror (~650 KB with its language packs) loads the first time a file is opened,
+  // not with the page — most visits to Files never open the editor.
+  let RemoteFileEditor = $state<typeof RemoteFileEditorComponent | null>(null);
+
   async function openEditorModal() {
     const isLocal = activePane === 'local';
     const target = isLocal ? localLastSelected : remoteLastSelected;
     if (!target || target.is_dir) return;
+    if (!RemoteFileEditor) {
+      import('$lib/components/RemoteFileEditor.svelte').then((mod) => (RemoteFileEditor = mod.default));
+    }
 
     editorItem = { pane: isLocal ? 'local' : 'remote', path: target.path, name: target.name };
     showEditorModal = true;
@@ -1592,14 +1599,18 @@
       </div>
 
       <div class="flex-1 bg-neutral-50 dark:bg-[#12161b] relative overflow-hidden flex flex-col">
-        <RemoteFileEditor
-          bind:content={editorContent}
-          filename={editorItem.name}
-          pane={editorItem.pane}
-          onSave={saveEditorFile}
-          saving={isEditorSaving}
-          loading={isEditorLoading}
-        />
+        {#if RemoteFileEditor}
+          <RemoteFileEditor
+            bind:content={editorContent}
+            filename={editorItem.name}
+            pane={editorItem.pane}
+            onSave={saveEditorFile}
+            saving={isEditorSaving}
+            loading={isEditorLoading}
+          />
+        {:else}
+          <div class="flex-1 flex items-center justify-center text-xs text-neutral-500">{t('editor.loading')}</div>
+        {/if}
       </div>
     </div>
   </div>

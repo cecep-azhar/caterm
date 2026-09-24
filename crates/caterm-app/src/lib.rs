@@ -23,6 +23,7 @@
 )]
 
 mod commands;
+mod window;
 
 use serde::Serialize;
 use tauri::Emitter;
@@ -90,6 +91,7 @@ pub fn run_with_start(start: std::time::Instant) {
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         .setup(move |app| {
+            window::create_main_window(app)?;
             install_ssh_event_bridge(app.handle());
 
             // Desktop only: the updater has no mobile implementation (see Dockerfile.android).
@@ -198,7 +200,8 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::window_close,
             commands::window_start_dragging,
             commands::open_external_url,
-            commands::trim_memory,
+            commands::get_performance_prefs,
+            commands::set_performance_prefs,
             commands::submit_feedback,
         ])
         .run(tauri::generate_context!())

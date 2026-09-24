@@ -32,12 +32,10 @@ tauri-plugin-updater = "2"
 
 [target.'cfg(windows)'.dependencies]
 ssh2 = "0.9.6"
-windows-sys = { version = "0.59", features = [
-    "Win32_Foundation",
-    "Win32_System_ProcessStatus",
-    "Win32_System_Threading",
-    "Win32_System_Diagnostics_ToolHelp",
-] }
+# Same versions Tauri/wry already link (webview2-com 0.38 on windows 0.61), so no second
+# copy of the bindings ends up in the binary. Used to set WebView2's memory target level.
+webview2-com = "0.38"
+windows-core = "0.61"
 
 [target.'cfg(not(windows))'.dependencies]
 ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }

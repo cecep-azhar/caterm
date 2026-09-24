@@ -6,13 +6,6 @@
   import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
   import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
   import { oneDark } from '@codemirror/theme-one-dark';
-  import { javascript } from '@codemirror/lang-javascript';
-  import { json } from '@codemirror/lang-json';
-  import { html } from '@codemirror/lang-html';
-  import { css } from '@codemirror/lang-css';
-  import { python } from '@codemirror/lang-python';
-  import { rust } from '@codemirror/lang-rust';
-  import { markdown } from '@codemirror/lang-markdown';
   import { isDark } from '$lib/stores/theme.svelte';
 
   // Props
@@ -57,41 +50,45 @@
     prevSaving = saving;
   });
 
-  function getLanguage(name: string): Extension {
+  // Only the grammar for the file being opened is downloaded — opening a .py file no longer
+  // pulls in the HTML, CSS, Rust, Markdown and JavaScript parsers as well.
+  async function loadLanguage(name: string): Promise<Extension> {
     const ext = name.split('.').pop()?.toLowerCase() ?? '';
     switch (ext) {
       case 'js':
       case 'mjs':
       case 'cjs':
-        return javascript();
+        return (await import('@codemirror/lang-javascript')).javascript();
       case 'ts':
       case 'tsx':
-        return javascript({ typescript: true });
+        return (await import('@codemirror/lang-javascript')).javascript({ typescript: true });
       case 'jsx':
-        return javascript({ jsx: true });
+        return (await import('@codemirror/lang-javascript')).javascript({ jsx: true });
       case 'json':
       case 'jsonc':
-        return json();
+        return (await import('@codemirror/lang-json')).json();
       case 'html':
       case 'htm':
       case 'svelte':
-        return html();
+        return (await import('@codemirror/lang-html')).html();
       case 'css':
       case 'pcss':
       case 'scss':
-        return css();
+        return (await import('@codemirror/lang-css')).css();
       case 'py':
-        return python();
+        return (await import('@codemirror/lang-python')).python();
       case 'rs':
-        return rust();
+        return (await import('@codemirror/lang-rust')).rust();
       case 'md':
       case 'mdx':
       case 'markdown':
-        return markdown();
+        return (await import('@codemirror/lang-markdown')).markdown();
       default:
         return [];
     }
   }
+
+  let language: Extension = [];
 
   let editorContainer: HTMLDivElement;
   let view: EditorView | null = null;
@@ -103,7 +100,7 @@
       history(),
       bracketMatching(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      getLanguage(filename),
+      language,
       dark ? oneDark : [],
       keymap.of([
         ...defaultKeymap,
@@ -134,8 +131,9 @@
     ];
   }
 
-  function initEditor() {
-    if (!editorContainer) return;
+  async function initEditor() {
+    language = await loadLanguage(filename);
+    if (!editorContainer) return; // unmounted while the grammar was loading
     if (view) { view.destroy(); view = null; }
 
     const state = EditorState.create({

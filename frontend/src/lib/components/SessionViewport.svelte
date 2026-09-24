@@ -2,7 +2,7 @@
   import { t } from '$lib/i18n/index.svelte';
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import TerminalPane from '$lib/components/TerminalPane.svelte';
+  import type TerminalPaneComponent from '$lib/components/TerminalPane.svelte';
   import SessionFileManager from '$lib/components/SessionFileManager.svelte';
   import { listHosts } from '$lib/api/hosts';
   import { getTabs, openTab, closeTab, tabLabel, LOCAL_HOST_ID, localTerminalHost } from '$lib/stores/sessionTabs.svelte';
@@ -64,6 +64,16 @@
   });
 
   const tabs = $derived(getTabs());
+
+  // xterm and the terminal pane (~300 KB of JS) load on first use instead of at startup: the
+  // viewport lives in the layout, so a static import would ship xterm to every user who
+  // never opens a session. Once loaded it stays loaded for later tabs.
+  let TerminalPane = $state<typeof TerminalPaneComponent | null>(null);
+  $effect(() => {
+    if (tabs.length > 0 && !TerminalPane) {
+      import('$lib/components/TerminalPane.svelte').then((mod) => (TerminalPane = mod.default));
+    }
+  });
 
   $effect(() => {
     if (tabs.length > 0 && (!view.selectedTabId || !tabs.some((tab) => tab.id === view.selectedTabId))) {
@@ -136,6 +146,7 @@
             <div class={containerClass}>
               {#each tabs as tab (tab.id)}
                 <div class={paneClass(tab.id)}>
+                  {#if TerminalPane}
                   <TerminalPane
                     host={tab.host}
                     label={tabLabel(tab)}
@@ -144,6 +155,7 @@
                     onSplitDown={effectiveLayout === 1 && tabs.length > 1 ? () => setLayout(2) : undefined}
                     onClose={() => close(tab.id)}
                   />
+                  {/if}
                 </div>
               {/each}
             </div>

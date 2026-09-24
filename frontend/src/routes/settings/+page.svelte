@@ -10,8 +10,11 @@
   import { relaunch } from '@tauri-apps/plugin-process';
   import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
   import { getUpdater, checkForUpdates, installUpdate } from '$lib/stores/updater.svelte';
-  import { APP_VERSION, releaseNotesUrl } from '$lib/appInfo';
+  import { APP_VERSION, releaseNotesUrl, PRICING_URL } from '$lib/appInfo';
+  import { PRO_PRICING, formatUsd, type BillingInterval } from '$lib/pro/pricing';
+  import { openExternalUrl } from '$lib/utils/url';
   import { errorText } from '$lib/errors';
+  import { getPerformancePrefs, setPerformancePrefs } from '$lib/api/performance';
   import { t } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
@@ -23,8 +26,16 @@
   const LABEL = `${LABEL_BASE} mb-1`;
   const INPUT = 'w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500';
   const EYE_BUTTON = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors p-1';
-  const SOON_BADGE = 'text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded shrink-0';
-  const SOON_BUTTON = 'mt-4 w-full py-2 bg-neutral-200 dark:bg-neutral-800 text-neutral-500 text-xs font-medium rounded cursor-not-allowed';
+
+  // Subscription tab
+  let billing = $state<BillingInterval>('yearly');
+  const proFeatures = $derived([
+    t('settings.subscription.featureSync', { devices: PRO_PRICING.syncDevices }),
+    t('settings.subscription.featureAi', { requests: PRO_PRICING.aiRequestsPerMonth }),
+    t('settings.subscription.featureTeam', { extra: PRO_PRICING.maxMembers - 1, members: PRO_PRICING.maxMembers }),
+    t('settings.subscription.featureLogs'),
+    t('settings.subscription.featureCommunity')
+  ]);
 
   const SHORTCUT_GROUPS: { title: string; items: { label: string; keys: string; vars?: Record<string, number> }[] }[] = [
     { title: 'global', items: [{ label: 'commandPalette', keys: 'Ctrl + K' }] },
@@ -35,7 +46,7 @@
     }
   ];
 
-  const TABS = ['profile', 'updates', 'ai', 'subscription', 'sync', 'security', 'backup', 'shortcuts'] as const;
+  const TABS = ['profile', 'updates', 'ai', 'subscription', 'security', 'backup', 'performance', 'shortcuts'] as const;
   type SettingsTab = (typeof TABS)[number];
   // `?tab=` lets the profile menu deep-link straight to a tab.
   const requestedTab = page.url.searchParams.get('tab') ?? '';
@@ -74,7 +85,36 @@
       const stored = localStorage.getItem('caterm_max_audit_records');
       if (stored) maxAuditRecords = parseInt(stored, 10) || 1000;
     } catch {}
+    getPerformancePrefs()
+      .then((prefs) => (gpuAcceleration = prefs.gpuAcceleration))
+      .catch(() => {}); // browser preview: no backend, keep the default
   });
+
+  // Performance: GPU on/off is read when the window is created, so it needs a restart.
+  let gpuAcceleration = $state(true);
+  let isSavingPerformance = $state(false);
+
+  async function toggleGpuAcceleration() {
+    const next = !gpuAcceleration;
+    isSavingPerformance = true;
+    try {
+      await setPerformancePrefs({ gpuAcceleration: next });
+      gpuAcceleration = next;
+    } catch (err) {
+      showToast(t('settings.performance.saveFailed', { error: errorText(err) }), 'error');
+      return;
+    } finally {
+      isSavingPerformance = false;
+    }
+    const restart = await confirmModal(
+      t('settings.performance.restartBody'),
+      t('settings.performance.restartTitle'),
+      false,
+      t('settings.performance.restartNow'),
+      t('settings.performance.later')
+    );
+    if (restart) await relaunch();
+  }
 
   function handleSaveAuditSettings(e: Event) {
     e.preventDefault();
@@ -326,33 +366,82 @@
         <p class="{MUTED} text-sm mt-1">{t('settings.subscription.subtitle')}</p>
       </div>
 
-      <div class="{SUBCARD} flex items-center justify-between">
-        <div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <!-- Community: what everyone has today -->
+        <div class="{SUBCARD} space-y-2">
           <div class="flex items-center gap-2">
             <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.subscription.freePlan')}</span>
-            <span class="text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 rounded">{t('settings.subscription.current')}</span>
+            <span class="text-xs bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 rounded">{t('settings.subscription.current')}</span>
           </div>
-          <p class="{MUTED} text-xs mt-2">{t('settings.subscription.freeBody')}</p>
+          <div class="text-2xl font-bold text-neutral-900 dark:text-white">$0</div>
+          <p class="{MUTED} text-xs leading-relaxed">{t('settings.subscription.freeBody')}</p>
         </div>
-      </div>
 
-      <div class="border border-sky-500/30 rounded-lg p-5 bg-neutral-50 dark:bg-neutral-950 flex flex-col gap-4 opacity-90 hidden">
-        <div class="flex justify-between items-start">
+        <!-- Pro -->
+        <div class="rounded-lg border-2 border-sky-500/50 bg-sky-50/60 dark:bg-sky-950/20 p-5 space-y-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.subscription.proPlan')}</span>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
+              {t('settings.subscription.introBadge', { percent: PRO_PRICING.introDiscountPercent, months: PRO_PRICING.introMonths })}
+            </span>
+          </div>
+
+          <div class="inline-flex p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs" role="group">
+            {#each ['monthly', 'yearly'] as const as interval (interval)}
+              <button
+                type="button"
+                aria-pressed={billing === interval}
+                onclick={() => (billing = interval)}
+                class="px-3 py-1 rounded-md font-medium transition-colors {billing === interval ? 'bg-sky-600 text-white' : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white'}"
+              >
+                {t(`settings.subscription.${interval}`)}
+                {#if interval === 'yearly'}
+                  <span class="ml-1 text-[10px] font-semibold {billing === 'yearly' ? 'text-sky-100' : 'text-emerald-600 dark:text-emerald-400'}">{t('settings.subscription.saveYearly', { percent: PRO_PRICING.yearlyDiscountPercent })}</span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+
           <div>
-            <div class="flex items-center gap-2">
-              <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.subscription.proPlan')}</span>
-              <span class={SOON_BADGE}>{t('settings.nextFeature')}</span>
+            <div class="flex items-baseline gap-2">
+              <span class="text-sm text-neutral-400 line-through">{formatUsd(PRO_PRICING[billing].list)}</span>
+              <span class="text-3xl font-bold text-neutral-900 dark:text-white">{formatUsd(PRO_PRICING[billing].intro)}</span>
+              <span class="text-sm text-neutral-500">{billing === 'monthly' ? t('settings.subscription.perMonth') : t('settings.subscription.perYear')}</span>
             </div>
-            <p class="{MUTED} text-xs mt-2">{t('settings.subscription.proBody')}</p>
+            <p class="text-xs {MUTED} mt-1">
+              {#if billing === 'monthly'}
+                {t('settings.subscription.monthlyThen', { months: PRO_PRICING.introMonths, price: formatUsd(PRO_PRICING.monthly.list) })}
+              {:else}
+                {t('settings.subscription.yearlyThen', { perMonth: formatUsd(PRO_PRICING.yearly.intro / 12), price: formatUsd(PRO_PRICING.yearly.list) })}
+              {/if}
+            </p>
           </div>
-          <div class="text-right shrink-0">
-            <div class="text-2xl font-bold text-neutral-900 dark:text-white">$1 <span class="text-sm font-normal text-neutral-500">{t('settings.perMonth')}</span></div>
-            <p class="text-neutral-500 text-xs">{t('settings.subscription.proThen')}</p>
+
+          <ul class="space-y-1.5 text-xs text-neutral-700 dark:text-neutral-300">
+            {#each proFeatures as feature (feature)}
+              <li class="flex items-start gap-2">
+                <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <span>{feature}</span>
+              </li>
+            {/each}
+          </ul>
+
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button disabled class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/40 text-sky-700/70 dark:text-sky-300/70 cursor-not-allowed" title={t('settings.subscription.comingSoon')}>
+              {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
+              <span class="block text-[10px] font-normal">{t('settings.subscription.comingSoon')}</span>
+            </button>
+            <button
+              type="button"
+              onclick={() => openExternalUrl(PRICING_URL)}
+              class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors"
+            >
+              {t('settings.subscription.subscribe')}
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            </button>
           </div>
+          <p class="text-[11px] text-neutral-500">{t('settings.subscription.trialNote')}</p>
         </div>
-        <button disabled class="w-full py-2.5 bg-sky-600/20 dark:bg-sky-600/30 text-sky-700/60 dark:text-sky-200/60 text-sm font-semibold rounded-md cursor-not-allowed border border-sky-500/20">
-          {t('settings.subscription.upgrade')}
-        </button>
       </div>
 
       <div class="pt-4 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-4">
@@ -368,45 +457,6 @@
         >
           <span>{t('contribution.donateVia')}</span>
         </a>
-      </div>
-    </div>
-  {:else if activeTab === 'sync'}
-    <div class="{CARD} space-y-6">
-      <div>
-        <h2 class="text-lg font-semibold text-neutral-900 dark:text-white">{t('settings.sync.title')}</h2>
-        <p class="{MUTED} text-sm mt-1">{t('settings.sync.subtitle')}</p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <!-- Personal Tier Placeholder -->
-        <div class="{SUBCARD} flex flex-col justify-between opacity-75">
-          <div>
-            <div class="flex justify-between items-center gap-2">
-              <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.sync.personalTitle')}</span>
-              <span class={SOON_BADGE}>{t('settings.nextFeature')}</span>
-            </div>
-            <div class="text-2xl font-bold text-neutral-900 dark:text-white mt-3">$1 <span class="text-sm font-normal text-neutral-500">{t('settings.perMonth')}</span></div>
-            <p class="{MUTED} text-xs mt-2">{t('settings.sync.personalBody')}</p>
-          </div>
-          <button disabled class={SOON_BUTTON}>
-            {t('common.comingSoon')}
-          </button>
-        </div>
-
-        <!-- Team Tier Placeholder -->
-        <div class="{SUBCARD} flex flex-col justify-between opacity-75">
-          <div>
-            <div class="flex justify-between items-center gap-2">
-              <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.sync.teamTitle')}</span>
-              <span class={SOON_BADGE}>{t('settings.nextFeature')}</span>
-            </div>
-            <div class="text-2xl font-bold text-neutral-900 dark:text-white mt-3">$1 <span class="text-sm font-normal text-neutral-500">{t('settings.perUserMonth')}</span></div>
-            <p class="{MUTED} text-xs mt-2">{t('settings.sync.teamBody')}</p>
-          </div>
-          <button disabled class={SOON_BUTTON}>
-            {t('common.comingSoon')}
-          </button>
-        </div>
       </div>
     </div>
   {:else if activeTab === 'security'}
@@ -580,6 +630,40 @@
             {t('settings.backup.restoreButton')}
           </button>
         </form>
+      </div>
+    </div>
+  {:else if activeTab === 'performance'}
+    <div class="{CARD} space-y-6">
+      <div>
+        <h2 class="text-lg font-semibold text-neutral-900 dark:text-white">{t('settings.performance.title')}</h2>
+        <p class="{MUTED} text-sm mt-1">{t('settings.performance.subtitle')}</p>
+      </div>
+
+      <div class="{SUBCARD} flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.backgroundTitle')}</p>
+          <p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.backgroundBody')}</p>
+        </div>
+        <span class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">{t('settings.performance.alwaysOn')}</span>
+      </div>
+
+      <div class="{SUBCARD} flex items-start justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.gpuTitle')}</p>
+          <p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.gpuBody')}</p>
+          <p class="text-[11px] text-neutral-500 mt-2">{t('settings.performance.recommended')} · {t('settings.performance.restartNote')}</p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={gpuAcceleration}
+          aria-label={t('settings.performance.gpuTitle')}
+          disabled={isSavingPerformance}
+          onclick={toggleGpuAcceleration}
+          class="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 {gpuAcceleration ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'}"
+        >
+          <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {gpuAcceleration ? 'translate-x-5' : ''}"></span>
+        </button>
       </div>
     </div>
   {:else if activeTab === 'shortcuts'}

@@ -109,12 +109,22 @@
   let currentQuote = QUOTES[0];
 
   onMount(async () => {
-    currentQuote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
-    try {
-      isSetup = !(await isVaultInitialized());
-    } catch {
-      isSetup = true; // Fallback to setup if cannot determine
-    }
+  	currentQuote = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+  	try {
+  		if (appWindow) {
+  			const isMax = await appWindow.isMaximized();
+  			if (!isMax) {
+  				await appWindow.maximize();
+  			}
+  		}
+  	} catch (e) {
+  		console.warn('Failed to maximize on mount:', e);
+  	}
+  	try {
+  		isSetup = !(await isVaultInitialized());
+  	} catch {
+  		isSetup = true; // Fallback to setup if cannot determine
+  	}
   });
 
   async function handleUnlock() {
@@ -234,54 +244,54 @@
 
   <!-- Left Panel: Brand & Quote -->
   <div
-    data-tauri-drag-region
-    class="hidden lg:flex flex-1 flex-col justify-between p-12 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800/60 relative overflow-hidden"
-    onmousedown={startDragging}
+  	data-tauri-drag-region
+  	class="hidden lg:flex w-3/4 flex-col justify-between p-12 lg:p-16 xl:p-20 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800/60 relative overflow-hidden shrink-0"
+  	onmousedown={startDragging}
   >
-    <!-- SkyBlue Grid Flow Animation to CATerm Logo -->
-    <GridFlowBackground targetX={64} targetY={64} count={17} />
+  	<!-- Sky Blue Grid Flow Animation & CATerm Logo -->
+  	<GridFlowBackground targetX={64} targetY={64} count={17} />
 
-    <div class="relative z-10 flex items-center gap-3">
-      <Logo size={40} mode="brand" />
-      <div>
-        <h1 class="text-xl font-bold tracking-wider text-neutral-900 dark:text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 border border-sky-500/30">v{APP_VERSION}</span></h1>
-        <p class="text-xs text-neutral-500 dark:text-neutral-400">{t('lock.tagline')}</p>
-      </div>
-    </div>
+  	<div class="relative z-10 flex items-center gap-3">
+  		<Logo size={40} mode="brand" />
+  		<div>
+  			<h1 class="text-xl font-bold tracking-wider text-neutral-900 dark:text-white">CATerm <span class="text-xs px-2 py-0.5 rounded bg-sky-500/10 dark:bg-sky-500/20 text-sky-700 dark:text-sky-400 border border-sky-500/30">v{APP_VERSION}</span></h1>
+  			<p class="text-xs text-neutral-500 dark:text-neutral-400">{t('lock.tagline')}</p>
+  		</div>
+  	</div>
 
-    <!-- Quote Container -->
-    <div class="relative z-10 my-auto max-w-lg">
-      <div class="mb-4 text-sky-500 dark:text-sky-400">
-        <svg class="w-8 h-8 opacity-60" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
-      </div>
-      <blockquote class="text-2xl font-light text-neutral-700 dark:text-neutral-200 leading-relaxed italic">
-        "{t(`lock.quotes.${currentQuote.key}`)}"
-      </blockquote>
-      <p class="mt-4 text-sm font-semibold text-sky-600 dark:text-sky-400">— {currentQuote.author}</p>
+  	<!-- Quote Container -->
+  	<div class="relative z-10 my-auto max-w-2xl xl:max-w-3xl">
+  		<div class="mb-4 text-sky-500 dark:text-sky-400">
+  			<svg class="w-8 h-8 opacity-60" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21v-7.391c0-5.704 3.731-9.578 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.579 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/></svg>
+  		</div>
+  		<blockquote class="text-2xl xl:text-3xl font-light text-neutral-700 dark:text-neutral-200 leading-relaxed italic">
+  			"{t(`lock.quotes.${currentQuote.key}`)}"
+  		</blockquote>
+  		<p class="mt-4 text-sm font-semibold text-sky-600 dark:text-sky-400">— {currentQuote.author}</p>
 
-      <div class="mt-8 p-4 rounded-xl bg-neutral-50/90 dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 space-y-2">
-        <div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
-          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-          {t('lock.zkTitle')}
-        </div>
-        <p>{t('lock.zkBody')}</p>
-      </div>
-    </div>
+  		<div class="mt-8 p-5 rounded-xl bg-neutral-50/90 dark:bg-neutral-900/80 border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 space-y-2">
+  			<div class="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-medium">
+  				<svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+  				{t('lock.zkTitle')}
+  			</div>
+  			<p>{t('lock.zkBody')}</p>
+  		</div>
+  	</div>
 
-    <!-- Left Panel Footer -->
-    <div class="relative z-10 flex items-center justify-between text-xs text-neutral-500">
-      <span>{t('lock.zkIdentity')}</span>
-      <span class="font-mono text-neutral-400 dark:text-neutral-600">v{APP_VERSION}</span>
-    </div>
+  	<!-- Left Panel Footer -->
+  	<div class="relative z-10 flex items-center justify-between text-xs text-neutral-500">
+  		<span>{t('lock.zkIdentity')}</span>
+  		<span class="font-mono text-neutral-400 dark:text-neutral-600">v{APP_VERSION}</span>
+  	</div>
   </div>
 
   <!-- Right Panel: Master Password Input Form -->
   <div
-    data-tauri-drag-region
-    class="flex-1 flex flex-col justify-center items-center p-8 sm:p-16 bg-neutral-50 dark:bg-[#0a0a0a]"
-    onmousedown={startDragging}
+  	data-tauri-drag-region
+  	class="w-full lg:w-1/4 flex flex-col justify-center items-center p-6 sm:p-10 xl:p-12 bg-neutral-50 dark:bg-[#0a0a0a] relative z-10 shrink-0"
+  	onmousedown={startDragging}
   >
-    <div class="w-full max-w-md space-y-8 no-drag">
+  	<div class="w-full max-w-sm space-y-8 no-drag">
       <div class="text-center">
         {#if isSetup}
           <div class="w-16 h-16 rounded-full bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center justify-center mx-auto mb-4 text-sky-500 dark:text-sky-400">

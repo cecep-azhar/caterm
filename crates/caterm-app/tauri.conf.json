@@ -14,8 +14,10 @@
         "height": 800,
         "minWidth": 800,
         "minHeight": 600,
+        "maximized": true,
         "decorations": false,
-        "additionalBrowserArgs": "--renderer-process-limit=1 --disable-features=Translate,OptimizationHints,MediaRouter --disable-gpu-shader-disk-cache --disk-cache-size=16777216"
+        "create": false,
+        "additionalBrowserArgs": "--renderer-process-limit=1 --in-process-gpu --disable-features=Translate,OptimizationHints,MediaRouter --disable-gpu-shader-disk-cache --disk-cache-size=16777216"
       }
     ],
     "security": {

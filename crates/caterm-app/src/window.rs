@@ -1,0 +1,110 @@
+//! Main window creation and WebView2 memory governance.
+//!
+//! The window is built here instead of by Tauri (`"create": false` in tauri.conf.json)
+//! because whether the WebView gets GPU acceleration is a user preference that has to be
+//! known before the WebView exists — Chromium switches cannot change afterwards.
+
+use tauri::WebviewWindow;
+
+/// Appended to the configured browser args when the user turned GPU acceleration off in
+/// Settings > Performance: software rendering, less memory, more CPU.
+const NO_GPU_ARGS: &str = "--disable-gpu --disable-gpu-compositing";
+
+pub fn create_main_window(app: &tauri::App) -> tauri::Result<WebviewWindow> {
+    let config = app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .cloned()
+        .ok_or(tauri::Error::WindowNotFound)?;
+
+    let mut builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
+    if !caterm_core::prefs::load_performance_prefs().gpu_acceleration {
+        let base = config.additional_browser_args.clone().unwrap_or_default();
+        builder = builder.additional_browser_args(&format!("{base} {NO_GPU_ARGS}"));
+    }
+
+    let window = builder.build()?;
+    memory::install(&window);
+    Ok(window)
+}
+
+/// Tells WebView2 to shrink (drop caches, compact the heap) while CATerm is in the
+/// background, and to go back to normal the moment it is in front again. This is the
+/// supported way to lower WebView2's footprint; it reaches the renderer and GPU processes,
+/// which is where most of the memory is — unlike trimming working sets from the outside.
+#[cfg(windows)]
+mod memory {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tauri::{WebviewWindow, WindowEvent};
+
+    /// Visible but unfocused for this long counts as "in the background". Minimizing is
+    /// immediate. SSH sessions keep running either way — this only trims caches.
+    const BACKGROUND_AFTER: Duration = Duration::from_secs(30);
+
+    fn set_low_memory(window: &WebviewWindow, low: bool) {
+        let _ = window.with_webview(move |webview| {
+            use webview2_com::Microsoft::Web::WebView2::Win32::{
+                ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+                COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+            };
+            use windows_core::Interface;
+
+            // SAFETY: plain COM calls on the live controller Tauri hands us, on the thread
+            // Tauri runs `with_webview` closures on (the UI thread, as WebView2 requires).
+            unsafe {
+                let Ok(core) = webview.controller().CoreWebView2() else {
+                    return;
+                };
+                // ICoreWebView2_19 needs WebView2 Runtime 1.0.2210+. Older runtimes simply
+                // keep the default level — nothing to do, nothing to report.
+                let Ok(core19) = core.cast::<ICoreWebView2_19>() else {
+                    return;
+                };
+                let level = if low {
+                    COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+                } else {
+                    COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+                };
+                let _ = core19.SetMemoryUsageTargetLevel(level);
+            }
+        });
+    }
+
+    pub fn install(window: &WebviewWindow) {
+        // Every focus change bumps the generation, so a pending "go low" timer from an
+        // earlier blur is ignored once the user has come back.
+        let generation = Arc::new(AtomicU64::new(0));
+        let handle = window.clone();
+        window.on_window_event(move |event| match event {
+            WindowEvent::Focused(true) => {
+                generation.fetch_add(1, Ordering::SeqCst);
+                set_low_memory(&handle, false);
+            }
+            WindowEvent::Focused(false) => {
+                let ticket = generation.fetch_add(1, Ordering::SeqCst) + 1;
+                let (generation, window) = (generation.clone(), handle.clone());
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(BACKGROUND_AFTER).await;
+                    if generation.load(Ordering::SeqCst) == ticket {
+                        set_low_memory(&window, true);
+                    }
+                });
+            }
+            WindowEvent::Resized(_) if handle.is_minimized().unwrap_or(false) => {
+                generation.fetch_add(1, Ordering::SeqCst);
+                set_low_memory(&handle, true);
+            }
+            _ => {}
+        });
+    }
+}
+
+#[cfg(not(windows))]
+mod memory {
+    pub fn install(_window: &tauri::WebviewWindow) {}
+}
