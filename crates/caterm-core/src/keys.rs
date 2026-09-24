@@ -115,7 +115,7 @@ pub fn generate_key(input: KeyInput) -> Result<KeyRecord, CatermError> {
         }
         other => {
             return Err(CatermError::Validation(ValidationError::Generic(format!(
-                "Algoritma '{other}' tidak didukung. Gunakan 'Ed25519' atau 'RSA-4096'."
+                "Algorithm '{other}' is not supported. Use 'Ed25519' or 'RSA-4096'."
             ))));
         }
     };

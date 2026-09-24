@@ -52,7 +52,7 @@
       </div>
       <div class="flex justify-between py-2">
         <dt class="text-neutral-500">Built by</dt>
-        <dd class="text-neutral-900 dark:text-neutral-200 font-medium">Fathforce</dd>
+        <dd class="text-neutral-900 dark:text-neutral-200 font-medium">Cecep Azhar</dd>
       </div>
     </dl>
 
@@ -69,8 +69,21 @@
       </p>
     </div>
 
-    <p class="mt-4 text-[11px] text-neutral-400 dark:text-neutral-500">
-      © {new Date().getFullYear()} Cecep Saeful Azhar Hidayat · Fathforce
-    </p>
+    <div class="mt-4 text-[11px] text-neutral-500 dark:text-neutral-400 flex flex-col items-center justify-center gap-1">
+      <div>Copyright 2026 by Cecep Azhar</div>
+      <div class="flex items-center gap-1.5 text-neutral-400 dark:text-neutral-500">
+        <span>Built with Love</span>
+        <svg class="w-3 h-3 text-rose-500 fill-rose-500 inline-block shrink-0" viewBox="0 0 24 24" aria-label="Love">
+          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        </svg>
+        <span>from Indonesia</span>
+        <span class="inline-flex items-center justify-center overflow-hidden rounded-sm border border-neutral-300 dark:border-neutral-700 w-4 h-2.5 shrink-0" title="Indonesia">
+          <svg viewBox="0 0 3 2" class="w-full h-full">
+            <rect width="3" height="1" fill="#e70011"/>
+            <rect y="1" width="3" height="1" fill="#ffffff"/>
+          </svg>
+        </span>
+      </div>
+    </div>
   </div>
 </div>

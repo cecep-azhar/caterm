@@ -18,12 +18,12 @@ const PROXY_URL: &str = "https://caterm.fathforce.com/api/feedback";
 pub fn submit_feedback(rating: i32, content: &str) -> Result<(), CatermError> {
     if !(1..=5).contains(&rating) {
         return Err(CatermError::Io(IoError::Generic(
-            "Rating harus antara 1 dan 5".into(),
+            "Rating must be between 1 and 5".into(),
         )));
     }
     if content.trim().is_empty() {
         return Err(CatermError::Io(IoError::Generic(
-            "Feedback tidak boleh kosong".into(),
+            "Feedback cannot be empty".into(),
         )));
     }
 
@@ -37,13 +37,13 @@ pub fn submit_feedback(rating: i32, content: &str) -> Result<(), CatermError> {
         .post(PROXY_URL)
         .header("Content-Type", "application/json")
         .send_json(&payload)
-        .map_err(|e| CatermError::Io(IoError::Generic(format!("Gagal mengirim feedback: {e}"))))?;
+        .map_err(|e| CatermError::Io(IoError::Generic(format!("Failed to submit feedback: {e}"))))?;
 
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
         let body = resp.body_mut().read_to_string().unwrap_or_default();
         return Err(CatermError::Io(IoError::Generic(format!(
-            "Proxy menolak feedback (HTTP {status}): {body}"
+            "Feedback proxy rejected request (HTTP {status}): {body}"
         ))));
     }
 

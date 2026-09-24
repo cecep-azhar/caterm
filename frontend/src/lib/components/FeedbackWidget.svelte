@@ -24,11 +24,11 @@
   let errorMessage = $state('');
 
   const ratingLabels: Record<number, string> = {
-    1: 'Sangat Buruk',
-    2: 'Kurang',
-    3: 'Cukup',
-    4: 'Bagus',
-    5: 'Sangat Bagus'
+    1: 'Poor',
+    2: 'Fair',
+    3: 'Good',
+    4: 'Very Good',
+    5: 'Excellent'
   };
 
   function storageKey(action: 'submitted' | 'dismissed'): string {
@@ -47,7 +47,7 @@
   async function handleSubmit(event: Event) {
     event.preventDefault();
     if (rating < 1 || rating > 5) {
-      errorMessage = 'Pilih rating bintang 1 sampai 5.';
+      errorMessage = 'Please select a rating between 1 and 5 stars.';
       return;
     }
 
@@ -58,7 +58,7 @@
       // Backend enforces non-empty content
       const effectiveContent = content.trim().length > 0
         ? content.trim()
-        : `${rating} bintang (tanpa catatan)`;
+        : `${rating} stars (no notes)`;
 
       await submitFeedback(rating, effectiveContent);
 
@@ -69,7 +69,7 @@
       }
 
       submitted = true;
-      showToast('Terima kasih! Feedback berhasil dikirim.', 'success');
+      showToast('Thank you! Feedback submitted successfully.', 'success');
       onSubmitted?.();
     } catch (err) {
       const msg = errorText(err);
@@ -88,14 +88,14 @@
   }
 </script>
 
-<div class="bg-neutral-900 border border-neutral-800 rounded-lg p-6 space-y-5 text-neutral-100 relative">
+<div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-6 space-y-5 text-neutral-900 dark:text-neutral-100 relative shadow-sm">
   {#if dismissible}
     <button
       type="button"
       onclick={handleDismiss}
-      class="absolute top-4 right-4 text-neutral-400 hover:text-white p-1 rounded transition-colors"
-      aria-label="Tutup"
-      title="Tutup"
+      class="absolute top-4 right-4 text-neutral-400 hover:text-neutral-700 dark:hover:text-white p-1 rounded transition-colors"
+      aria-label="Close"
+      title="Close"
     >
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -104,24 +104,24 @@
   {/if}
 
   <div>
-    <h3 class="text-lg font-semibold text-white tracking-tight">Kirim Feedback</h3>
-    <p class="text-sm text-neutral-400 mt-1">
-      Bantu kami menyempurnakan CATerm. Berikan penilaian atau laporkan kendala yang Anda alami.
+    <h3 class="text-lg font-semibold text-neutral-900 dark:text-white tracking-tight">Send Feedback</h3>
+    <p class="text-sm text-neutral-600 dark:text-neutral-400 mt-1">
+      Help us improve CATerm. Share your rating or report any issues you encountered.
     </p>
   </div>
 
   {#if submitted}
-    <div class="p-5 bg-emerald-950/40 border border-emerald-800/60 rounded-lg space-y-3">
+    <div class="p-5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-lg space-y-3">
       <div class="flex items-center gap-3">
-        <div class="p-2 bg-emerald-500/10 rounded-full text-emerald-400">
+        <div class="p-2 bg-emerald-500/10 rounded-full text-emerald-600 dark:text-emerald-400">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
           </svg>
         </div>
         <div>
-          <h4 class="text-sm font-semibold text-white">Feedback Terkirim!</h4>
-          <p class="text-xs text-neutral-300 mt-0.5">
-            Terima kasih atas waktu dan masukannya. Feedback Anda sangat berarti untuk pengembangan tim CATerm.
+          <h4 class="text-sm font-semibold text-neutral-900 dark:text-white">Feedback Submitted!</h4>
+          <p class="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5">
+            Thank you for your time and feedback. Your input helps us build a better CATerm.
           </p>
         </div>
       </div>
@@ -129,17 +129,17 @@
         <button
           type="button"
           onclick={handleReset}
-          class="text-xs text-sky-400 hover:text-sky-300 underline font-medium transition-colors"
+          class="text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium transition-colors"
         >
-          Kirim feedback lain
+          Send another feedback
         </button>
         {#if dismissible}
           <button
             type="button"
             onclick={handleDismiss}
-            class="text-xs text-neutral-400 hover:text-neutral-200 font-medium transition-colors"
+            class="text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 font-medium transition-colors"
           >
-            Tutup
+            Close
           </button>
         {/if}
       </div>
@@ -148,24 +148,24 @@
     <form onsubmit={handleSubmit} class="space-y-4">
       <!-- Star Rating -->
       <div class="space-y-1.5">
-        <label for="feedback-stars" class="block text-xs font-medium text-neutral-300 uppercase tracking-wider">
-          Rating Pengalaman
+        <label for="feedback-stars" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+          Experience Rating
         </label>
         <div id="feedback-stars" class="flex items-center gap-2">
-          <div class="flex items-center gap-1" role="radiogroup" aria-label="Rating bintang">
+          <div class="flex items-center gap-1" role="radiogroup" aria-label="Star rating">
             {#each [1, 2, 3, 4, 5] as star}
               <button
                 type="button"
                 role="radio"
                 aria-checked={rating === star}
-                aria-label="{star} dari 5 bintang"
+                aria-label="{star} out of 5 stars"
                 onclick={() => (rating = star)}
                 onmouseenter={() => (hoverRating = star)}
                 onmouseleave={() => (hoverRating = 0)}
-                class="p-1 text-neutral-600 hover:scale-110 transition-transform focus:outline-none focus:ring-1 focus:ring-sky-500 rounded"
+                class="p-1 text-neutral-400 dark:text-neutral-600 hover:scale-110 transition-transform focus:outline-none focus:ring-1 focus:ring-sky-500 rounded"
               >
                 <svg
-                  class="w-7 h-7 transition-colors {(hoverRating || rating) >= star ? 'text-amber-400 fill-amber-400' : 'text-neutral-600'}"
+                  class="w-7 h-7 transition-colors {(hoverRating || rating) >= star ? 'text-amber-400 fill-amber-400' : 'text-neutral-300 dark:text-neutral-700'}"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -180,7 +180,7 @@
               </button>
             {/each}
           </div>
-          <span class="text-xs font-medium text-neutral-400 ml-2">
+          <span class="text-xs font-medium text-neutral-600 dark:text-neutral-400 ml-2">
             {ratingLabels[hoverRating || rating] || ''}
           </span>
         </div>
@@ -188,36 +188,36 @@
 
       <!-- Textarea (Optional) -->
       <div class="space-y-1.5">
-        <label for="feedback-content" class="block text-xs font-medium text-neutral-300 uppercase tracking-wider">
-          Pesan atau Catatan <span class="text-neutral-500 font-normal normal-case">(opsional)</span>
+        <label for="feedback-content" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+          Message or Notes <span class="text-neutral-500 font-normal normal-case">(optional)</span>
         </label>
         <textarea
           id="feedback-content"
           bind:value={content}
           rows="4"
           maxlength="2000"
-          placeholder="Bagikan apa yang Anda suka atau hal apa yang bisa ditingkatkan dari CATerm..."
-          class="w-full px-3 py-2 bg-neutral-950 border border-neutral-800 rounded-md text-sm text-neutral-100 placeholder-neutral-500 focus:outline-none focus:border-sky-500 resize-y"
+          placeholder="Share what you like or what could be improved in CATerm..."
+          class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-md text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500 resize-y"
         ></textarea>
-        <div class="flex justify-between items-center text-xs text-neutral-500">
-          <span>Maksimal 2000 karakter</span>
+        <div class="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400">
+          <span>Maximum 2000 characters</span>
           <span>{content.length} / 2000</span>
         </div>
       </div>
 
       {#if errorMessage}
-        <div class="p-3 bg-red-950/40 border border-red-800/60 rounded text-xs text-red-400">
+        <div class="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 rounded text-xs text-red-600 dark:text-red-400">
           {errorMessage}
         </div>
       {/if}
 
       <!-- Disclosure & Legal Moderation Note -->
-      <div class="p-3 bg-neutral-950/80 border border-neutral-800 rounded text-xs text-neutral-400 flex items-start gap-2">
-        <svg class="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="p-3 bg-neutral-50 dark:bg-neutral-950/80 border border-neutral-200 dark:border-neutral-800 rounded text-xs text-neutral-600 dark:text-neutral-400 flex items-start gap-2">
+        <svg class="w-4 h-4 text-neutral-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <p>
-          Feedback dikirim ke tim CATerm untuk moderasi, mungkin ditampilkan di website (dengan izin).
+          Feedback is sent to the CATerm team for review and may be featured on our website (with permission).
         </p>
       </div>
 
@@ -226,14 +226,14 @@
         <button
           type="submit"
           disabled={isSubmitting}
-          class="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-sm font-medium rounded-md transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+          class="px-5 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white text-sm font-medium rounded-md transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed shadow-sm"
         >
           {#if isSubmitting}
             <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>Mengirim...</span>
+            <span>Sending...</span>
           {:else}
             <span>Send Feedback</span>
           {/if}
@@ -243,9 +243,9 @@
           <button
             type="button"
             onclick={handleDismiss}
-            class="px-4 py-2 text-sm text-neutral-400 hover:text-neutral-200 transition-colors"
+            class="px-4 py-2 text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors"
           >
-            Nanti Saja
+            Maybe later
           </button>
         {/if}
       </div>

@@ -195,7 +195,7 @@
       <button
         onclick={onClose}
         class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-        aria-label="Tutup AI Assistant"
+        aria-label="Close AI Assistant"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -214,7 +214,7 @@
         class="flex-1 min-w-0 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500"
       >
         {#if hosts.length === 0}
-          <option value="">Belum ada host tersimpan</option>
+          <option value="">No saved hosts yet</option>
         {/if}
         {#each hosts as host (host.id)}
           <option value={host.id}>{host.label} ({host.username}@{host.address})</option>
@@ -299,9 +299,9 @@
 
     {#if errorMsg}
       <div class="rounded-lg px-3 py-2 text-xs bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300">
-        <p class="font-semibold mb-0.5">Gagal menghubungi AI</p>
+        <p class="font-semibold mb-0.5">Failed to connect to AI</p>
         <p class="break-words">{errorMsg}</p>
-        <a href="/settings" class="underline mt-1 inline-block">Periksa Settings &gt; AI Assistant</a>
+        <a href="/settings" class="underline mt-1 inline-block">Check Settings &gt; AI Assistant</a>
       </div>
     {/if}
 
@@ -310,9 +310,9 @@
       <div class="rounded-xl border border-violet-300 dark:border-violet-900 bg-violet-50 dark:bg-violet-950/30 p-3 space-y-2">
         <div class="flex items-center justify-between gap-2">
           <h3 class="text-xs font-bold text-violet-800 dark:text-violet-300">
-            Rencana eksekusi ({proposedSteps.length} langkah)
+            Execution plan ({proposedSteps.length} steps)
           </h3>
-          <span class="text-[11px] text-violet-700 dark:text-violet-400">{acceptedCount} dipilih</span>
+          <span class="text-[11px] text-violet-700 dark:text-violet-400">{acceptedCount} selected</span>
         </div>
 
         <ul class="space-y-1.5">
@@ -332,7 +332,7 @@
                     </span>
                     {#if step.is_danger || step.is_sudo}
                       <span class="px-1 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                        {step.is_danger ? 'Berisiko' : 'Sudo'}
+                        {step.is_danger ? 'Risk' : 'Sudo'}
                       </span>
                     {/if}
                   </span>
@@ -354,7 +354,7 @@
                         ? 'text-rose-600 dark:text-rose-400'
                         : 'text-amber-600 dark:text-amber-400'}"
                   >
-                    {runs[i].status === 'running' ? 'Berjalan...' : runs[i].status}
+                    {runs[i].status === 'running' ? 'Running...' : runs[i].status}
                     {#if runs[i].exitCode !== undefined}· exit {runs[i].exitCode}{/if}
                   </span>
                   {#if runs[i].output}

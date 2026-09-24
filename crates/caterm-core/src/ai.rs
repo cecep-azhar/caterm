@@ -218,11 +218,11 @@ fn post_chat_completion(
     let body = response
         .body_mut()
         .read_to_string()
-        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Respons AI tidak terbaca: {e}"))))?;
+        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Failed to read AI response: {e}"))))?;
 
     extract_message_content(&body).ok_or_else(|| {
         CatermError::Ai(AiError::Generic(format!(
-            "Respons AI tidak sesuai format OpenAI chat/completions: {}",
+            "AI response does not match OpenAI chat/completions format: {}",
             body.chars().take(300).collect::<String>()
         )))
     })

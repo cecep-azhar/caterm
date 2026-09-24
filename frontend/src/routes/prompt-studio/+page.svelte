@@ -54,23 +54,23 @@
   const quickPrompts = [
     {
       label: '🚀 Setup Laravel 11 Dev',
-      goal: 'Setup Laptop Ubuntu saya untuk kebutuhan Development Laravel 11 lengkap dengan PHP 8.3, Composer, Node.js 20, dan MySQL Server'
+      goal: 'Setup Ubuntu machine for Laravel 11 development with PHP 8.3, Composer, Node.js 20, and MySQL Server'
     },
     {
       label: '🐳 Install Docker & Compose',
-      goal: 'Install Docker Engine resmi, Docker Compose plugin, dan konfigurasi non-root user group di Ubuntu/Debian'
+      goal: 'Install official Docker Engine, Docker Compose plugin, and configure non-root user group on Ubuntu/Debian'
     },
     {
       label: '📦 Node.js 20 & Fullstack',
-      goal: 'Setup runtime Node.js 20 LTS via NodeSource, npm, pnpm, PM2 process manager, dan Nginx web server'
+      goal: 'Setup Node.js 20 LTS runtime via NodeSource, npm, pnpm, PM2 process manager, and Nginx web server'
     },
     {
       label: '🛡️ Linux Security Hardening',
-      goal: 'Hardening keamanan server Linux: konfigurasi firewall UFW, fail2ban brute-force protection, dan disable SSH password authentication'
+      goal: 'Linux server security hardening: configure UFW firewall, fail2ban brute-force protection, and disable SSH password authentication'
     },
     {
       label: '🐘 PostgreSQL & Redis',
-      goal: 'Install dan konfigurasi database server PostgreSQL 16 dan Redis Server dengan basic service hardening'
+      goal: 'Install and configure PostgreSQL 16 database server and Redis Server with basic service hardening'
     }
   ];
 
@@ -125,13 +125,13 @@
     const lower = goalText.toLowerCase();
     if (lower.includes('laravel')) {
       return {
-        summary: 'Rencana otomatisasi persiapan environment pengembangan Laravel 11 lengkap di Ubuntu dengan PHP 8.3, Composer, MySQL Server, dan Node.js 20 LTS.',
+        summary: 'Automated plan to prepare a full Laravel 11 development environment on Ubuntu with PHP 8.3, Composer, MySQL Server, and Node.js 20 LTS.',
         requirements: ['PHP 8.3', 'Composer', 'MySQL 8.0', 'Node.js 20', 'Git', 'Nginx'],
         steps: [
           {
             step_number: 1,
-            title: 'Update Package Index & Dependensi Dasar',
-            description: 'Memperbarui katalog repositori APT dan memasang dependensi pendukung dasar (curl, git, zip, ca-certificates).',
+            title: 'Update Package Index & Core Dependencies',
+            description: 'Update APT package index and install basic supporting utilities (curl, git, zip, ca-certificates).',
             command: 'sudo apt-get update && sudo apt-get install -y curl zip unzip git software-properties-common ca-certificates apt-transport-https',
             is_sudo: true,
             is_danger: false
@@ -139,7 +139,7 @@
           {
             step_number: 2,
             title: 'Setup Ondrej PHP PPA & Install PHP 8.3',
-            description: 'Menambahkan repositori PPA Ondrej Sury untuk mendapatkan PHP 8.3 dan ekstensi resmi yang dibutuhkan oleh Laravel 11.',
+            description: 'Add Ondrej Sury PPA repository and install PHP 8.3 with extensions required by Laravel 11.',
             command: 'sudo add-apt-repository -y ppa:ondrej/php && sudo apt-get update && sudo apt-get install -y php8.3 php8.3-cli php8.3-common php8.3-fpm php8.3-mysql php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-bcmath php8.3-intl php8.3-gd php8.3-sqlite3',
             is_sudo: true,
             is_danger: false
@@ -147,15 +147,15 @@
           {
             step_number: 3,
             title: 'Install Composer (PHP Package Manager)',
-            description: 'Mengunduh dan memasang Composer secara global ke /usr/local/bin/composer.',
+            description: 'Download and install Composer globally to /usr/local/bin/composer.',
             command: 'curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php && sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer && rm /tmp/composer-setup.php',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Install & Aktifkan MySQL Server',
-            description: 'Memasang database server MySQL dan memastikan servicenya berjalan otomatis saat booting.',
+            title: 'Install & Start MySQL Server',
+            description: 'Install MySQL database server and ensure service starts on boot.',
             command: 'sudo apt-get install -y mysql-server && sudo systemctl enable --now mysql',
             is_sudo: true,
             is_danger: false
@@ -163,15 +163,15 @@
           {
             step_number: 5,
             title: 'Install Node.js 20 LTS via NodeSource',
-            description: 'Memasang Node.js v20 LTS dan npm untuk kebutuhan kompilasi asset frontend (Vite/Tailwind).',
+            description: 'Install Node.js v20 LTS and npm for frontend asset compilation (Vite/Tailwind).',
             command: 'curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 6,
-            title: 'Verifikasi Seluruh Versi Tooling Laravel',
-            description: 'Memeriksa bahwa PHP, Composer, Node.js, npm, dan MySQL telah terpasang dengan benar.',
+            title: 'Verify All Laravel Tooling Versions',
+            description: 'Confirm that PHP, Composer, Node.js, npm, and MySQL are installed correctly.',
             command: 'php -v && composer --version && node -v && npm -v && mysql --version',
             is_sudo: false,
             is_danger: false
@@ -181,13 +181,13 @@
     }
     if (lower.includes('docker')) {
       return {
-        summary: 'Rencana instalasi Docker Engine, containerd, dan Docker Compose Plugin resmi di Ubuntu beserta konfigurasi user permission.',
+        summary: 'Official Docker Engine, containerd, and Docker Compose Plugin installation on Ubuntu with user permission setup.',
         requirements: ['Docker CE', 'Docker Compose v2', 'containerd.io', 'User Permissions'],
         steps: [
           {
             step_number: 1,
-            title: 'Hapus Paket Docker Lama / Konflik',
-            description: 'Membersihkan instalasi Docker usang dari repositori distro bawaan agar tidak menimbulkan konflik dependensi.',
+            title: 'Remove Conflicting Old Docker Packages',
+            description: 'Remove legacy distribution packages to prevent dependency conflicts.',
             command: 'for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove -y $pkg; done || true',
             is_sudo: true,
             is_danger: false
@@ -195,7 +195,7 @@
           {
             step_number: 2,
             title: 'Setup Docker Official GPG Key & APT Repo',
-            description: 'Menambahkan kunci GPG resmi Docker dan mendaftarkan repositori APT stable.',
+            description: 'Add Docker official GPG key and configure the stable APT repository.',
             command: 'sudo apt-get update && sudo apt-get install -y ca-certificates curl && sudo install -m 0755 -d /etc/apt/keyrings && sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && sudo chmod a+r /etc/apt/keyrings/docker.asc && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \\"$VERSION_CODENAME\\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null',
             is_sudo: true,
             is_danger: false
@@ -203,23 +203,23 @@
           {
             step_number: 3,
             title: 'Install Docker CE, CLI & Docker Compose',
-            description: 'Memasang paket Docker Engine, CLI, containerd, dan plugin Docker Compose.',
+            description: 'Install Docker Engine, CLI, containerd, and Docker Compose plugins.',
             command: 'sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Aktifkan Service Docker & Group Permission',
-            description: 'Memastikan daemon Docker berjalan dan menambahkan user aktif ke group docker tanpa perlu sudo.',
+            title: 'Enable Docker Service & Group Permissions',
+            description: 'Enable Docker daemon and append the current user to the docker group.',
             command: 'sudo systemctl enable --now docker && sudo usermod -aG docker $USER',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 5,
-            title: 'Uji Coba Eksekusi Docker & Versi',
-            description: 'Memeriksa instalasi dengan mengecek versi dan menjalankan container test hello-world.',
+            title: 'Verify Docker Installation & Test Container',
+            description: 'Check Docker versions and run hello-world container verification.',
             command: 'docker --version && docker compose version && sudo docker run --rm hello-world',
             is_sudo: true,
             is_danger: false
@@ -229,21 +229,21 @@
     }
     if (lower.includes('node') || lower.includes('fullstack')) {
       return {
-        summary: 'Rencana setup runtime Fullstack JavaScript: Node.js 20 LTS, npm, pnpm, PM2 process manager, dan Nginx web server.',
+        summary: 'Fullstack JavaScript runtime setup: Node.js 20 LTS, npm, pnpm, PM2 process supervisor, and Nginx web server.',
         requirements: ['Node.js 20 LTS', 'npm', 'pnpm', 'PM2', 'Nginx', 'Build Essential'],
         steps: [
           {
             step_number: 1,
-            title: 'Install Compiler & Dependensi Dasar',
-            description: 'Memasang build-essential, python3, curl, dan git untuk kebutuhan kompilasi modul native.',
+            title: 'Install Compiler & Core Dependencies',
+            description: 'Install build-essential, python3, curl, and git for native module builds.',
             command: 'sudo apt-get update && sudo apt-get install -y curl git build-essential',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Daftarkan NodeSource Node.js 20 LTS Repo',
-            description: 'Menambahkan repositori resmi NodeSource untuk rilis Node.js 20 (Iron LTS).',
+            title: 'Configure NodeSource Node.js 20 LTS Repo',
+            description: 'Add official NodeSource repository for Node.js 20 (Iron LTS).',
             command: 'curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -',
             is_sudo: true,
             is_danger: false
@@ -251,31 +251,31 @@
           {
             step_number: 3,
             title: 'Install Node.js & npm',
-            description: 'Memasang paket Node.js terbaru dari repositori NodeSource.',
+            description: 'Install latest Node.js release from NodeSource repository.',
             command: 'sudo apt-get install -y nodejs',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Install Global Tooling: pnpm & PM2',
-            description: 'Memasang package manager modern pnpm dan process supervisor PM2.',
+            title: 'Install Global Tools: pnpm & PM2',
+            description: 'Install modern package manager pnpm and PM2 process supervisor.',
             command: 'sudo npm install -g pnpm pm2',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 5,
-            title: 'Install & Aktifkan Nginx',
-            description: 'Memasang Nginx sebagai reverse proxy untuk aplikasi web Node.js.',
+            title: 'Install & Enable Nginx',
+            description: 'Install Nginx as reverse proxy web server for Node.js applications.',
             command: 'sudo apt-get install -y nginx && sudo systemctl enable --now nginx',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 6,
-            title: 'Verifikasi Instalasi Node.js & Tooling',
-            description: 'Mengecek versi Node.js, npm, pnpm, PM2, dan status Nginx.',
+            title: 'Verify Node.js & Tooling Versions',
+            description: 'Verify versions of Node.js, npm, pnpm, PM2, and Nginx status.',
             command: 'node -v && npm -v && pnpm -v && pm2 -v && nginx -v',
             is_sudo: false,
             is_danger: false
@@ -285,29 +285,29 @@
     }
     if (lower.includes('hardening') || lower.includes('security') || lower.includes('keamanan')) {
       return {
-        summary: 'Rencana hardening keamanan server Linux: konfigurasi firewall UFW, proteksi brute-force fail2ban, SSH key-only enforcement, dan automatic security updates.',
+        summary: 'Linux server security hardening plan: configure UFW firewall, fail2ban brute-force protection, SSH key-only enforcement, and automatic security updates.',
         requirements: ['UFW Firewall', 'Fail2ban', 'SSH Hardening', 'Unattended Upgrades'],
         steps: [
           {
             step_number: 1,
-            title: 'Install Perangkat Keamanan Dasar',
-            description: 'Memasang paket ufw, fail2ban, dan unattended-upgrades untuk pembaruan patch keamanan otomatis.',
+            title: 'Install Essential Security Tools',
+            description: 'Install ufw, fail2ban, and unattended-upgrades packages for automated patch delivery.',
             command: 'sudo apt-get update && sudo apt-get install -y ufw fail2ban unattended-upgrades',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Konfigurasi Kebijakan Firewall UFW',
-            description: 'Mengatur default deny incoming, allow outgoing, dan mengamankan port SSH (22) sebelum mengaktifkan firewall.',
+            title: 'Configure UFW Firewall Policies',
+            description: 'Set default deny incoming, allow outgoing, and permit SSH port (22) before enabling firewall.',
             command: 'sudo ufw default deny incoming && sudo ufw default allow outgoing && sudo ufw allow 22/tcp comment "SSH" && sudo ufw --force enable',
             is_sudo: true,
             is_danger: true
           },
           {
             step_number: 3,
-            title: 'Aktifkan & Konfigurasi Fail2ban Jail',
-            description: 'Mengaktifkan service fail2ban untuk memblokir IP yang melakukan percobaan login SSH berulang kali secara ilegal.',
+            title: 'Enable & Configure Fail2ban Jail',
+            description: 'Activate fail2ban service to block IP addresses with repeated unauthorized SSH login attempts.',
             command: 'sudo systemctl enable --now fail2ban && sudo fail2ban-client status',
             is_sudo: true,
             is_danger: false
@@ -315,15 +315,15 @@
           {
             step_number: 4,
             title: 'Harden SSH Configuration (Disable Root & Password Auth)',
-            description: 'Mematikan login root langsung dan membatasi autentikasi SSH hanya menggunakan SSH Key.',
+            description: 'Disable direct root login and enforce SSH key-based authentication only.',
             command: 'sudo sed -i -E "s/^#?PermitRootLogin.*/PermitRootLogin no/" /etc/ssh/sshd_config && sudo sed -i -E "s/^#?PasswordAuthentication.*/PasswordAuthentication no/" /etc/ssh/sshd_config && (sudo systemctl reload ssh || sudo systemctl reload sshd)',
             is_sudo: true,
             is_danger: true
           },
           {
             step_number: 5,
-            title: 'Aktifkan Pembaruan Keamanan Otomatis',
-            description: 'Mengaktifkan unattended-upgrades untuk mengaplikasikan patch keamanan Linux secara otomatis.',
+            title: 'Enable Automatic Security Updates',
+            description: 'Configure unattended-upgrades to apply security patches automatically.',
             command: 'sudo dpkg-reconfigure -f noninteractive unattended-upgrades && sudo systemctl status unattended-upgrades --no-pager',
             is_sudo: true,
             is_danger: false
@@ -333,37 +333,37 @@
     }
     if (lower.includes('postgres') || lower.includes('redis')) {
       return {
-        summary: 'Rencana instalasi dan konfigurasi database PostgreSQL 16 dan in-memory cache Redis Server di Ubuntu.',
+        summary: 'Installation and configuration plan for PostgreSQL 16 database and Redis in-memory cache on Ubuntu.',
         requirements: ['PostgreSQL 16', 'Postgres Contrib', 'Redis Server', 'Service Configuration'],
         steps: [
           {
             step_number: 1,
-            title: 'Install PostgreSQL 16 & Ekstensi Contrib',
-            description: 'Memperbarui repositori dan memasang server PostgreSQL beserta modul ekstensi pendukung.',
+            title: 'Install PostgreSQL 16 & Contrib Extensions',
+            description: 'Update repository and install PostgreSQL server with auxiliary modules.',
             command: 'sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Install & Konfigurasi Redis In-Memory Cache',
-            description: 'Memasang Redis Server dan memastikan service aktif.',
+            title: 'Install & Configure Redis Server',
+            description: 'Install Redis Server and ensure daemon is running.',
             command: 'sudo apt-get install -y redis-server && sudo systemctl enable --now redis-server',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 3,
-            title: 'Pastikan Service PostgreSQL Berjalan',
-            description: 'Mengaktifkan service PostgreSQL dan memeriksa konektivitas internal socket.',
+            title: 'Verify PostgreSQL Service & Connectivity',
+            description: 'Enable PostgreSQL service and check socket connectivity.',
             command: 'sudo systemctl enable --now postgresql && sudo -u postgres psql -c "SELECT version();"',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Uji Koneksi & Respons Redis',
-            description: 'Mengirimkan perintah PING ke Redis daemon untuk memverifikasi respons PONG.',
+            title: 'Test Redis Response with Ping',
+            description: 'Send PING command to verify Redis responds with PONG.',
             command: 'redis-cli ping',
             is_sudo: false,
             is_danger: false
@@ -374,29 +374,29 @@
 
     // Generic fallback
     return {
-      summary: `Rencana eksekusi otomatis untuk: "${goalText}". Terdiri dari persiapan dependensi, eksekusi perintah utama, dan verifikasi status.`,
+      summary: `Automated plan for: "${goalText}". Prepares dependencies, executes main commands, and verifies status.`,
       requirements: ['Bash', 'APT Package Manager', 'Systemd'],
       steps: [
         {
           step_number: 1,
-          title: 'Update Katalog Paket Sistem',
-          description: 'Memperbarui cache daftar paket untuk memastikan dependensi terbaru.',
+          title: 'Update Package Catalog',
+          description: 'Update APT package cache to fetch latest dependency versions.',
           command: 'sudo apt-get update',
           is_sudo: true,
           is_danger: false
         },
         {
           step_number: 2,
-          title: `Eksekusi Setup: ${goalText.slice(0, 35)}`,
-          description: `Menjalankan perintah utama terkait permintaan: ${goalText}`,
-          command: `echo "Menjalankan konfigurasi untuk: ${goalText.replace(/"/g, '\\"')}"`,
+          title: `Execute Setup: ${goalText.slice(0, 35)}`,
+          description: `Run configuration commands for: ${goalText}`,
+          command: `echo "Configuring for: ${goalText.replace(/"/g, '\\"')}"`,
           is_sudo: false,
           is_danger: false
         },
         {
           step_number: 3,
-          title: 'Verifikasi Status Sistem & Resource',
-          description: 'Memeriksa kondisi uptime dan status resource host setelah konfigurasi.',
+          title: 'Verify System Status & Resources',
+          description: 'Check uptime and resource status after configuration.',
           command: 'uptime && free -h && df -h /',
           is_sudo: false,
           is_danger: false
@@ -407,7 +407,7 @@
 
   async function handleGeneratePlan() {
     if (!goal.trim()) {
-      showToast('Masukkan target atau tujuan eksekusi terlebih dahulu.', 'error');
+      showToast('Please enter an execution goal first.', 'error');
       return;
     }
 
@@ -438,9 +438,9 @@
       }));
 
       viewMode = 'review';
-      showToast('Rencana berhasil dianalisis & disusun!', 'success');
+      showToast('Plan analyzed and generated successfully!', 'success');
     } catch (err: any) {
-      showToast(err?.message || 'Gagal menghasilkan rencana', 'error');
+      showToast(err?.message || 'Failed to generate plan', 'error');
     } finally {
       isGenerating = false;
     }
@@ -474,7 +474,7 @@
         if (copiedStepIndex === index) copiedStepIndex = null;
       }, 2000);
     } catch {
-      showToast('Gagal menyalin perintah ke clipboard', 'error');
+      showToast('Failed to copy command to clipboard', 'error');
     }
   }
 
@@ -518,7 +518,7 @@
   async function handleExecutePlan() {
     const approvedSteps = steps.filter((s) => s.enabled);
     if (approvedSteps.length === 0) {
-      showToast('Pilih minimal satu langkah untuk dieksekusi.', 'error');
+      showToast('Select at least one step to execute.', 'error');
       return;
     }
 
@@ -554,9 +554,9 @@
     viewMode = 'completed';
 
     if (executionFailedCount === 0) {
-      showToast('Semua langkah berhasil dieksekusi di host!', 'success');
+      showToast('All steps executed successfully on host!', 'success');
     } else {
-      showToast(`Eksekusi selesai dengan ${executionFailedCount} langkah gagal.`, 'error');
+      showToast(`Execution completed with ${executionFailedCount} failed steps.`, 'error');
     }
   }
 
@@ -670,12 +670,12 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span>Menganalisis Kebutuhan...</span>
+          <span>Analyzing Requirements...</span>
         {:else}
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          <span>Analisis & Buat Rencana (Generate Plan)</span>
+          <span>Generate Execution Plan</span>
         {/if}
       </button>
     </div>
@@ -689,20 +689,20 @@
         <div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-lg font-bold text-neutral-900 dark:text-white">Rencana Eksekusi: Konfirmasi Seluruhnya</h2>
+              <h2 class="text-lg font-bold text-neutral-900 dark:text-white">Execution Plan: Full Confirmation</h2>
               <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
-                {approvedCount} dari {steps.length} Langkah Terpilih
+                {approvedCount} of {steps.length} Steps Selected
               </span>
               <!-- Says which planner actually produced this. The LLM path silently falls back
                    to the offline template planner when the endpoint is unreachable, and without
                    this badge a broken connection still looked like a working assistant. -->
               {#if plan?.source === 'llm'}
-                <span class="text-xs px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold border border-violet-500/20" title="Dihasilkan oleh model AI yang dikonfigurasi">
-                  Model AI
+                <span class="text-xs px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold border border-violet-500/20" title="Generated by configured AI model">
+                  AI Model
                 </span>
               {:else}
-                <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold border border-amber-500/20" title="Endpoint AI tidak terjangkau atau balasannya tidak terbaca, jadi rencana ini dari template bawaan. Uji koneksi di Settings > AI Assistant.">
-                  Template bawaan
+                <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold border border-amber-500/20" title="AI endpoint unreachable; generated from built-in template. Test connection in Settings > AI Assistant.">
+                  Built-in Template
                 </span>
               {/if}
             </div>
@@ -834,7 +834,7 @@
                   <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                   </svg>
-                  <span class="text-emerald-500 font-semibold">Tersalin!</span>
+                  <span class="text-emerald-500 font-semibold">Copied!</span>
                 {:else}
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -881,7 +881,7 @@
                   {#if step.status === 'running' && !step.result}
                     <div class="text-sky-400 flex items-center gap-2">
                       <span class="animate-pulse">▶</span>
-                      <span>Menjalankan perintah di host {selectedHost ? selectedHost.label : ''}...</span>
+                      <span>Executing command on host {selectedHost ? selectedHost.label : ''}...</span>
                     </div>
                   {/if}
 

@@ -23,7 +23,7 @@
   } from '$lib/stores/theme.svelte';
   import { getToasts, showToast } from '$lib/stores/uiNotifications.svelte';
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
-  import FeedbackWidget from '$lib/components/FeedbackWidget.svelte';
+  import FeedbackModal from '$lib/components/FeedbackModal.svelte';
   import ProfileMenu from '$lib/components/ProfileMenu.svelte';
   import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
   import { checkForUpdates } from '$lib/stores/updater.svelte';
@@ -780,15 +780,12 @@
       {/if}
 
       {#if feedbackPrompt.show}
-        <!-- Feedback form: auto-prompted after the 3rd closed session, or opened from the
-             profile menu (Report bug). Dismissible. -->
-        <div class="absolute bottom-5 right-5 z-50 w-[400px] max-w-[calc(100vw-2.5rem)] shadow-2xl">
-          <FeedbackWidget
-            dismissible={true}
-            onDismiss={() => feedbackPrompt.close()}
-            onSubmitted={() => feedbackPrompt.markSubmitted()}
-          />
-        </div>
+        <!-- Feedback popup modal: auto-prompted after the 3rd closed session, or opened from the
+             profile menu (Report bug). Modal popup like AboutModal. -->
+        <FeedbackModal
+          onClose={() => feedbackPrompt.close()}
+          onSubmitted={() => feedbackPrompt.markSubmitted()}
+        />
       {/if}
     </main>
   </div>
