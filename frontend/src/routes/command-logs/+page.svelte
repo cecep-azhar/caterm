@@ -5,6 +5,8 @@
   import { save } from '@tauri-apps/plugin-dialog';
   import { writeTextFile } from '@tauri-apps/plugin-fs';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
+  import { t } from '$lib/i18n/index.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
 
   interface CommandLog {
     id: string;
@@ -60,7 +62,7 @@
       });
     } catch (e) {
       console.error('Failed to fetch logs', e);
-      showToast('Failed to load audit logs.', 'error');
+      showToast(t('commandLogs.loadFailed'), 'error');
     } finally {
       isLoading = false;
     }
@@ -189,7 +191,7 @@
         if (filePath) {
           await writeTextFile(filePath, csvContent);
           saved = true;
-          showToast('Audit logs exported successfully!', 'success');
+          showToast(t('commandLogs.exportedFile'), 'success');
         }
       } catch {
         // Fallback to standard web download
@@ -203,11 +205,11 @@
         a.download = `caterm-audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
-        showToast('Audit logs downloaded successfully!', 'success');
+        showToast(t('commandLogs.exportedDownload'), 'success');
       }
     } catch (e) {
       console.error('Export failed', e);
-      showToast('Failed to export audit logs.', 'error');
+      showToast(t('commandLogs.exportFailed'), 'error');
     }
   }
 
@@ -217,30 +219,23 @@
 </script>
 
 <div class="max-w-5xl mx-auto space-y-6">
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
-    <div class="flex items-center gap-3">
-      <div class="p-2 bg-sky-500/10 text-sky-400 rounded-lg border border-sky-500/20">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-      </div>
-      <div>
-        <h1 class="text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Command Logs (Audit)</h1>
-        <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-1">
-          Audit trail of PTY terminal commands, automated AI actions, and system security events.
-        </p>
-      </div>
-    </div>
-    <div class="flex items-center gap-2">
+  <PageHeader
+    icon={['M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z']}
+    accent="sky"
+    title={t('commandLogs.title')}
+    subtitle={t('commandLogs.subtitle')}
+  >
+    {#snippet actions()}
       <button
         onclick={fetchLogs}
         disabled={isLoading}
         class="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg text-sm transition-colors flex items-center gap-1.5"
-        title="Reload audit logs"
+        title={t('commandLogs.reload')}
       >
         <svg class="w-4 h-4 {isLoading ? 'animate-spin' : ''}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>
-        <span>Refresh</span>
+        <span>{t('commandLogs.refresh')}</span>
       </button>
       <button
         onclick={exportLogs}
@@ -249,14 +244,14 @@
         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        <span>Export CSV</span>
+        <span>{t('commandLogs.exportCsv')}</span>
       </button>
-    </div>
-  </div>
+    {/snippet}
+  </PageHeader>
 
   <!-- Quick Filter Buttons -->
   <div class="flex items-center gap-2 mb-4 overflow-x-auto pb-1 text-xs">
-    <span class="text-neutral-500 dark:text-neutral-400 font-medium shrink-0">Quick Filter:</span>
+    <span class="text-neutral-500 dark:text-neutral-400 font-medium shrink-0">{t('commandLogs.quickFilter')}</span>
     <button
       type="button"
       onclick={() => (eventFilter = '')}
@@ -264,7 +259,7 @@
         ? 'bg-neutral-800 text-white dark:bg-white dark:text-black font-semibold'
         : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
     >
-      All ({logs.length})
+      {t('commandLogs.all', { count: logs.length })}
     </button>
     <button
       type="button"
@@ -276,7 +271,7 @@
       <svg class="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" />
       </svg>
-      <span>AI Automation</span>
+      <span>{t('commandLogs.aiAutomation')}</span>
       {#if aiAutomationCount > 0}
         <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-purple-900/40 text-purple-800 dark:text-purple-200 font-semibold">{aiAutomationCount}</span>
       {/if}
@@ -291,7 +286,7 @@
       <svg class="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
       </svg>
-      <span>AI Plan</span>
+      <span>{t('commandLogs.aiPlan')}</span>
       {#if aiPlanCount > 0}
         <span class="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 font-semibold">{aiPlanCount}</span>
       {/if}
@@ -303,7 +298,7 @@
         ? 'bg-blue-600 text-white font-semibold ring-2 ring-blue-400/50'
         : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
     >
-      PTY Command
+      {t('commandLogs.ptyCommand')}
     </button>
     <button
       type="button"
@@ -312,7 +307,7 @@
         ? 'bg-cyan-600 text-white font-semibold ring-2 ring-cyan-400/50'
         : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-200 dark:hover:bg-neutral-700'}"
     >
-      Key Deploy
+      {t('commandLogs.keyDeploy')}
     </button>
   </div>
 
@@ -322,7 +317,7 @@
       <input
         type="text"
         bind:value={searchQuery}
-        placeholder="Search logs..."
+        placeholder={t('commandLogs.searchPlaceholder')}
         class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
       />
     </div>
@@ -330,7 +325,7 @@
       <input
         type="text"
         bind:value={hostFilter}
-        placeholder="Filter by Host ID"
+        placeholder={t('commandLogs.hostIdPlaceholder')}
         class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
       />
     </div>
@@ -339,7 +334,7 @@
         bind:value={eventFilter}
         class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
       >
-        <option value="">All Events</option>
+        <option value="">{t('commandLogs.allEvents')}</option>
         <option value="AI_AUTOMATION">✨ AI Automation</option>
         <option value="AI_PLAN">📋 AI Plan</option>
         <option value="PTY_COMMAND">PTY Command</option>
@@ -364,10 +359,10 @@
     <table class="w-full text-left border-collapse">
       <thead class="sticky top-0 bg-neutral-100 dark:bg-[#2D2D2D] border-b border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-600 dark:text-neutral-300">
         <tr>
-          <th class="p-3 w-44">Time</th>
-          <th class="p-3 w-40">Event</th>
-          <th class="p-3 w-32">Host ID</th>
-          <th class="p-3">Details</th>
+          <th class="p-3 w-44">{t('commandLogs.tableTime')}</th>
+          <th class="p-3 w-40">{t('commandLogs.tableEvent')}</th>
+          <th class="p-3 w-32">{t('commandLogs.tableHostId')}</th>
+          <th class="p-3">{t('commandLogs.tableDetails')}</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-neutral-200/60 dark:divide-neutral-700/50 text-sm">
@@ -458,7 +453,7 @@
                 <svg class="w-8 h-8 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <span>No logs found matching the current filters.</span>
+                <span>{t('commandLogs.emptyTitle')}</span>
               </div>
             </td>
           </tr>
@@ -471,10 +466,10 @@
   {#if filteredLogs.length > 0}
     <div class="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-600 dark:text-neutral-400 select-none">
       <div class="flex items-center gap-2">
-        <span>Showing {(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredLogs.length)} of {filteredLogs.length} records</span>
+        <span>{t('commandLogs.showingRecords', { from: (currentPage - 1) * pageSize + 1, to: Math.min(currentPage * pageSize, filteredLogs.length), total: filteredLogs.length })}</span>
         <span class="text-neutral-400 dark:text-neutral-600">|</span>
         <label class="flex items-center gap-1.5">
-          <span>Rows per page:</span>
+          <span>{t('commandLogs.rowsPerPage')}</span>
           <select
             bind:value={pageSize}
             class="px-2 py-1 bg-neutral-100 dark:bg-[#2D2D2D] rounded border border-neutral-300 dark:border-neutral-700 text-xs focus:outline-none"
@@ -493,7 +488,7 @@
           disabled={currentPage <= 1}
           onclick={() => currentPage = 1}
           class="px-2 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-          title="First Page"
+          title={t('commandLogs.firstPage')}
         >
           «
         </button>
@@ -503,11 +498,11 @@
           onclick={() => currentPage = Math.max(1, currentPage - 1)}
           class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
         >
-          Prev
+          {t('commandLogs.previous')}
         </button>
 
         <span class="px-3 py-1 font-mono text-neutral-800 dark:text-neutral-200">
-          Page {currentPage} / {totalPages}
+          {t('commandLogs.pageOf', { current: currentPage, total: totalPages })}
         </span>
 
         <button
@@ -516,14 +511,14 @@
           onclick={() => currentPage = Math.min(totalPages, currentPage + 1)}
           class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
         >
-          Next
+          {t('commandLogs.next')}
         </button>
         <button
           type="button"
           disabled={currentPage >= totalPages}
           onclick={() => currentPage = totalPages}
           class="px-2 py-1 rounded bg-neutral-100 dark:bg-[#2D2D2D] border border-neutral-300 dark:border-neutral-700 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-          title="Last Page"
+          title={t('commandLogs.lastPage')}
         >
           »
         </button>
