@@ -9,7 +9,7 @@
 </script>
 
 <div
-  class={`flex flex-col flex-1 min-h-0 rounded-2xl bg-[#12161f] border border-white/[0.06] overflow-hidden ${noPadding ? '' : 'p-4'} ${cls}`}
+  class={`flex flex-col flex-1 min-h-0 rounded-2xl bg-neutral-50 dark:bg-[#12161f] border border-neutral-200 dark:border-white/[0.06] overflow-hidden ${noPadding ? '' : 'p-4'} ${cls}`}
 >
   {@render children()}
 </div>

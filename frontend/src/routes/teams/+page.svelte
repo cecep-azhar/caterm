@@ -241,7 +241,7 @@
                 onclick={() => newTeam.color = c}
                 class="w-7 h-7 rounded-full transition-transform border-2 {newTeam.color === c ? 'border-neutral-900 dark:border-white scale-110' : 'border-transparent'}"
                 style="background-color: {c}"
-                aria-label="Select color {c}">
+                aria-label={t('common.selectColor', { color: c })}>
               </button>
             {/each}
           </div>

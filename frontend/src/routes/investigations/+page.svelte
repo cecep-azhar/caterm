@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { listInvestigations, saveInvestigation, deleteInvestigation, type InvestigationRecord } from '$lib/api/investigations';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
-  import { t } from '$lib/i18n/index.svelte';
+  import { t, intlLocale } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   let isAddModalOpen = $state(false);
@@ -87,7 +87,7 @@
   }
 
   function formatDate(ts: number) {
-    return new Date(ts).toLocaleString();
+    return new Date(ts).toLocaleString(intlLocale());
   }
 </script>
 

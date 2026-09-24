@@ -35,6 +35,8 @@
   import RemoteFileEditor from '$lib/components/RemoteFileEditor.svelte';
   import DirectorySync from '$lib/components/DirectorySync.svelte';
   import PageContainer from '$lib/components/PageContainer.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import { t, intlLocale } from '$lib/i18n/index.svelte';
 
   interface TransferItem {
     id: string;
@@ -98,7 +100,7 @@
 
   async function handleQuickConnect() {
     if (!qcAddress.trim()) {
-      qcError = 'Address is required';
+      qcError = t('sftp.errAddress');
       return;
     }
     qcConnecting = true;
@@ -281,7 +283,7 @@
   function openCompressModal() {
     const selected = [...remoteSelectedPaths];
     if (selected.length === 0 && remoteLastSelected) selected.push(remoteLastSelected.path);
-    if (selected.length === 0) { errorMsg = 'Select items to compress.'; return; }
+    if (selected.length === 0) { errorMsg = t('sftp.errSelectCompress'); return; }
     compressItems = selected.map((p) => p.split('/').pop() ?? p);
     compressParentDir = remotePath;
     compressArchiveName = 'archive.tar.gz';
@@ -294,7 +296,7 @@
     try {
       await sftpCompress(currentHostId, compressParentDir, compressItems, compressArchiveName);
       showCompressModal = false;
-      notifySuccess(`Compressed → ${compressArchiveName}`);
+      notifySuccess(t('sftp.compressed', { name: compressArchiveName }));
       await fetchRemoteFiles();
     } catch (e: unknown) {
       errorMsg = String(e);
@@ -322,7 +324,7 @@
     try {
       await sftpExtract(currentHostId, extractArchivePath, extractDestDir);
       showExtractModal = false;
-      notifySuccess(`Extracted → ${extractDestDir}`);
+      notifySuccess(t('sftp.extracted', { dest: extractDestDir }));
       await fetchRemoteFiles();
     } catch (e: unknown) {
       errorMsg = String(e);
@@ -358,7 +360,7 @@
 
   function formatMtime(mtime: number): string {
     if (!mtime) return '-';
-    return new Date(mtime * 1000).toLocaleString(undefined, {
+    return new Date(mtime * 1000).toLocaleString(intlLocale(), {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -400,7 +402,7 @@
         localPath = parent;
       }
     } catch (e: any) {
-      errorMsg = `Local FS Error: ${e?.message || e}`;
+      errorMsg = t('sftp.errLocalFs', { error: e?.message || String(e) });
       localFiles = [];
     } finally {
       localLoading = false;
@@ -430,7 +432,7 @@
     try {
       remoteFiles = await listRemoteDir(currentHostId, remotePath);
     } catch (e: any) {
-      errorMsg = `Remote SFTP Error: ${e?.message || e}`;
+      errorMsg = t('sftp.errRemote', { error: e?.message || String(e) });
       remoteFiles = [];
     } finally {
       remoteLoading = false;
@@ -557,7 +559,7 @@
         transfers[idx].status = 'cancelled';
       }
     } catch (e: any) {
-      errorMsg = `Cancel failed: ${e?.message || e}`;
+      errorMsg = t('sftp.errCancel', { error: e?.message || String(e) });
     }
   }
 
@@ -577,7 +579,7 @@
         const remoteTarget = joinPath(remotePath, name);
         enqueueTransfer('upload', p, remoteTarget);
       }
-      notifySuccess(`Queued ${localSelectedPaths.size} item(s) for upload.`);
+      notifySuccess(t('sftp.queuedUpload', { count: localSelectedPaths.size }));
       localSelectedPaths = new Set();
     } else {
       // Download selected remote files to local current dir
@@ -589,7 +591,7 @@
         const localTarget = joinPath(localPath, name);
         enqueueTransfer('download', p, localTarget);
       }
-      notifySuccess(`Queued ${remoteSelectedPaths.size} item(s) for download.`);
+      notifySuccess(t('sftp.queuedDownload', { count: remoteSelectedPaths.size }));
       remoteSelectedPaths = new Set();
     }
   }
@@ -609,16 +611,16 @@
       if (newFolderTargetPane === 'local') {
         const dest = joinPath(localPath, folder);
         await localMkdir(dest);
-        notifySuccess(`Created local folder "${folder}"`);
+        notifySuccess(t('sftp.createdLocalFolder', { name: folder }));
         await fetchLocalFiles();
       } else {
         const dest = joinPath(remotePath, folder);
         await mkdirRemoteDir(currentHostId, dest);
-        notifySuccess(`Created remote folder "${folder}"`);
+        notifySuccess(t('sftp.createdRemoteFolder', { name: folder }));
         await fetchRemoteFiles();
       }
     } catch (e: any) {
-      errorMsg = `Failed to create folder: ${e?.message || e}`;
+      errorMsg = t('sftp.errCreateFolder', { error: e?.message || String(e) });
     }
   }
 
@@ -641,16 +643,16 @@
       if (newFileTargetPane === 'local') {
         const dest = joinPath(localPath, filename);
         await localWriteFile(dest, []);
-        notifySuccess(`Created local file "${filename}"`);
+        notifySuccess(t('sftp.createdLocalFile', { name: filename }));
         await fetchLocalFiles();
       } else {
         const dest = joinPath(remotePath, filename);
         await writeRemoteFile(currentHostId, dest, []);
-        notifySuccess(`Created remote file "${filename}"`);
+        notifySuccess(t('sftp.createdRemoteFile', { name: filename }));
         await fetchRemoteFiles();
       }
     } catch (e: any) {
-      errorMsg = `Failed to create file: ${e?.message || e}`;
+      errorMsg = t('sftp.errCreateFile', { error: e?.message || String(e) });
     }
   }
 
@@ -679,15 +681,15 @@
     try {
       if (renameItem.pane === 'local') {
         await localRename(renameItem.path, newPath);
-        notifySuccess(`Renamed local file to "${newName}"`);
+        notifySuccess(t('sftp.renamedLocal', { name: newName }));
         await fetchLocalFiles();
       } else {
         await renameRemoteFile(currentHostId, renameItem.path, newPath);
-        notifySuccess(`Renamed remote file to "${newName}"`);
+        notifySuccess(t('sftp.renamedRemote', { name: newName }));
         await fetchRemoteFiles();
       }
     } catch (e: any) {
-      errorMsg = `Failed to rename: ${e?.message || e}`;
+      errorMsg = t('sftp.errRename', { error: e?.message || String(e) });
     }
   }
 
@@ -719,7 +721,7 @@
         for (const p of deleteTarget.paths) {
           await localDelete(p, true, true);
         }
-        notifySuccess(`Deleted ${deleteTarget.paths.length} local item(s)`);
+        notifySuccess(t('sftp.deletedLocal', { count: deleteTarget.paths.length }));
         localSelectedPaths = new Set();
         localLastSelected = null;
         await fetchLocalFiles();
@@ -727,13 +729,13 @@
         for (const p of deleteTarget.paths) {
           await deleteRemoteFile(currentHostId, p, true, true);
         }
-        notifySuccess(`Deleted ${deleteTarget.paths.length} remote item(s)`);
+        notifySuccess(t('sftp.deletedRemote', { count: deleteTarget.paths.length }));
         remoteSelectedPaths = new Set();
         remoteLastSelected = null;
         await fetchRemoteFiles();
       }
     } catch (e: any) {
-      errorMsg = `Failed to delete: ${e?.message || e}`;
+      errorMsg = t('sftp.errDelete', { error: e?.message || String(e) });
     }
   }
 
@@ -756,7 +758,7 @@
       }
       editorContent = new TextDecoder('utf-8').decode(new Uint8Array(bytes));
     } catch (e: any) {
-      errorMsg = `Failed to read file: ${e?.message || e}`;
+      errorMsg = t('sftp.errRead', { error: e?.message || String(e) });
       showEditorModal = false;
     } finally {
       isEditorLoading = false;
@@ -770,16 +772,16 @@
       const bytes = Array.from(new TextEncoder().encode(editorContent));
       if (editorItem.pane === 'local') {
         await localWriteFile(editorItem.path, bytes);
-        notifySuccess(`Saved local file "${editorItem.name}"`);
+        notifySuccess(t('sftp.savedLocal', { name: editorItem.name }));
         await fetchLocalFiles();
       } else {
         await writeRemoteFile(currentHostId, editorItem.path, bytes);
-        notifySuccess(`Saved remote file "${editorItem.name}"`);
+        notifySuccess(t('sftp.savedRemote', { name: editorItem.name }));
         await fetchRemoteFiles();
       }
       showEditorModal = false;
     } catch (e: any) {
-      errorMsg = `Failed to save file: ${e?.message || e}`;
+      errorMsg = t('sftp.errSave', { error: e?.message || String(e) });
     } finally {
       isEditorSaving = false;
     }
@@ -823,10 +825,10 @@
     try {
       const mode = parseInt(chmodOctal, 8);
       await sftpChmod(currentHostId, chmodTarget.path, mode);
-      notifySuccess(`Changed permissions for "${chmodTarget.name}" to ${chmodOctal}`);
+      notifySuccess(t('sftp.chmodDone', { name: chmodTarget.name, mode: chmodOctal }));
       await fetchRemoteFiles();
     } catch (e: any) {
-      errorMsg = `Chmod error: ${e?.message || e}`;
+      errorMsg = t('sftp.errChmod', { error: e?.message || String(e) });
     }
   }
 
@@ -857,11 +859,11 @@
       if (parsed.pane === 'local' && targetPane === 'remote') {
         const remoteDest = joinPath(remotePath, parsed.name);
         enqueueTransfer('upload', parsed.path, remoteDest);
-        notifySuccess(`Queued "${parsed.name}" for upload.`);
+        notifySuccess(t('sftp.queuedOneUpload', { name: parsed.name }));
       } else if (parsed.pane === 'remote' && targetPane === 'local') {
         const localDest = joinPath(localPath, parsed.name);
         enqueueTransfer('download', parsed.path, localDest);
-        notifySuccess(`Queued "${parsed.name}" for download.`);
+        notifySuccess(t('sftp.queuedOneDownload', { name: parsed.name }));
       }
     } catch {}
   }
@@ -938,13 +940,20 @@
   });
 </script>
 
-<PageContainer noPadding class="h-full">
+<div class="h-full flex flex-col">
+<PageHeader
+  icon="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
+  accent="emerald"
+  title={t('sftp.title')}
+  subtitle={t('sftp.subtitle')}
+/>
+<PageContainer noPadding class="flex-1">
 <div class="h-full flex flex-col space-y-3 p-3 text-neutral-800 dark:text-neutral-200">
   <!-- Top Bar: Host Selector & Controls -->
   <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#181c22] p-3 rounded-lg border border-neutral-200 dark:border-slate-800 shadow-xs">
     <div class="flex items-center gap-3">
       <div class="flex items-center gap-2">
-        <span class="text-xs font-semibold uppercase text-neutral-500 dark:text-slate-400">Remote Host:</span>
+        <span class="text-xs font-semibold uppercase text-neutral-500 dark:text-slate-400">{t('sftp.remoteHost')}</span>
         <select
           bind:value={currentHostId}
           onchange={() => fetchRemoteFiles()}
@@ -963,7 +972,7 @@
             viewMode === 'dual' ? 'bg-cyan-600 text-white' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
           }`}
         >
-          Dual Pane
+          {t('sftp.dualPane')}
         </button>
         <button
           onclick={() => (viewMode = 'single')}
@@ -971,18 +980,18 @@
             viewMode === 'single' ? 'bg-cyan-600 text-white' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
           }`}
         >
-          Remote Only
+          {t('sftp.remoteOnly')}
         </button>
       </div>
     </div>
 
     <!-- Quick Action Hotkeys Reference -->
     <div class="hidden lg:flex items-center gap-2 text-xs text-neutral-500 dark:text-slate-400">
-      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F5</span> Copy
-      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F7</span> New Folder
-      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F8</span> Delete
-      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F2</span> Rename
-      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F4</span> Edit
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F5</span> {t('sftp.hkCopy')}
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F7</span> {t('sftp.hkNewFolder')}
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F8</span> {t('sftp.hkDelete')}
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F2</span> {t('sftp.hkRename')}
+      <span class="bg-neutral-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-neutral-300 dark:border-slate-700 text-neutral-700 dark:text-slate-300 font-mono">F4</span> {t('sftp.hkEdit')}
     </div>
 
     {#if currentHostId}
@@ -993,22 +1002,22 @@
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
-        Terminal Here
+        {t('sftp.terminalHere')}
       </a>
     {/if}
   </div>
 
   <!-- Error / Success Banners -->
   {#if errorMsg}
-    <div class="bg-red-950/80 border border-red-800 text-red-300 text-xs px-3 py-2 rounded flex justify-between items-center">
+    <div class="bg-red-50 dark:bg-red-950/80 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs px-3 py-2 rounded flex justify-between items-center">
       <span>{errorMsg}</span>
-      <button onclick={() => (errorMsg = '')} class="text-red-400 hover:text-red-200">✕</button>
+      <button onclick={() => (errorMsg = '')} class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200" aria-label={t('sftp.dismiss')}>✕</button>
     </div>
   {/if}
   {#if successMsg}
-    <div class="bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs px-3 py-2 rounded flex justify-between items-center">
+    <div class="bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs px-3 py-2 rounded flex justify-between items-center">
       <span>{successMsg}</span>
-      <button onclick={() => (successMsg = '')} class="text-emerald-400 hover:text-emerald-200">✕</button>
+      <button onclick={() => (successMsg = '')} class="text-emerald-500 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-200" aria-label={t('sftp.dismiss')}>✕</button>
     </div>
   {/if}
 
@@ -1023,18 +1032,18 @@
         }`}
         onclick={() => (activePane = 'local')}
         role="region"
-        aria-label="Local File System"
+        aria-label={t('sftp.localFs')}
         ondragover={onDragOver}
         ondrop={(e) => onDrop(e, 'local')}
       >
         <!-- Local Toolbar & Path -->
         <div class="p-2 bg-neutral-50 dark:bg-[#1e232a] border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between gap-2">
           <div class="flex items-center gap-1.5">
-            <span class="text-xs font-bold text-amber-600 dark:text-amber-400">Local:</span>
+            <span class="text-xs font-bold text-amber-600 dark:text-amber-400">{t('sftp.local')}</span>
             <button
               onclick={goUpLocal}
               class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs flex items-center gap-1"
-              title="Parent Directory"
+              title={t('sftp.parentDir')}
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
@@ -1043,7 +1052,7 @@
             <button
               onclick={() => navigateLocal('~')}
               class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs"
-              title="Home Directory (~)"
+              title={t('sftp.homeDir')}
             >
               ~
             </button>
@@ -1057,9 +1066,9 @@
           <button
             onclick={() => openNewFolderModal('local')}
             class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
-            title="New Folder"
+            title={t('sftp.newFolder')}
           >
-            +Dir
+            {t('sftp.addDir')}
           </button>
         </div>
 
@@ -1068,19 +1077,19 @@
           <table class="w-full border-collapse">
             <thead class="sticky top-0 bg-neutral-100/95 dark:bg-slate-900/95 text-neutral-600 dark:text-slate-400 border-b border-neutral-200 dark:border-slate-800 select-none">
               <tr>
-                <th class="text-left py-1.5 px-3">Name</th>
-                <th class="text-right py-1.5 px-3">Size</th>
-                <th class="text-right py-1.5 px-3">Modified</th>
+                <th class="text-left py-1.5 px-3">{t('sftp.colName')}</th>
+                <th class="text-right py-1.5 px-3">{t('sftp.colSize')}</th>
+                <th class="text-right py-1.5 px-3">{t('sftp.colModified')}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-neutral-200 dark:divide-slate-800/40">
               {#if localLoading}
                 <tr>
-                  <td colspan="3" class="text-center py-6 text-neutral-400 dark:text-slate-500">Loading local directory...</td>
+                  <td colspan="3" class="text-center py-6 text-neutral-400 dark:text-slate-500">{t('sftp.loadingLocal')}</td>
                 </tr>
               {:else if localFiles.length === 0}
                 <tr>
-                  <td colspan="3" class="text-center py-6 text-neutral-400 dark:text-slate-500">Empty directory</td>
+                  <td colspan="3" class="text-center py-6 text-neutral-400 dark:text-slate-500">{t('sftp.emptyDir')}</td>
                 </tr>
               {:else}
                 {#each localFiles as item}
@@ -1127,18 +1136,18 @@
       } ${activePane === 'remote' ? 'border-cyan-500/80 ring-1 ring-cyan-500/40' : 'border-neutral-200 dark:border-slate-800'}`}
       onclick={() => (activePane = 'remote')}
       role="region"
-      aria-label="Remote SFTP Server"
+      aria-label={t('sftp.remoteServer')}
       ondragover={onDragOver}
       ondrop={(e) => onDrop(e, 'remote')}
     >
       <!-- Remote Toolbar & Path -->
       <div class="p-2 bg-neutral-50 dark:bg-[#1e232a] border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between gap-2">
         <div class="flex items-center gap-1.5">
-          <span class="text-xs font-bold text-cyan-600 dark:text-cyan-400">Remote:</span>
+          <span class="text-xs font-bold text-cyan-600 dark:text-cyan-400">{t('sftp.remote')}</span>
           <button
             onclick={goUpRemote}
             class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs flex items-center gap-1"
-            title="Parent Directory"
+            title={t('sftp.parentDir')}
           >
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
@@ -1147,7 +1156,7 @@
           <button
             onclick={() => navigateRemote('/')}
             class="p-1 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-neutral-600 dark:text-slate-300 text-xs"
-            title="Root Directory (/)"
+            title={t('sftp.rootDir')}
           >
             /
           </button>
@@ -1161,23 +1170,23 @@
         <button
           onclick={() => openNewFolderModal('remote')}
           class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
-          title="New Folder"
+          title={t('sftp.newFolder')}
         >
-          +Dir
+          {t('sftp.addDir')}
         </button>
         <button
           onclick={openCompressModal}
           class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
-          title="Compress Selected"
+          title={t('sftp.compressSelected')}
         >
-          🗜️ Zip
+          {t('sftp.zip')}
         </button>
         <button
           onclick={() => (showSyncModal = true)}
           class="px-2 py-1 bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 rounded text-xs text-neutral-700 dark:text-slate-300 border border-neutral-300 dark:border-slate-700 flex items-center gap-1"
-          title="Directory Synchronize & Live Watch"
+          title={t('sftp.syncTitle')}
         >
-          🔄 Sync
+          {t('sftp.sync')}
         </button>
         <button
           onclick={() => (showRemoteSearch = !showRemoteSearch)}
@@ -1186,12 +1195,12 @@
               ? "bg-cyan-600 text-white border-cyan-500"
               : "bg-neutral-100 dark:bg-slate-800 hover:bg-neutral-200 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 border-neutral-300 dark:border-slate-700"
           }`}
-          title="Search remote files"
+          title={t('sftp.searchTitle')}
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
-          Search
+          {t('sftp.search')}
         </button>
       </div>
 
@@ -1201,7 +1210,7 @@
           <div class="flex items-center gap-2">
             <input
               type="text"
-              placeholder="Search pattern (e.g. *.log, config*)"
+              placeholder={t('sftp.searchPlaceholder')}
               bind:value={remoteSearchQuery}
               onkeydown={(e) => e.key === "Enter" && executeRemoteSearch()}
               class="flex-1 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
@@ -1212,23 +1221,23 @@
               class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded font-medium flex items-center gap-1 transition"
             >
               {#if isSearchingRemote}
-                <span class="animate-spin inline-block">⏳</span> Searching...
+                <span class="animate-spin inline-block">⏳</span> {t('sftp.searching')}
               {:else}
-                Find
+                {t('sftp.find')}
               {/if}
             </button>
             <button
               onclick={() => { showRemoteSearch = false; remoteSearchResults = []; }}
               class="px-2 py-1 text-neutral-500 hover:text-neutral-700 dark:hover:text-slate-200"
-              title="Close search"
+              title={t('sftp.closeSearch')}
             >
               ✕
             </button>
           </div>
           <div class="flex items-center gap-3 text-neutral-600 dark:text-slate-400">
-            <span class="text-[11px] font-semibold">Filters:</span>
+            <span class="text-[11px] font-semibold">{t('sftp.filters')}</span>
             <label class="flex items-center gap-1 text-[11px]">
-              Min KB:
+              {t('sftp.minKb')}
               <input
                 type="number"
                 min="0"
@@ -1238,7 +1247,7 @@
               />
             </label>
             <label class="flex items-center gap-1 text-[11px]">
-              Max KB:
+              {t('sftp.maxKb')}
               <input
                 type="number"
                 min="0"
@@ -1247,7 +1256,7 @@
                 class="w-16 bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono"
               />
             </label>
-            <span class="text-[10px] text-neutral-400 dark:text-slate-500 ml-auto">Under {remotePath}</span>
+            <span class="text-[10px] text-neutral-400 dark:text-slate-500 ml-auto">{t('sftp.under', { path: remotePath })}</span>
           </div>
 
           {#if remoteSearchResults.length > 0}
@@ -1272,7 +1281,7 @@
               {/each}
             </div>
           {:else if !isSearchingRemote && remoteSearchQuery && remoteSearchResults.length === 0}
-            <div class="text-[11px] text-neutral-400 dark:text-slate-500 italic py-1">No matching files found.</div>
+            <div class="text-[11px] text-neutral-400 dark:text-slate-500 italic py-1">{t('sftp.noMatches')}</div>
           {/if}
         </div>
       {/if}
@@ -1282,20 +1291,20 @@
         <table class="w-full border-collapse">
           <thead class="sticky top-0 bg-neutral-100/95 dark:bg-slate-900/95 text-neutral-600 dark:text-slate-400 border-b border-neutral-200 dark:border-slate-800 select-none">
             <tr>
-              <th class="text-left py-1.5 px-3">Name</th>
-              <th class="text-right py-1.5 px-3">Size</th>
-              <th class="text-center py-1.5 px-3">Rights</th>
-              <th class="text-right py-1.5 px-3">Modified</th>
+              <th class="text-left py-1.5 px-3">{t('sftp.colName')}</th>
+              <th class="text-right py-1.5 px-3">{t('sftp.colSize')}</th>
+              <th class="text-center py-1.5 px-3">{t('sftp.colRights')}</th>
+              <th class="text-right py-1.5 px-3">{t('sftp.colModified')}</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-neutral-200 dark:divide-slate-800/40">
             {#if remoteLoading}
               <tr>
-                <td colspan="4" class="text-center py-6 text-neutral-400 dark:text-slate-500">Loading remote directory...</td>
+                <td colspan="4" class="text-center py-6 text-neutral-400 dark:text-slate-500">{t('sftp.loadingRemote')}</td>
               </tr>
             {:else if remoteFiles.length === 0}
               <tr>
-                <td colspan="4" class="text-center py-6 text-neutral-400 dark:text-slate-500">Empty directory</td>
+                <td colspan="4" class="text-center py-6 text-neutral-400 dark:text-slate-500">{t('sftp.emptyDir')}</td>
               </tr>
             {:else}
               {#each remoteFiles as item}
@@ -1344,9 +1353,9 @@
   <div class="h-36 bg-white dark:bg-[#181c22] rounded-lg border border-neutral-200 dark:border-slate-800 flex flex-col overflow-hidden text-xs shadow-xs">
     <div class="bg-neutral-50 dark:bg-[#1e232a] px-3 py-1.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <span class="font-bold text-neutral-700 dark:text-slate-300">Transfer Queue</span>
+        <span class="font-bold text-neutral-700 dark:text-slate-300">{t('sftp.queueTitle')}</span>
         <span class="text-neutral-500 dark:text-slate-500">
-          ({transfers.filter((t) => t.status === 'active').length} active, {transfers.filter((t) => t.status === 'queued').length} queued)
+          {t('sftp.queueCounts', { active: transfers.filter((tr) => tr.status === 'active').length, queued: transfers.filter((tr) => tr.status === 'queued').length })}
         </span>
       </div>
       <div class="flex items-center gap-2">
@@ -1354,21 +1363,21 @@
           onclick={clearCompletedTransfers}
           class="text-neutral-600 hover:text-neutral-800 dark:text-slate-400 dark:hover:text-slate-200 px-2 py-0.5 rounded hover:bg-neutral-200 dark:hover:bg-slate-800 transition"
         >
-          Clear Finished
+          {t('sftp.clearFinished')}
         </button>
       </div>
     </div>
 
     <div class="flex-1 overflow-auto divide-y divide-neutral-200 dark:divide-slate-800/40 font-mono">
       {#if transfers.length === 0}
-        <div class="text-center py-6 text-neutral-400 dark:text-slate-500">No active or queued transfers</div>
+        <div class="text-center py-6 text-neutral-400 dark:text-slate-500">{t('sftp.queueEmpty')}</div>
       {:else}
         {#each transfers as item}
           <div class="p-2 flex items-center justify-between gap-3 hover:bg-neutral-50 dark:hover:bg-slate-800/30">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 truncate">
                 <span class={`font-bold ${item.direction === 'upload' ? 'text-cyan-600 dark:text-cyan-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                  {item.direction === 'upload' ? '▲ UPLOAD' : '▼ DOWNLOAD'}
+                  {item.direction === 'upload' ? t('sftp.upload') : t('sftp.download')}
                 </span>
                 <span class="text-neutral-700 dark:text-slate-300 truncate">{item.source.split('/').pop()}</span>
                 <span class="text-neutral-400 dark:text-slate-500">→</span>
@@ -1418,13 +1427,13 @@
                     : 'bg-neutral-200 text-neutral-700 dark:bg-slate-800 dark:text-slate-400'
                 }`}
               >
-                {item.status}
+                {t(`sftp.status.${item.status}`)}
               </span>
               {#if item.status === 'active'}
                 <button
                   onclick={() => cancelQueueItem(item.id)}
                   class="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-200 text-xs px-1.5 py-0.5 rounded bg-red-100 hover:bg-red-200 dark:bg-red-950/40 dark:hover:bg-red-900/60"
-                  title="Cancel Transfer"
+                  title={t('sftp.cancelTransfer')}
                 >
                   ✕
                 </button>
@@ -1439,10 +1448,10 @@
 
 <!-- MODAL: NEW FOLDER -->
 {#if showNewFileModal}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
       <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
-        New File ({newFileTargetPane === 'local' ? 'Local' : 'Remote'})
+        {t('sftp.newFileTitle', { pane: newFileTargetPane === 'local' ? t('sftp.paneLocal') : t('sftp.paneRemote') })}
       </h3>
       <input
         type="text"
@@ -1456,13 +1465,13 @@
           onclick={() => (showNewFileModal = false)}
           class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onclick={confirmNewFile}
           class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
         >
-          Create
+          {t('common.create')}
         </button>
       </div>
     </div>
@@ -1470,15 +1479,15 @@
 {/if}
 
 {#if showNewFolderModal}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
       <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
-        New Folder ({newFolderTargetPane === 'local' ? 'Local' : 'Remote'})
+        {t('sftp.newFolderTitle', { pane: newFolderTargetPane === 'local' ? t('sftp.paneLocal') : t('sftp.paneRemote') })}
       </h3>
       <input
         type="text"
         bind:value={newFolderName}
-        placeholder="Folder name"
+        placeholder={t('sftp.folderNamePlaceholder')}
         onkeydown={(e) => e.key === 'Enter' && confirmNewFolder()}
         class="w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
       />
@@ -1487,13 +1496,13 @@
           onclick={() => (showNewFolderModal = false)}
           class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onclick={confirmNewFolder}
           class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
         >
-          Create
+          {t('common.create')}
         </button>
       </div>
     </div>
@@ -1502,9 +1511,9 @@
 
 <!-- MODAL: RENAME -->
 {#if showRenameModal && renameItem}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
-      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">Rename Item</h3>
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">{t('sftp.renameTitle')}</h3>
       <input
         type="text"
         bind:value={renameNewName}
@@ -1516,13 +1525,13 @@
           onclick={() => (showRenameModal = false)}
           class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onclick={confirmRename}
           class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
         >
-          Rename
+          {t('common.rename')}
         </button>
       </div>
     </div>
@@ -1531,24 +1540,24 @@
 
 <!-- MODAL: DELETE CONFIRMATION -->
 {#if showDeleteModal && deleteTarget}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-red-200 dark:border-red-900/60 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
-      <h3 class="text-sm font-bold text-red-600 dark:text-red-400">Confirm Deletion</h3>
+      <h3 class="text-sm font-bold text-red-600 dark:text-red-400">{t('sftp.deleteTitle')}</h3>
       <p class="text-xs text-neutral-600 dark:text-slate-300">
-        Are you sure you want to permanently delete {deleteTarget.paths.length} item(s) from {deleteTarget.pane === 'local' ? 'Local FS' : 'Remote SFTP'}?
+        {t('sftp.deleteBody', { count: deleteTarget.paths.length, where: deleteTarget.pane === 'local' ? t('sftp.localFsShort') : t('sftp.remoteSftpShort') })}
       </p>
       <div class="flex justify-end gap-2 pt-2">
         <button
           onclick={() => (showDeleteModal = false)}
           class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onclick={confirmDelete}
           class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-medium"
         >
-          Delete
+          {t('common.delete')}
         </button>
       </div>
     </div>
@@ -1561,9 +1570,9 @@
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden">
       <div class="bg-neutral-100 dark:bg-slate-900 px-4 py-2.5 border-b border-neutral-200 dark:border-slate-800 flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="text-xs font-bold text-cyan-600 dark:text-cyan-400">Editor:</span>
+          <span class="text-xs font-bold text-cyan-600 dark:text-cyan-400">{t('sftp.editor')}</span>
           <span class="text-xs text-neutral-800 dark:text-slate-200 font-mono">{editorItem.name}</span>
-          <span class="text-xs text-neutral-500 dark:text-slate-500">({editorItem.pane})</span>
+          <span class="text-xs text-neutral-500 dark:text-slate-500">({editorItem.pane === 'local' ? t('sftp.paneLocal') : t('sftp.paneRemote')})</span>
         </div>
         <div class="flex items-center gap-2">
           <button
@@ -1571,13 +1580,13 @@
             disabled={isEditorSaving || isEditorLoading}
             class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-xs font-medium flex items-center gap-1"
           >
-            {isEditorSaving ? 'Saving...' : 'Save'}
+            {isEditorSaving ? t('sftp.saving') : t('common.save')}
           </button>
           <button
             onclick={() => (showEditorModal = false)}
             class="px-3 py-1 bg-neutral-200 hover:bg-neutral-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
           >
-            Close
+            {t('common.close')}
           </button>
         </div>
       </div>
@@ -1598,59 +1607,59 @@
 
 <!-- MODAL: CHMOD PERMISSIONS -->
 {#if showChmodModal && chmodTarget}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-md w-full p-4 space-y-4 shadow-xl text-xs">
       <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
-        Permissions for <span class="text-cyan-600 dark:text-cyan-400">{chmodTarget.name}</span>
+        {t('sftp.permissionsFor')} <span class="text-cyan-600 dark:text-cyan-400">{chmodTarget.name}</span>
       </h3>
 
       <div class="grid grid-cols-3 gap-3 bg-neutral-50 dark:bg-slate-900 p-3 rounded border border-neutral-200 dark:border-slate-800">
         <!-- User -->
         <div class="space-y-1.5">
-          <span class="font-bold text-neutral-700 dark:text-slate-400">Owner</span>
+          <span class="font-bold text-neutral-700 dark:text-slate-400">{t('sftp.owner')}</span>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodUserR} onchange={updateChmodOctalFromCheckboxes} /> Read
+            <input type="checkbox" bind:checked={chmodUserR} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.read')}
           </label>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodUserW} onchange={updateChmodOctalFromCheckboxes} /> Write
+            <input type="checkbox" bind:checked={chmodUserW} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.write')}
           </label>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodUserX} onchange={updateChmodOctalFromCheckboxes} /> Execute
+            <input type="checkbox" bind:checked={chmodUserX} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.execute')}
           </label>
         </div>
 
         <!-- Group -->
         <div class="space-y-1.5">
-          <span class="font-bold text-neutral-700 dark:text-slate-400">Group</span>
+          <span class="font-bold text-neutral-700 dark:text-slate-400">{t('sftp.group')}</span>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodGroupR} onchange={updateChmodOctalFromCheckboxes} /> Read
+            <input type="checkbox" bind:checked={chmodGroupR} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.read')}
           </label>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodGroupW} onchange={updateChmodOctalFromCheckboxes} /> Write
+            <input type="checkbox" bind:checked={chmodGroupW} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.write')}
           </label>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodGroupX} onchange={updateChmodOctalFromCheckboxes} /> Execute
+            <input type="checkbox" bind:checked={chmodGroupX} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.execute')}
           </label>
         </div>
 
         <!-- Others -->
         <div class="space-y-1.5">
-          <span class="font-bold text-neutral-700 dark:text-slate-400">Others</span>
+          <span class="font-bold text-neutral-700 dark:text-slate-400">{t('sftp.others')}</span>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodOtherR} onchange={updateChmodOctalFromCheckboxes} /> Read
+            <input type="checkbox" bind:checked={chmodOtherR} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.read')}
           </label>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodOtherW} onchange={updateChmodOctalFromCheckboxes} /> Write
+            <input type="checkbox" bind:checked={chmodOtherW} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.write')}
           </label>
           <label class="flex items-center gap-1.5 text-neutral-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" bind:checked={chmodOtherX} onchange={updateChmodOctalFromCheckboxes} /> Execute
+            <input type="checkbox" bind:checked={chmodOtherX} onchange={updateChmodOctalFromCheckboxes} /> {t('sftp.execute')}
           </label>
         </div>
       </div>
 
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <span class="font-bold text-neutral-700 dark:text-slate-400">Octal:</span>
+          <span class="font-bold text-neutral-700 dark:text-slate-400">{t('sftp.octal')}</span>
           <input
             type="text"
             bind:value={chmodOctal}
@@ -1664,13 +1673,13 @@
             onclick={() => (showChmodModal = false)}
             class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onclick={confirmChmod}
             class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-medium"
           >
-            Apply
+            {t('sftp.apply')}
           </button>
         </div>
       </div>
@@ -1700,7 +1709,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); handleCopyTransfer(); }}
         >
-          <span class="flex items-center gap-2"><span>📥</span> Download</span>
+          <span class="flex items-center gap-2"><span>📥</span> {t('sftp.ctxDownload')}</span>
           <span class="text-[10px] text-neutral-400 font-mono">F5</span>
         </button>
 
@@ -1709,7 +1718,7 @@
             class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
             onclick={() => { closeCtxMenu(); openEditorModal(); }}
           >
-            <span class="flex items-center gap-2"><span>✏️</span> Edit / View</span>
+            <span class="flex items-center gap-2"><span>✏️</span> {t('sftp.ctxEditView')}</span>
             <span class="text-[10px] text-neutral-400 font-mono">F4</span>
           </button>
         {/if}
@@ -1718,7 +1727,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); openRenameModal(); }}
         >
-          <span class="flex items-center gap-2"><span>🏷️</span> Rename</span>
+          <span class="flex items-center gap-2"><span>🏷️</span> {t('sftp.ctxRename')}</span>
           <span class="text-[10px] text-neutral-400 font-mono">F2</span>
         </button>
 
@@ -1726,7 +1735,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 hover:text-rose-400 flex items-center justify-between text-rose-600 dark:text-rose-400"
           onclick={() => { closeCtxMenu(); openDeleteModal(); }}
         >
-          <span class="flex items-center gap-2"><span>🗑️</span> Delete</span>
+          <span class="flex items-center gap-2"><span>🗑️</span> {t('sftp.ctxDelete')}</span>
           <span class="text-[10px] opacity-70 font-mono">Del</span>
         </button>
 
@@ -1734,7 +1743,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { const item = ctxMenu!.item as SftpFileEntry; closeCtxMenu(); openChmodModal(item); }}
         >
-          <span class="flex items-center gap-2"><span>🔒</span> Permissions (Chmod)</span>
+          <span class="flex items-center gap-2"><span>🔒</span> {t('sftp.ctxPermissions')}</span>
         </button>
 
         <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
@@ -1743,14 +1752,14 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); openNewFileModal('remote'); }}
         >
-          <span class="flex items-center gap-2"><span>📄</span> New File</span>
+          <span class="flex items-center gap-2"><span>📄</span> {t('sftp.ctxNewFile')}</span>
         </button>
 
         <button
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); openNewFolderModal('remote'); }}
         >
-          <span class="flex items-center gap-2"><span>📁</span> New Folder</span>
+          <span class="flex items-center gap-2"><span>📁</span> {t('sftp.ctxNewFolder')}</span>
           <span class="text-[10px] text-neutral-400 font-mono">F7</span>
         </button>
 
@@ -1760,10 +1769,10 @@
             const item = ctxMenu!.item;
             closeCtxMenu();
             navigator.clipboard.writeText(item.path);
-            notifySuccess(`Copied path: ${item.path}`);
+            notifySuccess(t('sftp.copiedPath', { path: item.path }));
           }}
         >
-          <span class="flex items-center gap-2"><span>📋</span> Copy Path</span>
+          <span class="flex items-center gap-2"><span>📋</span> {t('sftp.ctxCopyPath')}</span>
         </button>
 
         <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
@@ -1772,7 +1781,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center gap-2 text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); openCompressModal(); }}
         >
-          <span>🗜️</span> Compress...
+          <span>🗜️</span> {t('sftp.ctxCompress')}
         </button>
 
         {#if isArchive(ctxMenu.item.name)}
@@ -1780,13 +1789,13 @@
             class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center gap-2 text-neutral-800 dark:text-neutral-200"
             onclick={() => { const item = ctxMenu!.item as SftpFileEntry; closeCtxMenu(); openExtractHere(item); }}
           >
-            <span>📦</span> Extract Here
+            <span>📦</span> {t('sftp.ctxExtractHere')}
           </button>
           <button
             class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center gap-2 text-neutral-800 dark:text-neutral-200"
             onclick={() => { const item = ctxMenu!.item as SftpFileEntry; closeCtxMenu(); openExtractTo(item); }}
           >
-            <span>📂</span> Extract to...
+            <span>📂</span> {t('sftp.ctxExtractTo')}
           </button>
         {/if}
 
@@ -1796,7 +1805,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); handleCopyTransfer(); }}
         >
-          <span class="flex items-center gap-2"><span>📤</span> Upload</span>
+          <span class="flex items-center gap-2"><span>📤</span> {t('sftp.ctxUpload')}</span>
           <span class="text-[10px] text-neutral-400 font-mono">F5</span>
         </button>
 
@@ -1805,7 +1814,7 @@
             class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
             onclick={() => { closeCtxMenu(); openEditorModal(); }}
           >
-            <span class="flex items-center gap-2"><span>✏️</span> Edit / View</span>
+            <span class="flex items-center gap-2"><span>✏️</span> {t('sftp.ctxEditView')}</span>
             <span class="text-[10px] text-neutral-400 font-mono">F4</span>
           </button>
         {/if}
@@ -1814,7 +1823,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); openRenameModal(); }}
         >
-          <span class="flex items-center gap-2"><span>🏷️</span> Rename</span>
+          <span class="flex items-center gap-2"><span>🏷️</span> {t('sftp.ctxRename')}</span>
           <span class="text-[10px] text-neutral-400 font-mono">F2</span>
         </button>
 
@@ -1822,7 +1831,7 @@
           class="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 hover:text-rose-400 flex items-center justify-between text-rose-600 dark:text-rose-400"
           onclick={() => { closeCtxMenu(); openDeleteModal(); }}
         >
-          <span class="flex items-center gap-2"><span>🗑️</span> Delete</span>
+          <span class="flex items-center gap-2"><span>🗑️</span> {t('sftp.ctxDelete')}</span>
           <span class="text-[10px] opacity-70 font-mono">Del</span>
         </button>
 
@@ -1832,14 +1841,14 @@
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); openNewFileModal('local'); }}
         >
-          <span class="flex items-center gap-2"><span>📄</span> New File</span>
+          <span class="flex items-center gap-2"><span>📄</span> {t('sftp.ctxNewFile')}</span>
         </button>
 
         <button
           class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => { closeCtxMenu(); openNewFolderModal('local'); }}
         >
-          <span class="flex items-center gap-2"><span>📁</span> New Folder</span>
+          <span class="flex items-center gap-2"><span>📁</span> {t('sftp.ctxNewFolder')}</span>
           <span class="text-[10px] text-neutral-400 font-mono">F7</span>
         </button>
 
@@ -1849,10 +1858,10 @@
             const item = ctxMenu!.item;
             closeCtxMenu();
             navigator.clipboard.writeText(item.path);
-            notifySuccess(`Copied path: ${item.path}`);
+            notifySuccess(t('sftp.copiedPath', { path: item.path }));
           }}
         >
-          <span class="flex items-center gap-2"><span>📋</span> Copy Path</span>
+          <span class="flex items-center gap-2"><span>📋</span> {t('sftp.ctxCopyPath')}</span>
         </button>
       {/if}
     </div>
@@ -1861,16 +1870,16 @@
 
 <!-- MODAL: COMPRESS -->
 {#if showCompressModal}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
       <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
-        Compress {compressItems.length} item(s)
+        {t('sftp.compressTitle', { count: compressItems.length })}
       </h3>
       <p class="text-xs text-neutral-500 dark:text-slate-400">
-        Items: {compressItems.slice(0, 3).join(', ')}{compressItems.length > 3 ? '...' : ''}
+        {t('sftp.items', { list: compressItems.slice(0, 3).join(', ') + (compressItems.length > 3 ? '...' : '') })}
       </p>
       <div class="space-y-1">
-        <label for="archive-name-input" class="text-xs text-neutral-600 dark:text-slate-400">Archive Name:</label>
+        <label for="archive-name-input" class="text-xs text-neutral-600 dark:text-slate-400">{t('sftp.archiveName')}</label>
         <input
           id="archive-name-input"
           type="text"
@@ -1886,14 +1895,14 @@
           disabled={isCompressing}
           class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onclick={confirmCompress}
           disabled={isCompressing || !compressArchiveName.trim()}
           class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-xs font-medium"
         >
-          {isCompressing ? 'Compressing...' : 'Compress'}
+          {isCompressing ? t('sftp.compressing') : t('sftp.compress')}
         </button>
       </div>
     </div>
@@ -1902,14 +1911,14 @@
 
 <!-- MODAL: EXTRACT -->
 {#if showExtractModal}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-md w-full p-4 space-y-3 shadow-xl">
-      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">Extract Archive</h3>
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">{t('sftp.extractTitle')}</h3>
       <p class="text-xs text-neutral-500 dark:text-slate-400 truncate">
-        Source: <span class="font-mono text-cyan-600 dark:text-cyan-400">{extractArchivePath.split('/').pop()}</span>
+        {t('sftp.source')} <span class="font-mono text-cyan-600 dark:text-cyan-400">{extractArchivePath.split('/').pop()}</span>
       </p>
       <div class="space-y-1">
-        <label for="extract-dest-input" class="text-xs text-neutral-600 dark:text-slate-400">Destination Directory:</label>
+        <label for="extract-dest-input" class="text-xs text-neutral-600 dark:text-slate-400">{t('sftp.destination')}</label>
         <input
           id="extract-dest-input"
           type="text"
@@ -1924,14 +1933,14 @@
           disabled={isExtracting}
           class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           onclick={confirmExtract}
           disabled={isExtracting || !extractDestDir.trim()}
           class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-xs font-medium"
         >
-          {isExtracting ? 'Extracting...' : 'Extract'}
+          {isExtracting ? t('sftp.extracting') : t('sftp.extract')}
         </button>
       </div>
     </div>
@@ -1940,7 +1949,7 @@
 
 <!-- MODAL: DIRECTORY SYNC & LIVE WATCH -->
 {#if showSyncModal}
-  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+  <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#151921] rounded-lg shadow-2xl border border-neutral-200 dark:border-slate-800 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
       <DirectorySync
         hostId={currentHostId}
@@ -1952,4 +1961,5 @@
   </div>
 {/if}
 </PageContainer>
+</div>
 

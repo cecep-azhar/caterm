@@ -9,6 +9,7 @@
 // host id used to make a second Connect to an already-open host a silent no-op.
 
 import type { HostRecord } from '$lib/api/hosts';
+import { t } from '$lib/i18n/index.svelte';
 import { recordSessionClosed } from '$lib/stores/feedbackStore.svelte';
 import { markHostUsed } from '$lib/stores/hostPrefs.svelte';
 import { setShowFiles } from '$lib/stores/sessionView.svelte';
@@ -31,7 +32,8 @@ export function localTerminalHost(): HostRecord {
   const now = Date.now();
   return {
     id: LOCAL_HOST_ID,
-    label: 'Local Terminal',
+    // Resolved when the tab opens, so a new local tab is named in the current language.
+    label: t('session.localTerminal'),
     address: 'localhost',
     port: 0,
     username: 'local',

@@ -11,7 +11,7 @@
   import { isFavorite, toggleFavorite, lastUsedAt } from '$lib/stores/hostPrefs.svelte';
   import { getTabs } from '$lib/stores/sessionTabs.svelte';
   import { monitorState } from '$lib/stores/monitorStore.svelte';
-  import { t } from '$lib/i18n/index.svelte';
+  import { t, intlLocale } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   let hosts = $state<HostRecord[]>([]);
@@ -71,7 +71,7 @@
     await refreshHosts();
 
     if (failed.length > 0) {
-      showToast(`Failed to delete: ${failed.join(', ')}`, 'error');
+      showToast(t('hosts.deleteFailedList', { names: failed.join(', ') }), 'error');
     } else {
       showToast(t('hosts.hostDeleted'), 'success');
     }
@@ -187,7 +187,7 @@
       showToast(editingId ? t('hosts.hostUpdated') : t('hosts.hostAdded'), 'success');
       await refreshHosts();
     } catch (err: any) {
-      errorMsg = typeof err === 'string' ? err : (err?.message || 'Failed to save host');
+      errorMsg = typeof err === 'string' ? err : (err?.message || t('hosts.saveFailed'));
       showToast(errorMsg, 'error');
     } finally {
       isLoading = false;
@@ -300,7 +300,7 @@
     const hours = Math.floor(minutes / 60);
     if (hours < 24) return t('time.hoursAgo', { n: hours });
     const days = Math.floor(hours / 24);
-    return days < 30 ? t('time.daysAgo', { n: days }) : new Date(ts).toLocaleDateString();
+    return days < 30 ? t('time.daysAgo', { n: days }) : new Date(ts).toLocaleDateString(intlLocale());
   }
 
   function hostStatus(host: HostRecord): { live: boolean; text: string } {
@@ -530,7 +530,7 @@
               aria-pressed={isFavorite(host.id)}
               class="p-1.5 -mr-1 -mt-1 rounded-md transition-colors {isFavorite(host.id) ? 'text-amber-500' : 'text-neutral-300 dark:text-neutral-600 hover:text-amber-500'}"
               title={isFavorite(host.id) ? t('hosts.unstar') : t('hosts.star')}
-              aria-label={isFavorite(host.id) ? `Unstar ${host.label}` : `Star ${host.label}`}
+              aria-label={isFavorite(host.id) ? `${t('hosts.unstar')} ${host.label}` : `${t('hosts.star')} ${host.label}`}
             >
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill={isFavorite(host.id) ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z" /></svg>
             </button>
@@ -618,7 +618,7 @@
     <button
       type="button"
       class="absolute inset-0 bg-black/50 dark:bg-black/70 cursor-default"
-      aria-label="Close host editor"
+      aria-label={t('hosts.closeEditor')}
       onclick={() => (isAddModalOpen = false)}
     ></button>
     <div
@@ -655,7 +655,7 @@
             <input 
               type="text" 
               bind:value={formAddress} 
-              placeholder="100.76.150.46 or vps.domain.com"
+              placeholder={t('hosts.addressPlaceholder')}
               class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
             />
           </div>
@@ -814,7 +814,7 @@
                 <option value="parrot">Parrot OS</option>
                 <option value="mx">MX Linux</option>
                 <option value="lubuntu">Lubuntu / Xubuntu / Kubuntu</option>
-                <option value="linux">Generic Linux (Tux)</option>
+                <option value="linux">{t('hosts.osGenericLinux')}</option>
               </optgroup>
               <optgroup label={t('hosts.form.osOtherGroup')}>
                 <option value="windows">Windows</option>
@@ -826,7 +826,7 @@
                 <option value="netbsd">NetBSD</option>
                 <option value="mikrotik">MikroTik / RouterOS</option>
                 <option value="cisco">Cisco IOS</option>
-                <option value="server">Generic Server</option>
+                <option value="server">{t('hosts.osGenericServer')}</option>
               </optgroup>
             </select>
           </div>

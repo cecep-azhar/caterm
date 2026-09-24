@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { listKeys, generateKey, importKey, deleteKey, deployPublicKey, type KeyRecord } from '$lib/api/keys';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
-  import { t } from '$lib/i18n/index.svelte';
+  import { t, intlLocale } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import { confirmModal } from '$lib/stores/uiNotifications.svelte';
 
@@ -191,7 +191,7 @@
 
           <div class="mt-auto pt-3 border-t border-neutral-100 dark:border-neutral-800/50 flex justify-between items-center opacity-70 group-hover:opacity-100 transition-opacity">
             <span class="text-xs text-neutral-500" title={key.createdAt}>
-              {new Date(key.createdAt).toLocaleDateString()}
+              {new Date(key.createdAt).toLocaleDateString(intlLocale())}
             </span>
             <div class="flex items-center gap-2">
               <button

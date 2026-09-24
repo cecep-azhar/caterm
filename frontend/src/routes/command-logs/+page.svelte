@@ -5,7 +5,7 @@
   import { save } from '@tauri-apps/plugin-dialog';
   import { writeTextFile } from '@tauri-apps/plugin-fs';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
-  import { t } from '$lib/i18n/index.svelte';
+  import { t, intlLocale } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   interface CommandLog {
@@ -214,7 +214,7 @@
   }
 
   function formatTime(ts: number) {
-    return new Date(ts).toLocaleString();
+    return new Date(ts).toLocaleString(intlLocale());
   }
 </script>
 
@@ -335,14 +335,14 @@
         class="w-full px-3 py-2 bg-neutral-50 dark:bg-[#2D2D2D] rounded-lg border border-neutral-300 dark:border-neutral-700 text-sm focus:outline-none focus:border-purple-500 transition-colors"
       >
         <option value="">{t('commandLogs.allEvents')}</option>
-        <option value="AI_AUTOMATION">✨ AI Automation</option>
-        <option value="AI_PLAN">📋 AI Plan</option>
-        <option value="PTY_COMMAND">PTY Command</option>
-        <option value="TUNNEL_START">Tunnel Start</option>
-        <option value="TUNNEL_STOP">Tunnel Stop</option>
-        <option value="VAULT_LOCK">Vault Lock</option>
-        <option value="VAULT_UNLOCK">Vault Unlock</option>
-        <option value="KEY_DEPLOY">Key Deploy</option>
+        <option value="AI_AUTOMATION">{t('commandLogs.events.AI_AUTOMATION')}</option>
+        <option value="AI_PLAN">{t('commandLogs.events.AI_PLAN')}</option>
+        <option value="PTY_COMMAND">{t('commandLogs.events.PTY_COMMAND')}</option>
+        <option value="TUNNEL_START">{t('commandLogs.events.TUNNEL_START')}</option>
+        <option value="TUNNEL_STOP">{t('commandLogs.events.TUNNEL_STOP')}</option>
+        <option value="VAULT_LOCK">{t('commandLogs.events.VAULT_LOCK')}</option>
+        <option value="VAULT_UNLOCK">{t('commandLogs.events.VAULT_UNLOCK')}</option>
+        <option value="KEY_DEPLOY">{t('commandLogs.events.KEY_DEPLOY')}</option>
       </select>
     </div>
     <div>
