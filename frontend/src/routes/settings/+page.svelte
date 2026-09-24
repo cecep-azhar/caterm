@@ -7,7 +7,8 @@
   import FeedbackWidget from '$lib/components/FeedbackWidget.svelte';
   import ProfileAvatar from '$lib/components/ProfileAvatar.svelte';
   import AvatarPicker from '$lib/components/AvatarPicker.svelte';
-  import { showToast } from '$lib/stores/uiNotifications.svelte';
+  import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
+  import { relaunch } from '@tauri-apps/plugin-process';
   import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
   import { getUpdater, checkForUpdates, installUpdate } from '$lib/stores/updater.svelte';
   import { APP_VERSION, releaseNotesUrl } from '$lib/appInfo';
@@ -150,6 +151,17 @@
       currentPassword = '';
       newPassword = '';
       confirmPassword = '';
+      const restartNow = await confirmModal(
+        'Master password changed and the vault re-encrypted. Restart CATerm now and unlock with the new password?',
+        'Master Password Changed',
+        false,
+        'Restart now',
+        'Later'
+      );
+      if (restartNow) {
+        await relaunch();
+        return;
+      }
       showToast('Master password changed. Use the new password next time you unlock.', 'success');
     } catch (err) {
       showToast(errorText(err), 'error');

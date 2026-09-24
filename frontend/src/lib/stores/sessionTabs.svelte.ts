@@ -23,6 +23,28 @@ export interface SessionTab {
   title?: string;
 }
 
+/** Host id the Local Terminal button uses; there is no stored host behind it. */
+export const LOCAL_HOST_ID = 'local';
+
+/** Stand-in host record for a local shell session (it never goes through the vault). */
+export function localTerminalHost(): HostRecord {
+  const now = Date.now();
+  return {
+    id: LOCAL_HOST_ID,
+    label: 'Local Terminal',
+    address: 'localhost',
+    port: 0,
+    username: 'local',
+    authMethod: { type: 'password' },
+    tags: ['local'],
+    os: 'windows',
+    protocol: 'ssh',
+    createdAt: now,
+    updatedAt: now,
+    hasSecret: false
+  };
+}
+
 let tabs = $state<SessionTab[]>([]);
 let counter = 0;
 

@@ -3,8 +3,8 @@
   import { page } from '$app/state';
   import TerminalPane from '$lib/components/TerminalPane.svelte';
   import SessionFileManager from '$lib/components/SessionFileManager.svelte';
-  import { listHosts, type HostRecord } from '$lib/api/hosts';
-  import { getTabs, openTab, closeTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
+  import { listHosts } from '$lib/api/hosts';
+  import { getTabs, openTab, closeTab, tabLabel, LOCAL_HOST_ID, localTerminalHost } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
     setSelectedTabId,
@@ -48,22 +48,8 @@
         loadError = '';
         let lastOpened = '';
         for (const id of ids) {
-          if (id === 'local') {
-            const localHost: HostRecord = {
-              id: 'local',
-              label: 'Local Terminal',
-              address: 'localhost',
-              port: 0,
-              username: 'local',
-              authMethod: { type: 'password' },
-              tags: ['local'],
-              os: 'windows',
-              protocol: 'ssh',
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-              hasSecret: false,
-            };
-            lastOpened = openTab(localHost);
+          if (id === LOCAL_HOST_ID) {
+            lastOpened = openTab(localTerminalHost());
             continue;
           }
           const host = hosts.find((h) => h.id === id);

@@ -48,10 +48,12 @@
   const workspaces = $derived(getWorkspaces());
   const sessionTabs = $derived(getTabs());
 
+  // Host ids, not tab ids: tab ids are per-session (`tab-<hostId>-<n>`) and never match a host
+  // on restore. A host open twice is listed twice so both sessions come back.
   const activeHostIds = $derived(
     hostIds && hostIds.length > 0
       ? hostIds
-      : sessionTabs.map((t) => t.id)
+      : sessionTabs.map((t) => t.host.id)
   );
 
   const effectiveLayout = $derived(
@@ -167,7 +169,18 @@
     isLoadingWs = true;
     try {
       const result = await restoreWorkspace(ws);
-      showToast(`Workspace "${ws.name}" loaded successfully (${result.openedCount} hosts)`, 'success');
+      if (result.openedCount === 0) {
+        showToast(`Workspace "${ws.name}" not loaded: none of its hosts exist anymore.`, 'error');
+        return;
+      }
+      if (result.missingCount > 0) {
+        showToast(
+          `Workspace "${ws.name}" loaded ${result.openedCount} of ${ws.hostIds.length} hosts (${result.missingCount} no longer exist).`,
+          'info'
+        );
+      } else {
+        showToast(`Workspace "${ws.name}" loaded (${result.openedCount} hosts)`, 'success');
+      }
 
       if (onLoad) onLoad(ws);
       if (onLoadWorkspace) onLoadWorkspace(ws);

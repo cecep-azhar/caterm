@@ -2,7 +2,7 @@
 // Saves and restores multi-host session layouts and connection states.
 
 import { listHosts, type HostRecord } from '$lib/api/hosts';
-import { openTab, closeAllTabs } from '$lib/stores/sessionTabs.svelte';
+import { openTab, closeAllTabs, LOCAL_HOST_ID, localTerminalHost } from '$lib/stores/sessionTabs.svelte';
 import {
   getSessionView,
   setLayout,
@@ -30,6 +30,14 @@ export interface WorkspaceInput {
 
 const STORAGE_KEY = 'caterm_workspaces_v2';
 
+/**
+ * Workspaces saved before this fix stored session *tab* ids (`tab-<hostId>-<n>`) instead of
+ * host ids, so restoring matched nothing and opened 0 hosts. Recover the host id from them.
+ */
+function toHostId(id: string): string {
+  return /^tab-(.+)-\d+$/.exec(id)?.[1] ?? id;
+}
+
 function loadInitialWorkspaces(): Workspace[] {
   if (typeof window === 'undefined' || typeof localStorage === 'undefined') {
     return [];
@@ -39,7 +47,12 @@ function loadInitialWorkspaces(): Workspace[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed;
+      const migrated = (parsed as Workspace[]).map((ws) => ({
+        ...ws,
+        hostIds: (ws.hostIds ?? []).map(toHostId)
+      }));
+      if (JSON.stringify(migrated) !== raw) persistWorkspaces(migrated);
+      return migrated;
     }
   } catch (e) {
     console.error('Failed to load workspaces from localStorage:', e);
@@ -165,15 +178,17 @@ export async function restoreWorkspace(workspace: Workspace): Promise<{ openedCo
     console.error('Failed to list hosts when restoring workspace:', err);
   }
 
+  const resolved = workspace.hostIds
+    .map((hostId) => (hostId === LOCAL_HOST_ID ? localTerminalHost() : allHosts.find((h) => h.id === hostId)))
+    .filter((host): host is HostRecord => Boolean(host));
+  const missingCount = workspace.hostIds.length - resolved.length;
+
+  // Nothing to open: leave the sessions the user already has alone instead of closing them
+  // for an empty result.
+  if (resolved.length === 0) return { openedCount: 0, missingCount };
+
   closeAllTabs();
-  let openedCount = 0;
-  for (const hostId of workspace.hostIds) {
-    const host = allHosts.find((h) => h.id === hostId);
-    if (host) {
-      openTab(host);
-      openedCount++;
-    }
-  }
+  for (const host of resolved) openTab(host);
 
   setCurrentLayout(workspace.layout || 1);
   // Restoring connects every host; like any new connection, Files stays closed until asked for.
@@ -183,8 +198,5 @@ export async function restoreWorkspace(workspace: Workspace): Promise<{ openedCo
     window.dispatchEvent(new CustomEvent('caterm:workspace-loaded', { detail: workspace }));
   }
 
-  return {
-    openedCount,
-    missingCount: workspace.hostIds.length - openedCount
-  };
+  return { openedCount: resolved.length, missingCount };
 }
