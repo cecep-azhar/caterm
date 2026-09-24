@@ -4,7 +4,7 @@
 //! `caterm-core` for the guard that enforces this.
 
 use caterm_core::{
-    CatermError, ai, audit, backup, feedback, groups, investigations, keys, monitor, sftp, snippets, ssh,
+    CatermError, ai, audit, backup, feedback, groups, investigations, keys, monitor, prefs, sftp, snippets, ssh,
     store, sync, teams, tunnels, vault, vfs,
 };
 
@@ -607,13 +607,13 @@ pub async fn list_watches() -> Result<Vec<sync::WatchInfo>, CatermError> {
 /// GPU on/off for the WebView. Read by the shell before the window exists, so a change only
 /// applies after a restart — the Settings page says so and offers to relaunch.
 #[tauri::command]
-pub fn get_performance_prefs() -> caterm_core::prefs::PerformancePrefs {
-    caterm_core::prefs::load_performance_prefs()
+pub fn get_performance_prefs() -> prefs::PerformancePrefs {
+    prefs::load_performance_prefs()
 }
 
 #[tauri::command]
-pub async fn set_performance_prefs(prefs: caterm_core::prefs::PerformancePrefs) -> Result<(), CatermError> {
-    run_blocking(move || caterm_core::prefs::save_performance_prefs(&prefs)).await
+pub async fn set_performance_prefs(prefs: prefs::PerformancePrefs) -> Result<(), CatermError> {
+    run_blocking(move || prefs::save_performance_prefs(&prefs)).await
 }
 
 #[tauri::command]

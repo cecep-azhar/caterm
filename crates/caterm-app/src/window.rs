@@ -4,11 +4,12 @@
 //! because whether the WebView gets GPU acceleration is a user preference that has to be
 //! known before the WebView exists — Chromium switches cannot change afterwards.
 
+use caterm_core::prefs;
 use tauri::WebviewWindow;
 
-/// Appended to the configured browser args when the user turned GPU acceleration off in
-/// Settings > Performance: software rendering, less memory, more CPU.
-const NO_GPU_ARGS: &str = "--disable-gpu --disable-gpu-compositing";
+/// Appended to configured browser args when user turned GPU acceleration off in
+/// Settings -> Performance: software rendering, less memory, more CPU.
+const NO_GPU_ARGS: &str = " --disable-gpu --disable-gpu-compositing";
 
 pub fn create_main_window(app: &tauri::App) -> tauri::Result<WebviewWindow> {
     let config = app
@@ -21,7 +22,7 @@ pub fn create_main_window(app: &tauri::App) -> tauri::Result<WebviewWindow> {
         .ok_or(tauri::Error::WindowNotFound)?;
 
     let mut builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
-    if !caterm_core::prefs::load_performance_prefs().gpu_acceleration {
+    if !prefs::load_performance_prefs().gpu_acceleration {
         let base = config.additional_browser_args.clone().unwrap_or_default();
         builder = builder.additional_browser_args(&format!("{base} {NO_GPU_ARGS}"));
     }
