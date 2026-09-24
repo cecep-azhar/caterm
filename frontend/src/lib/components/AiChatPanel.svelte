@@ -14,6 +14,7 @@
   import { getActiveSession, injectIntoActiveSession } from '$lib/stores/activeSession.svelte';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { errorText } from '$lib/errors';
+  import { t } from '$lib/i18n/index.svelte';
 
   let { onClose }: { onClose: () => void } = $props();
 
@@ -110,11 +111,11 @@
     if (isExecuting || proposedSteps.length === 0) return;
 
     if (execMode === 'ssh' && !targetHostId) {
-      showToast('Please select a target host first.', 'error');
+      showToast(t('aiChat.errSelectHost'), 'error');
       return;
     }
     if (execMode === 'terminal' && !activeSession) {
-      showToast('No active terminal — open a session first or use SSH exec mode.', 'error');
+      showToast(t('aiChat.errNoTerminal'), 'error');
       return;
     }
 
@@ -127,7 +128,7 @@
         if (execMode === 'terminal') {
           // Fire-and-forget: the shell shows the result, we cannot read it back.
           injectIntoActiveSession(step.command);
-          runs[i] = { status: 'ok', output: 'Sent to active terminal.' };
+          runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
           continue;
         }
 
@@ -137,11 +138,11 @@
           const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
           runs[i] = {
             status: result.success ? 'ok' : 'failed',
-            output: output || '(no output)',
+            output: output || t('aiChat.noOutput'),
             exitCode: result.exit_code
           };
           if (!result.success) {
-            showToast(`Step ${i + 1} failed (exit ${result.exit_code ?? '?'}). Execution aborted.`, 'error');
+            showToast(t('aiChat.stepFailed', { step: i + 1, code: result.exit_code ?? '?' }), 'error');
             break;
           }
         } catch (err) {
@@ -165,7 +166,7 @@
      with nothing. Sits in the same slot as the SFTP panel; only one of the two is ever open. -->
 <aside
   class="fixed inset-0 z-50 sm:static sm:z-auto sm:w-[26rem] sm:shrink-0 h-full bg-white dark:bg-neutral-950 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl sm:shadow-none flex flex-col"
-  aria-label="AI Assistant"
+  aria-label={t('aiChat.title')}
 >
   <header class="p-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-2 shrink-0">
     <div class="flex items-center gap-2 min-w-0">
@@ -175,8 +176,8 @@
         </svg>
       </div>
       <div class="min-w-0">
-        <h2 class="text-sm font-bold text-neutral-900 dark:text-white truncate">AI Assistant</h2>
-        <p class="text-[11px] text-neutral-500 truncate">Discuss first, execute safely</p>
+        <h2 class="text-sm font-bold text-neutral-900 dark:text-white truncate">{t('aiChat.title')}</h2>
+        <p class="text-[11px] text-neutral-500 truncate">{t('aiChat.tagline')}</p>
       </div>
     </div>
     <div class="flex items-center gap-1 shrink-0">
@@ -184,8 +185,8 @@
         <button
           onclick={resetConversation}
           class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          title="Start new conversation"
-          aria-label="Start new conversation"
+          title={t('aiChat.newConversation')}
+          aria-label={t('aiChat.newConversation')}
         >
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -195,7 +196,7 @@
       <button
         onclick={onClose}
         class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-        aria-label="Close AI Assistant"
+        aria-label={t('aiChat.close')}
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -207,14 +208,14 @@
   <!-- Target + execution mode -->
   <div class="p-3 border-b border-neutral-200 dark:border-neutral-800 space-y-2 shrink-0">
     <div class="flex items-center gap-2">
-      <label for="ai-chat-host" class="text-[11px] font-semibold text-neutral-500 shrink-0">Host</label>
+      <label for="ai-chat-host" class="text-[11px] font-semibold text-neutral-500 shrink-0">{t('aiChat.host')}</label>
       <select
         id="ai-chat-host"
         bind:value={targetHostId}
         class="flex-1 min-w-0 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500"
       >
         {#if hosts.length === 0}
-          <option value="">No saved hosts yet</option>
+          <option value="">{t('aiChat.noHosts')}</option>
         {/if}
         {#each hosts as host (host.id)}
           <option value={host.id}>{host.label} ({host.username}@{host.address})</option>
@@ -223,21 +224,21 @@
     </div>
 
     <div class="flex items-center gap-2">
-      <span class="text-[11px] font-semibold text-neutral-500 shrink-0">Execute via</span>
+      <span class="text-[11px] font-semibold text-neutral-500 shrink-0">{t('aiChat.executeVia')}</span>
       <div class="flex items-center gap-0.5 p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-800">
         <button
           onclick={() => (execMode = 'ssh')}
           class="px-2 py-0.5 rounded text-[11px] font-medium transition-colors {execMode === 'ssh' ? 'bg-violet-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
-          title="Non-interactive SSH channel: output and exit code captured, all audited"
+          title={t('aiChat.sshExecTitle')}
         >
-          SSH exec
+          {t('aiChat.sshExec')}
         </button>
         <button
           onclick={() => (execMode = 'terminal')}
           class="px-2 py-0.5 rounded text-[11px] font-medium transition-colors {execMode === 'terminal' ? 'bg-violet-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
-          title="Type into active terminal pane directly"
+          title={t('aiChat.terminalTitle')}
         >
-          Active terminal
+          {t('aiChat.activeTerminal')}
         </button>
       </div>
     </div>
@@ -245,8 +246,8 @@
     {#if execMode === 'terminal'}
       <p class="text-[11px] {activeSession ? 'text-neutral-500' : 'text-amber-600 dark:text-amber-400'}">
         {activeSession
-          ? `Will type into terminal: ${activeSession.label}`
-          : 'No active terminal pane. Open an SSH session first.'}
+          ? t('aiChat.willType', { label: activeSession.label })
+          : t('aiChat.noActivePane')}
       </p>
     {/if}
   </div>
@@ -256,10 +257,10 @@
     {#if messages.length === 0}
       <div class="text-center py-8 space-y-3">
         <p class="text-sm text-neutral-500 dark:text-neutral-400">
-          Tell AI what you want to achieve on this server.
+          {t('aiChat.emptyPrompt')}
         </p>
         <div class="flex flex-wrap gap-1.5 justify-center">
-          {#each ['Setup Docker & Compose', 'Install Node.js LTS for production', 'Hardening SSH & firewall'] as suggestion}
+          {#each [t('aiChat.suggestDocker'), t('aiChat.suggestNode'), t('aiChat.suggestHardening')] as suggestion}
             <button
               onclick={() => {
                 draft = suggestion;
@@ -272,7 +273,7 @@
           {/each}
         </div>
         <p class="text-[11px] text-neutral-400 dark:text-neutral-500 max-w-xs mx-auto">
-          AI will ask questions first (version, distro, sudo) before proposing any commands.
+          {t('aiChat.asksFirst')}
         </p>
       </div>
     {/if}
@@ -292,16 +293,16 @@
     {#if isSending}
       <div class="flex justify-start">
         <div class="rounded-xl px-3 py-2 text-xs bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-500">
-          AI is thinking...
+          {t('aiChat.thinking')}
         </div>
       </div>
     {/if}
 
     {#if errorMsg}
       <div class="rounded-lg px-3 py-2 text-xs bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300">
-        <p class="font-semibold mb-0.5">Failed to connect to AI</p>
+        <p class="font-semibold mb-0.5">{t('aiChat.connectFailed')}</p>
         <p class="break-words">{errorMsg}</p>
-        <a href="/settings" class="underline mt-1 inline-block">Check Settings &gt; AI Assistant</a>
+        <a href="/settings" class="underline mt-1 inline-block">{t('aiChat.checkSettings')}</a>
       </div>
     {/if}
 
@@ -310,9 +311,9 @@
       <div class="rounded-xl border border-violet-300 dark:border-violet-900 bg-violet-50 dark:bg-violet-950/30 p-3 space-y-2">
         <div class="flex items-center justify-between gap-2">
           <h3 class="text-xs font-bold text-violet-800 dark:text-violet-300">
-            Execution plan ({proposedSteps.length} steps)
+            {t('aiChat.planTitle', { count: proposedSteps.length })}
           </h3>
-          <span class="text-[11px] text-violet-700 dark:text-violet-400">{acceptedCount} selected</span>
+          <span class="text-[11px] text-violet-700 dark:text-violet-400">{t('aiChat.selected', { count: acceptedCount })}</span>
         </div>
 
         <ul class="space-y-1.5">
@@ -332,7 +333,7 @@
                     </span>
                     {#if step.is_danger || step.is_sudo}
                       <span class="px-1 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                        {step.is_danger ? 'Risk' : 'Sudo'}
+                        {step.is_danger ? t('aiChat.risk') : t('aiChat.sudo')}
                       </span>
                     {/if}
                   </span>
@@ -354,11 +355,11 @@
                         ? 'text-rose-600 dark:text-rose-400'
                         : 'text-amber-600 dark:text-amber-400'}"
                   >
-                    {runs[i].status === 'running' ? 'Running...' : runs[i].status}
-                    {#if runs[i].exitCode !== undefined}· exit {runs[i].exitCode}{/if}
+                    {runs[i].status === 'running' ? t('aiChat.running') : runs[i].status === 'ok' ? t('aiChat.statusOk') : t('aiChat.statusFailed')}
+                    {#if runs[i].exitCode !== undefined}· {t('aiChat.exit', { code: runs[i].exitCode ?? '' })}{/if}
                   </span>
                   {#if runs[i].output}
-                    <pre class="mt-1 p-1.5 rounded bg-neutral-950 text-neutral-200 text-[10px] font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{runs[i].output}</pre>
+                    <pre class="mt-1 p-1.5 rounded bg-neutral-100 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-transparent text-[10px] font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{runs[i].output}</pre>
                   {/if}
                 </div>
               {/if}
@@ -372,10 +373,10 @@
           class="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white transition-colors"
         >
           {isExecuting
-            ? 'Executing...'
+            ? t('aiChat.executing')
             : execMode === 'ssh'
-              ? `Run ${acceptedCount} steps on ${targetHost?.label ?? 'host'}`
-              : `Send ${acceptedCount} steps to active terminal`}
+              ? t('aiChat.runOnHost', { count: acceptedCount, host: targetHost?.label ?? t('aiChat.hostFallback') })
+              : t('aiChat.sendToTerminal', { count: acceptedCount })}
         </button>
       </div>
     {/if}
@@ -388,15 +389,15 @@
         bind:value={draft}
         onkeydown={handleKeydown}
         rows="2"
-        placeholder="e.g. Help me setup Docker on this server"
-        aria-label="Message for AI"
+        placeholder={t('aiChat.composerPlaceholder')}
+        aria-label={t('aiChat.composerLabel')}
         class="flex-1 resize-none bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2.5 py-2 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-violet-500"
       ></textarea>
       <button
         onclick={send}
         disabled={isSending || draft.trim().length === 0}
         class="px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white transition-colors shrink-0"
-        aria-label="Send"
+        aria-label={t('aiChat.send')}
       >
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

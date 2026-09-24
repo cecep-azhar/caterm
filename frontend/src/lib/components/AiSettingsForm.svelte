@@ -6,6 +6,7 @@
   import { aiChat, getAiSettings, saveAiSettings, type AiSettings } from '$lib/api/ai';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { errorText } from '$lib/errors';
+  import { t } from '$lib/i18n/index.svelte';
 
   let { onSaved }: { onSaved?: (settings: AiSettings) => void } = $props();
 
@@ -42,7 +43,7 @@
     isSaving = true;
     try {
       await saveAiSettings(settings);
-      showToast('AI settings saved.', 'success');
+      showToast(t('aiSettings.saved'), 'success');
       onSaved?.(settings);
     } catch (err) {
       showToast(errorText(err), 'error');
@@ -63,8 +64,8 @@
     try {
       await saveAiSettings(settings);
       const reply = await aiChat([{ role: 'user', content: 'ping' }]);
-      const preview = reply.reply.trim().slice(0, 120) || '(empty response)';
-      testResult = { ok: true, text: `Connected. Model replied: ${preview}` };
+      const preview = reply.reply.trim().slice(0, 120) || t('aiSettings.emptyResponse');
+      testResult = { ok: true, text: t('aiSettings.connectedReply', { preview }) };
     } catch (err) {
       testResult = { ok: false, text: errorText(err) };
     } finally {
@@ -76,7 +77,7 @@
 <form onsubmit={handleSave} class="space-y-4">
   <div>
     <label for="ai-provider-select" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-      Provider
+      {t('aiSettings.provider')}
     </label>
     <select
       id="ai-provider-select"
@@ -84,16 +85,16 @@
       disabled={isLoading}
       class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
     >
-      <option value="custom">Custom / OpenAI Compatible (Self-hosted, vLLM, Ollama)</option>
-      <option value="openai">OpenAI Official</option>
-      <option value="ollama">Ollama Local</option>
-      <option value="anthropic">Anthropic Claude</option>
+      <option value="custom">{t('aiSettings.providerCustom')}</option>
+      <option value="openai">{t('aiSettings.providerOpenai')}</option>
+      <option value="ollama">{t('aiSettings.providerOllama')}</option>
+      <option value="anthropic">{t('aiSettings.providerAnthropic')}</option>
     </select>
   </div>
 
   <div>
     <label for="ai-base-url-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-      Base URL (OpenAI-compatible)
+      {t('aiSettings.baseUrl')}
     </label>
     <input
       id="ai-base-url-input"
@@ -104,13 +105,13 @@
       class="w-full font-mono bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-2 text-xs md:text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 transition-colors"
     />
     <p class="text-[11px] text-neutral-500 mt-1">
-      Endpoint harus menyediakan <span class="font-mono">/chat/completions</span>.
+      {t('aiSettings.baseUrlHintBefore')} <span class="font-mono">/chat/completions</span>.
     </p>
   </div>
 
   <div>
     <label for="ai-api-key-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-      API Key
+      {t('aiSettings.apiKey')}
     </label>
     <div class="relative">
       <input
@@ -125,7 +126,7 @@
         type="button"
         onclick={() => (showApiKey = !showApiKey)}
         class="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-        aria-label={showApiKey ? 'Sembunyikan API key' : 'Tampilkan API key'}
+        aria-label={showApiKey ? t('aiSettings.hideApiKey') : t('aiSettings.showApiKey')}
       >
         {#if showApiKey}
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -140,13 +141,13 @@
       </button>
     </div>
     <p class="text-[11px] text-neutral-500 mt-1">
-      Stored in local encrypted SQLite vault and sent directly from application process.
+      {t('aiSettings.apiKeyHint')}
     </p>
   </div>
 
   <div>
     <label for="ai-model-input" class="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
-      Model
+      {t('aiSettings.model')}
     </label>
     <input
       id="ai-model-input"
@@ -164,7 +165,7 @@
         ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300'
         : 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300'}"
     >
-      <p class="font-semibold mb-0.5">{testResult.ok ? 'Connection Succeeded' : 'Connection Failed'}</p>
+      <p class="font-semibold mb-0.5">{testResult.ok ? t('aiSettings.connectionOk') : t('aiSettings.connectionFailed')}</p>
       <p class="break-words">{testResult.text}</p>
     </div>
   {/if}
@@ -175,7 +176,7 @@
       onclick={handleReset}
       class="text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors shrink-0"
     >
-      Reset to Default
+      {t('aiSettings.resetDefault')}
     </button>
     <div class="flex items-center gap-2">
       <button
@@ -184,14 +185,14 @@
         disabled={isTesting || isLoading}
         class="px-4 py-2 rounded-lg text-xs font-semibold border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
       >
-        {isTesting ? 'Testing...' : 'Test Connection'}
+        {isTesting ? t('aiSettings.testing') : t('aiSettings.testConnection')}
       </button>
       <button
         type="submit"
         disabled={isSaving || isLoading}
         class="px-5 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white shadow transition-colors"
       >
-        {isSaving ? 'Saving...' : 'Save Settings'}
+        {isSaving ? t('aiSettings.saving') : t('aiSettings.saveSettings')}
       </button>
     </div>
   </div>

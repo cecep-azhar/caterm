@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '$lib/i18n/index.svelte';
   import { onMount, onDestroy } from 'svelte';
   import { EditorState, type Extension } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers, highlightActiveLine } from '@codemirror/view';
@@ -196,15 +197,14 @@
     <div class="flex-1 flex flex-col items-center justify-center gap-4 bg-neutral-50 dark:bg-[#12161b] text-xs p-6 text-center">
       <span class="text-3xl">⚠️</span>
       <p class="text-neutral-700 dark:text-slate-300 font-medium">
-        This file is <span class="font-bold text-amber-600 dark:text-amber-400">{formatBytes(byteSize)}</span>,
-        which exceeds the 5 MB safe-edit limit.
+        {t('editor.tooLarge', { size: formatBytes(byteSize) })}
       </p>
-      <p class="text-neutral-500 dark:text-slate-500">Loading large files may cause the editor to freeze or become sluggish.</p>
+      <p class="text-neutral-500 dark:text-slate-500">{t('editor.tooLargeBody')}</p>
       <button
         onclick={dismissWarningAndLoad}
         class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-white rounded text-xs font-semibold"
       >
-        Load anyway
+        {t('editor.loadAnyway')}
       </button>
     </div>
   {:else}
@@ -217,16 +217,16 @@
 
   <!-- Status bar -->
   <div class="flex items-center justify-between px-3 py-1 border-t border-neutral-200 dark:border-slate-800 bg-neutral-100 dark:bg-slate-900 text-[10px] text-neutral-500 dark:text-slate-500 select-none shrink-0">
-    <span>Ln {line}, Col {col}</span>
+    <span>{t('editor.position', { line, col })}</span>
     <span class="flex items-center gap-3">
       <span>UTF-8</span>
-      <span class="uppercase text-neutral-400 dark:text-slate-600">{pane}</span>
+      <span class="uppercase text-neutral-400 dark:text-slate-600">{t(`editor.pane.${pane}`)}</span>
       {#if loading}
-        <span class="text-cyan-500">Loading…</span>
+        <span class="text-cyan-600 dark:text-cyan-500">{t('editor.loading')}</span>
       {:else if saveStatus === 'saving'}
-        <span class="text-amber-500">Saving…</span>
+        <span class="text-amber-600 dark:text-amber-500">{t('editor.saving')}</span>
       {:else if saveStatus === 'saved'}
-        <span class="text-emerald-500">✓ Saved</span>
+        <span class="text-emerald-600 dark:text-emerald-500">{t('editor.saved')}</span>
       {/if}
     </span>
   </div>

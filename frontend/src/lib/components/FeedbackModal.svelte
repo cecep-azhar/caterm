@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from '$lib/i18n/index.svelte';
   import { submitFeedback } from '$lib/api/feedback';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { errorText } from '$lib/errors';
@@ -21,13 +22,10 @@
   let submitted = $state(false);
   let errorMessage = $state('');
 
-  const ratingLabels: Record<number, string> = {
-    1: 'Poor',
-    2: 'Fair',
-    3: 'Good',
-    4: 'Very Good',
-    5: 'Excellent'
-  };
+  // Label for the currently hovered/selected star count (`feedback.rating.1` … `.5`).
+  function ratingLabel(stars: number): string {
+    return stars >= 1 && stars <= 5 ? t(`feedback.rating.${stars}`) : '';
+  }
 
   function storageKey(action: 'submitted' | 'dismissed'): string {
     return `${STORAGE_KEY_PREFIX}_${APP_VERSION}_${action}`;
@@ -45,7 +43,7 @@
   async function handleSubmit(event: Event) {
     event.preventDefault();
     if (rating < 1 || rating > 5) {
-      errorMessage = 'Please select a rating between 1 and 5 stars.';
+      errorMessage = t('feedback.errRating');
       return;
     }
 
@@ -66,7 +64,7 @@
       }
 
       submitted = true;
-      showToast('Thank you! Feedback submitted successfully.', 'success');
+      showToast(t('feedback.thanks'), 'success');
       onSubmitted?.();
     } catch (err) {
       const msg = errorText(err);
@@ -90,8 +88,8 @@
 <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
   <button
     type="button"
-    class="absolute inset-0 bg-black/60 backdrop-blur-sm cursor-default"
-    aria-label="Close Feedback dialog"
+    class="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm cursor-default"
+    aria-label={t('feedback.closeDialog')}
     onclick={handleDismiss}
   ></button>
 
@@ -106,8 +104,8 @@
       type="button"
       onclick={handleDismiss}
       class="absolute top-4 right-4 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-      aria-label="Close"
-      title="Close"
+      aria-label={t('common.close')}
+      title={t('common.close')}
     >
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -123,10 +121,10 @@
       </div>
       <div>
         <h2 id="feedback-dialog-title" class="text-lg font-bold text-neutral-900 dark:text-white tracking-tight">
-          Send Feedback & Bug Report
+          {t('feedback.title')}
         </h2>
         <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-          Help us improve CATerm. Share your rating, feedback, or report an issue.
+          {t('feedback.subtitle')}
         </p>
       </div>
     </div>
@@ -140,9 +138,9 @@
             </svg>
           </div>
           <div>
-            <h3 class="text-sm font-semibold text-neutral-900 dark:text-white">Feedback Submitted!</h3>
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-white">{t('feedback.submittedTitle')}</h3>
             <p class="text-xs text-neutral-600 dark:text-neutral-300 mt-0.5 leading-relaxed">
-              Thank you for your time and feedback. Your input helps us make CATerm better for everyone.
+              {t('feedback.submittedBody')}
             </p>
           </div>
         </div>
@@ -152,14 +150,14 @@
             onclick={handleReset}
             class="text-xs text-sky-600 dark:text-sky-400 hover:underline font-medium transition-colors cursor-pointer"
           >
-            Send another feedback
+            {t('feedback.sendAnother')}
           </button>
           <button
             type="button"
             onclick={handleDismiss}
             class="px-4 py-1.5 text-xs font-medium rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 transition-colors cursor-pointer"
           >
-            Done
+            {t('feedback.done')}
           </button>
         </div>
       </div>
@@ -168,16 +166,16 @@
         <!-- Star Rating -->
         <div class="space-y-1.5">
           <label for="feedback-stars-modal" class="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
-            Experience Rating
+            {t('feedback.ratingLabel')}
           </label>
           <div id="feedback-stars-modal" class="flex items-center gap-2">
-            <div class="flex items-center gap-1" role="radiogroup" aria-label="Star rating">
+            <div class="flex items-center gap-1" role="radiogroup" aria-label={t('feedback.starRating')}>
               {#each [1, 2, 3, 4, 5] as star}
                 <button
                   type="button"
                   role="radio"
                   aria-checked={rating === star}
-                  aria-label="{star} out of 5 stars"
+                  aria-label={t('feedback.starsOutOf', { count: star })}
                   onclick={() => (rating = star)}
                   onmouseenter={() => (hoverRating = star)}
                   onmouseleave={() => (hoverRating = 0)}
@@ -200,7 +198,7 @@
               {/each}
             </div>
             <span class="text-xs font-medium text-neutral-600 dark:text-neutral-400 ml-2">
-              {ratingLabels[hoverRating || rating] || ''}
+              {ratingLabel(hoverRating || rating)}
             </span>
           </div>
         </div>
@@ -208,18 +206,18 @@
         <!-- Textarea -->
         <div class="space-y-1.5">
           <label for="feedback-content-modal" class="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
-            Message or Bug Description <span class="text-neutral-400 font-normal normal-case">(optional)</span>
+            {t('feedback.messageLabel')} <span class="text-neutral-400 font-normal normal-case">{t('feedback.optional')}</span>
           </label>
           <textarea
             id="feedback-content-modal"
             bind:value={content}
             rows="4"
             maxlength="2000"
-            placeholder="Tell us what happened, what you like, or report a bug..."
+            placeholder={t('feedback.messagePlaceholder')}
             class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500 resize-y"
           ></textarea>
           <div class="flex justify-between items-center text-[11px] text-neutral-500 dark:text-neutral-400">
-            <span>Maximum 2000 characters</span>
+            <span>{t('feedback.maxChars')}</span>
             <span>{content.length} / 2000</span>
           </div>
         </div>
@@ -236,7 +234,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <p>
-            Feedback is sent to the CATerm team for review and may be featured on our website (with permission).
+            {t('feedback.moderationNote')}
           </p>
         </div>
 
@@ -247,7 +245,7 @@
             onclick={handleDismiss}
             class="px-4 py-2 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 transition-colors cursor-pointer"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
 
           <button
@@ -260,9 +258,9 @@
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span>Sending...</span>
+              <span>{t('feedback.sending')}</span>
             {:else}
-              <span>Send Feedback</span>
+              <span>{t('feedback.send')}</span>
             {/if}
           </button>
         </div>
