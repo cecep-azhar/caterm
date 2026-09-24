@@ -54,7 +54,7 @@
   const activeHostIds = $derived(
     hostIds && hostIds.length > 0
       ? hostIds
-      : sessionTabs.map((t) => t.host.id)
+      : sessionTabs.map((tab) => tab.host.id)
   );
 
   const effectiveLayout = $derived(

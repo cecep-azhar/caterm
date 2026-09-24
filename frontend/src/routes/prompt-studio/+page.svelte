@@ -13,6 +13,8 @@
     type AiExecutionResult,
     type AiSettings
   } from '$lib/api/ai';
+  import { t } from '$lib/i18n/index.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
 
   interface ExtendedStep extends AiPlanStep {
     enabled: boolean;
@@ -51,28 +53,15 @@
   let copiedStepIndex = $state<number | null>(null);
 
   // Quick prompt suggestion chips
-  const quickPrompts = [
-    {
-      label: '🚀 Setup Laravel 11 Dev',
-      goal: 'Setup Ubuntu machine for Laravel 11 development with PHP 8.3, Composer, Node.js 20, and MySQL Server'
-    },
-    {
-      label: '🐳 Install Docker & Compose',
-      goal: 'Install official Docker Engine, Docker Compose plugin, and configure non-root user group on Ubuntu/Debian'
-    },
-    {
-      label: '📦 Node.js 20 & Fullstack',
-      goal: 'Setup Node.js 20 LTS runtime via NodeSource, npm, pnpm, PM2 process manager, and Nginx web server'
-    },
-    {
-      label: '🛡️ Linux Security Hardening',
-      goal: 'Linux server security hardening: configure UFW firewall, fail2ban brute-force protection, and disable SSH password authentication'
-    },
-    {
-      label: '🐘 PostgreSQL & Redis',
-      goal: 'Install and configure PostgreSQL 16 database server and Redis Server with basic service hardening'
-    }
-  ];
+  // Each translated goal keeps the keyword `generateLocalPlan` matches on (laravel, docker,
+  // node, keamanan/security, postgres), so the offline planner picks the same template in
+  // every language.
+  const quickPrompts = $derived(
+    (['laravel', 'docker', 'node', 'hardening', 'postgres'] as const).map((key) => ({
+      label: t(`promptStudio.quick.${key}Label`),
+      goal: t(`promptStudio.quick.${key}Goal`)
+    }))
+  );
 
   onMount(async () => {
     await Promise.all([loadHosts(), loadSettings()]);
@@ -125,53 +114,53 @@
     const lower = goalText.toLowerCase();
     if (lower.includes('laravel')) {
       return {
-        summary: 'Automated plan to prepare a full Laravel 11 development environment on Ubuntu with PHP 8.3, Composer, MySQL Server, and Node.js 20 LTS.',
+        summary: t('promptStudio.tpl.laravel.summary'),
         requirements: ['PHP 8.3', 'Composer', 'MySQL 8.0', 'Node.js 20', 'Git', 'Nginx'],
         steps: [
           {
             step_number: 1,
-            title: 'Update Package Index & Core Dependencies',
-            description: 'Update APT package index and install basic supporting utilities (curl, git, zip, ca-certificates).',
+            title: t('promptStudio.tpl.laravel.s1Title'),
+            description: t('promptStudio.tpl.laravel.s1Desc'),
             command: 'sudo apt-get update && sudo apt-get install -y curl zip unzip git software-properties-common ca-certificates apt-transport-https',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Setup Ondrej PHP PPA & Install PHP 8.3',
-            description: 'Add Ondrej Sury PPA repository and install PHP 8.3 with extensions required by Laravel 11.',
+            title: t('promptStudio.tpl.laravel.s2Title'),
+            description: t('promptStudio.tpl.laravel.s2Desc'),
             command: 'sudo add-apt-repository -y ppa:ondrej/php && sudo apt-get update && sudo apt-get install -y php8.3 php8.3-cli php8.3-common php8.3-fpm php8.3-mysql php8.3-mbstring php8.3-xml php8.3-curl php8.3-zip php8.3-bcmath php8.3-intl php8.3-gd php8.3-sqlite3',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 3,
-            title: 'Install Composer (PHP Package Manager)',
-            description: 'Download and install Composer globally to /usr/local/bin/composer.',
+            title: t('promptStudio.tpl.laravel.s3Title'),
+            description: t('promptStudio.tpl.laravel.s3Desc'),
             command: 'curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php && sudo php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer && rm /tmp/composer-setup.php',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Install & Start MySQL Server',
-            description: 'Install MySQL database server and ensure service starts on boot.',
+            title: t('promptStudio.tpl.laravel.s4Title'),
+            description: t('promptStudio.tpl.laravel.s4Desc'),
             command: 'sudo apt-get install -y mysql-server && sudo systemctl enable --now mysql',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 5,
-            title: 'Install Node.js 20 LTS via NodeSource',
-            description: 'Install Node.js v20 LTS and npm for frontend asset compilation (Vite/Tailwind).',
+            title: t('promptStudio.tpl.laravel.s5Title'),
+            description: t('promptStudio.tpl.laravel.s5Desc'),
             command: 'curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 6,
-            title: 'Verify All Laravel Tooling Versions',
-            description: 'Confirm that PHP, Composer, Node.js, npm, and MySQL are installed correctly.',
+            title: t('promptStudio.tpl.laravel.s6Title'),
+            description: t('promptStudio.tpl.laravel.s6Desc'),
             command: 'php -v && composer --version && node -v && npm -v && mysql --version',
             is_sudo: false,
             is_danger: false
@@ -181,45 +170,45 @@
     }
     if (lower.includes('docker')) {
       return {
-        summary: 'Official Docker Engine, containerd, and Docker Compose Plugin installation on Ubuntu with user permission setup.',
-        requirements: ['Docker CE', 'Docker Compose v2', 'containerd.io', 'User Permissions'],
+        summary: t('promptStudio.tpl.docker.summary'),
+        requirements: ['Docker CE', 'Docker Compose v2', 'containerd.io', t('promptStudio.req.userPermissions')],
         steps: [
           {
             step_number: 1,
-            title: 'Remove Conflicting Old Docker Packages',
-            description: 'Remove legacy distribution packages to prevent dependency conflicts.',
+            title: t('promptStudio.tpl.docker.s1Title'),
+            description: t('promptStudio.tpl.docker.s1Desc'),
             command: 'for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove -y $pkg; done || true',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Setup Docker Official GPG Key & APT Repo',
-            description: 'Add Docker official GPG key and configure the stable APT repository.',
+            title: t('promptStudio.tpl.docker.s2Title'),
+            description: t('promptStudio.tpl.docker.s2Desc'),
             command: 'sudo apt-get update && sudo apt-get install -y ca-certificates curl && sudo install -m 0755 -d /etc/apt/keyrings && sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc && sudo chmod a+r /etc/apt/keyrings/docker.asc && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo \\"$VERSION_CODENAME\\") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 3,
-            title: 'Install Docker CE, CLI & Docker Compose',
-            description: 'Install Docker Engine, CLI, containerd, and Docker Compose plugins.',
+            title: t('promptStudio.tpl.docker.s3Title'),
+            description: t('promptStudio.tpl.docker.s3Desc'),
             command: 'sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Enable Docker Service & Group Permissions',
-            description: 'Enable Docker daemon and append the current user to the docker group.',
+            title: t('promptStudio.tpl.docker.s4Title'),
+            description: t('promptStudio.tpl.docker.s4Desc'),
             command: 'sudo systemctl enable --now docker && sudo usermod -aG docker $USER',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 5,
-            title: 'Verify Docker Installation & Test Container',
-            description: 'Check Docker versions and run hello-world container verification.',
+            title: t('promptStudio.tpl.docker.s5Title'),
+            description: t('promptStudio.tpl.docker.s5Desc'),
             command: 'docker --version && docker compose version && sudo docker run --rm hello-world',
             is_sudo: true,
             is_danger: false
@@ -229,53 +218,53 @@
     }
     if (lower.includes('node') || lower.includes('fullstack')) {
       return {
-        summary: 'Fullstack JavaScript runtime setup: Node.js 20 LTS, npm, pnpm, PM2 process supervisor, and Nginx web server.',
+        summary: t('promptStudio.tpl.node.summary'),
         requirements: ['Node.js 20 LTS', 'npm', 'pnpm', 'PM2', 'Nginx', 'Build Essential'],
         steps: [
           {
             step_number: 1,
-            title: 'Install Compiler & Core Dependencies',
-            description: 'Install build-essential, python3, curl, and git for native module builds.',
+            title: t('promptStudio.tpl.node.s1Title'),
+            description: t('promptStudio.tpl.node.s1Desc'),
             command: 'sudo apt-get update && sudo apt-get install -y curl git build-essential',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Configure NodeSource Node.js 20 LTS Repo',
-            description: 'Add official NodeSource repository for Node.js 20 (Iron LTS).',
+            title: t('promptStudio.tpl.node.s2Title'),
+            description: t('promptStudio.tpl.node.s2Desc'),
             command: 'curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 3,
-            title: 'Install Node.js & npm',
-            description: 'Install latest Node.js release from NodeSource repository.',
+            title: t('promptStudio.tpl.node.s3Title'),
+            description: t('promptStudio.tpl.node.s3Desc'),
             command: 'sudo apt-get install -y nodejs',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Install Global Tools: pnpm & PM2',
-            description: 'Install modern package manager pnpm and PM2 process supervisor.',
+            title: t('promptStudio.tpl.node.s4Title'),
+            description: t('promptStudio.tpl.node.s4Desc'),
             command: 'sudo npm install -g pnpm pm2',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 5,
-            title: 'Install & Enable Nginx',
-            description: 'Install Nginx as reverse proxy web server for Node.js applications.',
+            title: t('promptStudio.tpl.node.s5Title'),
+            description: t('promptStudio.tpl.node.s5Desc'),
             command: 'sudo apt-get install -y nginx && sudo systemctl enable --now nginx',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 6,
-            title: 'Verify Node.js & Tooling Versions',
-            description: 'Verify versions of Node.js, npm, pnpm, PM2, and Nginx status.',
+            title: t('promptStudio.tpl.node.s6Title'),
+            description: t('promptStudio.tpl.node.s6Desc'),
             command: 'node -v && npm -v && pnpm -v && pm2 -v && nginx -v',
             is_sudo: false,
             is_danger: false
@@ -283,47 +272,47 @@
         ]
       };
     }
-    if (lower.includes('hardening') || lower.includes('security') || lower.includes('keamanan')) {
+    if (lower.includes('hardening') || lower.includes('security') || lower.includes('keamanan') || lower.includes('penguatan')) {
       return {
-        summary: 'Linux server security hardening plan: configure UFW firewall, fail2ban brute-force protection, SSH key-only enforcement, and automatic security updates.',
-        requirements: ['UFW Firewall', 'Fail2ban', 'SSH Hardening', 'Unattended Upgrades'],
+        summary: t('promptStudio.tpl.hardening.summary'),
+        requirements: ['UFW Firewall', 'Fail2ban', t('promptStudio.req.sshHardening'), 'Unattended Upgrades'],
         steps: [
           {
             step_number: 1,
-            title: 'Install Essential Security Tools',
-            description: 'Install ufw, fail2ban, and unattended-upgrades packages for automated patch delivery.',
+            title: t('promptStudio.tpl.hardening.s1Title'),
+            description: t('promptStudio.tpl.hardening.s1Desc'),
             command: 'sudo apt-get update && sudo apt-get install -y ufw fail2ban unattended-upgrades',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Configure UFW Firewall Policies',
-            description: 'Set default deny incoming, allow outgoing, and permit SSH port (22) before enabling firewall.',
+            title: t('promptStudio.tpl.hardening.s2Title'),
+            description: t('promptStudio.tpl.hardening.s2Desc'),
             command: 'sudo ufw default deny incoming && sudo ufw default allow outgoing && sudo ufw allow 22/tcp comment "SSH" && sudo ufw --force enable',
             is_sudo: true,
             is_danger: true
           },
           {
             step_number: 3,
-            title: 'Enable & Configure Fail2ban Jail',
-            description: 'Activate fail2ban service to block IP addresses with repeated unauthorized SSH login attempts.',
+            title: t('promptStudio.tpl.hardening.s3Title'),
+            description: t('promptStudio.tpl.hardening.s3Desc'),
             command: 'sudo systemctl enable --now fail2ban && sudo fail2ban-client status',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Harden SSH Configuration (Disable Root & Password Auth)',
-            description: 'Disable direct root login and enforce SSH key-based authentication only.',
+            title: t('promptStudio.tpl.hardening.s4Title'),
+            description: t('promptStudio.tpl.hardening.s4Desc'),
             command: 'sudo sed -i -E "s/^#?PermitRootLogin.*/PermitRootLogin no/" /etc/ssh/sshd_config && sudo sed -i -E "s/^#?PasswordAuthentication.*/PasswordAuthentication no/" /etc/ssh/sshd_config && (sudo systemctl reload ssh || sudo systemctl reload sshd)',
             is_sudo: true,
             is_danger: true
           },
           {
             step_number: 5,
-            title: 'Enable Automatic Security Updates',
-            description: 'Configure unattended-upgrades to apply security patches automatically.',
+            title: t('promptStudio.tpl.hardening.s5Title'),
+            description: t('promptStudio.tpl.hardening.s5Desc'),
             command: 'sudo dpkg-reconfigure -f noninteractive unattended-upgrades && sudo systemctl status unattended-upgrades --no-pager',
             is_sudo: true,
             is_danger: false
@@ -333,37 +322,37 @@
     }
     if (lower.includes('postgres') || lower.includes('redis')) {
       return {
-        summary: 'Installation and configuration plan for PostgreSQL 16 database and Redis in-memory cache on Ubuntu.',
-        requirements: ['PostgreSQL 16', 'Postgres Contrib', 'Redis Server', 'Service Configuration'],
+        summary: t('promptStudio.tpl.postgres.summary'),
+        requirements: ['PostgreSQL 16', 'Postgres Contrib', 'Redis Server', t('promptStudio.req.serviceConfig')],
         steps: [
           {
             step_number: 1,
-            title: 'Install PostgreSQL 16 & Contrib Extensions',
-            description: 'Update repository and install PostgreSQL server with auxiliary modules.',
+            title: t('promptStudio.tpl.postgres.s1Title'),
+            description: t('promptStudio.tpl.postgres.s1Desc'),
             command: 'sudo apt-get update && sudo apt-get install -y postgresql postgresql-contrib',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 2,
-            title: 'Install & Configure Redis Server',
-            description: 'Install Redis Server and ensure daemon is running.',
+            title: t('promptStudio.tpl.postgres.s2Title'),
+            description: t('promptStudio.tpl.postgres.s2Desc'),
             command: 'sudo apt-get install -y redis-server && sudo systemctl enable --now redis-server',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 3,
-            title: 'Verify PostgreSQL Service & Connectivity',
-            description: 'Enable PostgreSQL service and check socket connectivity.',
+            title: t('promptStudio.tpl.postgres.s3Title'),
+            description: t('promptStudio.tpl.postgres.s3Desc'),
             command: 'sudo systemctl enable --now postgresql && sudo -u postgres psql -c "SELECT version();"',
             is_sudo: true,
             is_danger: false
           },
           {
             step_number: 4,
-            title: 'Test Redis Response with Ping',
-            description: 'Send PING command to verify Redis responds with PONG.',
+            title: t('promptStudio.tpl.postgres.s4Title'),
+            description: t('promptStudio.tpl.postgres.s4Desc'),
             command: 'redis-cli ping',
             is_sudo: false,
             is_danger: false
@@ -374,29 +363,29 @@
 
     // Generic fallback
     return {
-      summary: `Automated plan for: "${goalText}". Prepares dependencies, executes main commands, and verifies status.`,
-      requirements: ['Bash', 'APT Package Manager', 'Systemd'],
+      summary: t('promptStudio.tpl.generic.summary', { goal: goalText }),
+      requirements: ['Bash', t('promptStudio.req.aptManager'), 'Systemd'],
       steps: [
         {
           step_number: 1,
-          title: 'Update Package Catalog',
-          description: 'Update APT package cache to fetch latest dependency versions.',
+          title: t('promptStudio.tpl.generic.s1Title'),
+          description: t('promptStudio.tpl.generic.s1Desc'),
           command: 'sudo apt-get update',
           is_sudo: true,
           is_danger: false
         },
         {
           step_number: 2,
-          title: `Execute Setup: ${goalText.slice(0, 35)}`,
-          description: `Run configuration commands for: ${goalText}`,
+          title: t('promptStudio.tpl.generic.s2Title', { goal: goalText.slice(0, 35) }),
+          description: t('promptStudio.tpl.generic.s2Desc', { goal: goalText }),
           command: `echo "Configuring for: ${goalText.replace(/"/g, '\\"')}"`,
           is_sudo: false,
           is_danger: false
         },
         {
           step_number: 3,
-          title: 'Verify System Status & Resources',
-          description: 'Check uptime and resource status after configuration.',
+          title: t('promptStudio.tpl.generic.s3Title'),
+          description: t('promptStudio.tpl.generic.s3Desc'),
           command: 'uptime && free -h && df -h /',
           is_sudo: false,
           is_danger: false
@@ -407,7 +396,7 @@
 
   async function handleGeneratePlan() {
     if (!goal.trim()) {
-      showToast('Please enter an execution goal first.', 'error');
+      showToast(t('promptStudio.errGoal'), 'error');
       return;
     }
 
@@ -438,9 +427,9 @@
       }));
 
       viewMode = 'review';
-      showToast('Plan analyzed and generated successfully!', 'success');
+      showToast(t('promptStudio.planReady'), 'success');
     } catch (err: any) {
-      showToast(err?.message || 'Failed to generate plan', 'error');
+      showToast(err?.message || t('promptStudio.planFailed'), 'error');
     } finally {
       isGenerating = false;
     }
@@ -474,7 +463,7 @@
         if (copiedStepIndex === index) copiedStepIndex = null;
       }, 2000);
     } catch {
-      showToast('Failed to copy command to clipboard', 'error');
+      showToast(t('promptStudio.copyFailed'), 'error');
     }
   }
 
@@ -518,7 +507,7 @@
   async function handleExecutePlan() {
     const approvedSteps = steps.filter((s) => s.enabled);
     if (approvedSteps.length === 0) {
-      showToast('Select at least one step to execute.', 'error');
+      showToast(t('promptStudio.errSelectStep'), 'error');
       return;
     }
 
@@ -554,9 +543,9 @@
     viewMode = 'completed';
 
     if (executionFailedCount === 0) {
-      showToast('All steps executed successfully on host!', 'success');
+      showToast(t('promptStudio.allDoneToast'), 'success');
     } else {
-      showToast(`Execution completed with ${executionFailedCount} failed steps.`, 'error');
+      showToast(t('promptStudio.someFailedToast', { count: executionFailedCount }), 'error');
     }
   }
 
@@ -564,33 +553,22 @@
   let approvedCount = $derived(steps.filter((s) => s.enabled).length);
 </script>
 
-<div class="max-w-6xl mx-auto p-4 md:p-6 space-y-6 text-neutral-800 dark:text-neutral-200">
-  <!-- Header -->
-  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-violet-500/10 dark:bg-violet-500/20 border border-violet-500/30 flex items-center justify-center text-violet-600 dark:text-violet-400">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-        </svg>
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="text-xl md:text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">Prompt Studio</h1>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400 font-semibold border border-violet-500/30">AI Ops Assistant</span>
-        </div>
-        <p class="text-xs md:text-sm text-neutral-500 dark:text-neutral-400">Plan, review, and execute server automations with transparent and controlled AI.</p>
-      </div>
-    </div>
-
-    <!-- Header Actions: Host Selector & Settings Gear -->
-    <div class="flex items-center gap-3">
+<div class="max-w-6xl mx-auto space-y-6 text-neutral-800 dark:text-neutral-200">
+  <PageHeader
+    icon={['M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z']}
+    accent="violet"
+    title={t('promptStudio.title')}
+    badge={t('promptStudio.badge')}
+    subtitle={t('promptStudio.subtitle')}
+  >
+    {#snippet actions()}
       <!-- Target Host Dropdown -->
       <div class="flex items-center gap-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-3 py-1.5 shadow-sm">
-        <label for="target-host-select" class="text-xs text-neutral-500 dark:text-neutral-400 font-medium whitespace-nowrap">Target Host:</label>
+        <label for="target-host-select" class="text-xs text-neutral-500 dark:text-neutral-400 font-medium whitespace-nowrap">{t('promptStudio.targetHost')}</label>
         {#if isLoadingHosts}
-          <span class="text-xs text-neutral-400">Loading hosts...</span>
+          <span class="text-xs text-neutral-400">{t('promptStudio.loadingHosts')}</span>
         {:else if hosts.length === 0}
-          <span class="text-xs text-amber-500 font-medium">No hosts available</span>
+          <span class="text-xs text-amber-600 dark:text-amber-500 font-medium">{t('promptStudio.noHosts')}</span>
         {:else}
           <select
             id="target-host-select"
@@ -609,8 +587,8 @@
       <!-- AI config now lives on the Settings page so there is exactly one place for it. -->
       <a
         href="/settings"
-        title="AI Settings (Settings page)"
-        aria-label="AI Settings"
+        title={t('promptStudio.aiSettingsTitle')}
+        aria-label={t('promptStudio.aiSettings')}
         class="p-2 rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 shadow-sm transition-colors inline-flex"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -618,27 +596,27 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
         </svg>
       </a>
-    </div>
-  </header>
+    {/snippet}
+  </PageHeader>
 
   <!-- Goal Input Section -->
   <section class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl p-4 md:p-5 shadow-sm space-y-4">
     <div>
       <label for="ai-ops-goal-input" class="block text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-2">
-        Ops Goal / Instruction
+        {t('promptStudio.goalLabel')}
       </label>
       <textarea
         id="ai-ops-goal-input"
         bind:value={goal}
         rows="3"
-        placeholder="e.g. Set up my Ubuntu laptop for Laravel and Docker development"
+        placeholder={t('promptStudio.goalPlaceholder')}
         class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg p-3 text-sm text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-colors"
       ></textarea>
     </div>
 
     <!-- Quick Prompt Suggestion Chips -->
     <div class="space-y-1.5">
-      <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Quick Suggestions:</span>
+      <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('promptStudio.quickSuggestions')}</span>
       <div class="flex flex-wrap gap-2">
         {#each quickPrompts as qp}
           <button
@@ -656,7 +634,7 @@
     <div class="flex items-center justify-between pt-2">
       <div class="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        Model aktif: <span class="font-mono text-neutral-700 dark:text-neutral-300 font-semibold">{settings.model}</span>
+        {t('promptStudio.activeModel')} <span class="font-mono text-neutral-700 dark:text-neutral-300 font-semibold">{settings.model}</span>
       </div>
 
       <button
@@ -670,12 +648,12 @@
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <span>Analyzing Requirements...</span>
+          <span>{t('promptStudio.analyzing')}</span>
         {:else}
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
-          <span>Generate Execution Plan</span>
+          <span>{t('promptStudio.generate')}</span>
         {/if}
       </button>
     </div>
@@ -689,20 +667,20 @@
         <div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
           <div>
             <div class="flex items-center gap-2">
-              <h2 class="text-lg font-bold text-neutral-900 dark:text-white">Execution Plan: Full Confirmation</h2>
+              <h2 class="text-lg font-bold text-neutral-900 dark:text-white">{t('promptStudio.planTitle')}</h2>
               <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/20">
-                {approvedCount} of {steps.length} Steps Selected
+                {t('promptStudio.stepsSelected', { approved: approvedCount, total: steps.length })}
               </span>
               <!-- Says which planner actually produced this. The LLM path silently falls back
                    to the offline template planner when the endpoint is unreachable, and without
                    this badge a broken connection still looked like a working assistant. -->
               {#if plan?.source === 'llm'}
-                <span class="text-xs px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold border border-violet-500/20" title="Generated by configured AI model">
-                  AI Model
+                <span class="text-xs px-2 py-0.5 rounded bg-violet-500/10 text-violet-600 dark:text-violet-400 font-semibold border border-violet-500/20" title={t('promptStudio.sourceLlmTitle')}>
+                  {t('promptStudio.sourceLlm')}
                 </span>
               {:else}
-                <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold border border-amber-500/20" title="AI endpoint unreachable; generated from built-in template. Test connection in Settings > AI Assistant.">
-                  Built-in Template
+                <span class="text-xs px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold border border-amber-500/20" title={t('promptStudio.sourceBuiltinTitle')}>
+                  {t('promptStudio.sourceBuiltin')}
                 </span>
               {/if}
             </div>
@@ -717,14 +695,14 @@
                 onclick={() => toggleAllSteps(true)}
                 class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-medium transition-colors"
               >
-                Select All
+                {t('promptStudio.selectAll')}
               </button>
               <button
                 type="button"
                 onclick={() => toggleAllSteps(false)}
                 class="px-2.5 py-1 rounded bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 font-medium transition-colors"
               >
-                Deselect All
+                {t('promptStudio.deselectAll')}
               </button>
             </div>
           {/if}
@@ -733,7 +711,7 @@
         <!-- Requirement Tags -->
         {#if plan.requirements && plan.requirements.length > 0}
           <div class="pt-2 border-t border-neutral-100 dark:border-neutral-800/80 flex flex-wrap items-center gap-2">
-            <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">Components & Dependencies:</span>
+            <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('promptStudio.components')}</span>
             {#each plan.requirements as req}
               <span class="text-xs font-medium px-2.5 py-1 rounded-md bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">
                 {req}
@@ -778,14 +756,14 @@
                   <!-- Sudo Badge -->
                   {#if step.is_sudo}
                     <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 uppercase">
-                      SUDO
+                      {t('promptStudio.sudo')}
                     </span>
                   {/if}
 
                   <!-- Danger / Risk Badge -->
                   {#if step.is_danger}
                     <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 uppercase">
-                      RISK / DANGER
+                      {t('promptStudio.risk')}
                     </span>
                   {/if}
 
@@ -793,7 +771,7 @@
                   {#if viewMode === 'executing' || viewMode === 'completed'}
                     {#if step.status === 'pending'}
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
-                        Pending
+                        {t('promptStudio.statusPending')}
                       </span>
                     {:else if step.status === 'running'}
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center gap-1.5 animate-pulse">
@@ -801,21 +779,21 @@
                           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Running...
+                        {t('promptStudio.statusRunning')}
                       </span>
                     {:else if step.status === 'success'}
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                         </svg>
-                        Success
+                        {t('promptStudio.statusSuccess')}
                       </span>
                     {:else if step.status === 'failed'}
                       <span class="text-[10px] font-medium px-2 py-0.5 rounded bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center gap-1">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                        Failed
+                        {t('promptStudio.statusFailed')}
                       </span>
                     {/if}
                   {/if}
@@ -827,70 +805,70 @@
               <button
                 type="button"
                 onclick={() => copyCommand(step.command, index)}
-                title="Copy bash command"
+                title={t('promptStudio.copyTitle')}
                 class="px-2.5 py-1 text-xs rounded bg-neutral-200/70 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
               >
                 {#if copiedStepIndex === index}
                   <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                   </svg>
-                  <span class="text-emerald-500 font-semibold">Copied!</span>
+                  <span class="text-emerald-600 dark:text-emerald-500 font-semibold">{t('promptStudio.copied')}</span>
                 {:else}
                   <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
-                  <span>Copy</span>
+                  <span>{t('promptStudio.copy')}</span>
                 {/if}
               </button>
             </div>
 
             <!-- Editable Bash Command Block -->
             <div class="px-4 pb-4">
-              <label for={`step-command-${index}`} class="sr-only">Bash command for step {step.step_number}</label>
+              <label for={`step-command-${index}`} class="sr-only">{t('promptStudio.commandLabel', { n: step.step_number })}</label>
               <div class="relative">
                 <textarea
                   id={`step-command-${index}`}
                   bind:value={step.command}
                   rows="2"
                   disabled={viewMode === 'executing'}
-                  class="w-full font-mono text-xs bg-neutral-900 text-emerald-400 dark:bg-neutral-950 border border-neutral-800 rounded-lg p-3 focus:outline-none focus:border-violet-500 transition-colors resize-y leading-relaxed"
+                  class="w-full font-mono text-xs bg-neutral-50 text-emerald-700 dark:bg-neutral-950 dark:text-emerald-400 border border-neutral-300 dark:border-neutral-800 rounded-lg p-3 focus:outline-none focus:border-violet-500 transition-colors resize-y leading-relaxed"
                 ></textarea>
               </div>
             </div>
 
             <!-- Live Output Viewer (For executing / completed view) -->
             {#if (viewMode === 'executing' || viewMode === 'completed') && (step.result || step.status === 'running')}
-              <div class="border-t border-neutral-200 dark:border-neutral-800 bg-neutral-950 p-3">
-                <div class="flex items-center justify-between text-xs text-neutral-400 mb-2 font-mono">
+              <div class="border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 p-3">
+                <div class="flex items-center justify-between text-xs text-neutral-500 dark:text-neutral-400 mb-2 font-mono">
                   <div class="flex items-center gap-2">
                     <span class="w-2 h-2 rounded-full {step.status === 'running' ? 'bg-sky-400 animate-pulse' : step.status === 'success' ? 'bg-emerald-400' : 'bg-rose-400'}"></span>
-                    <span>Output Terminal (Step {step.step_number})</span>
+                    <span>{t('promptStudio.outputTitle', { n: step.step_number })}</span>
                     {#if step.result?.duration_ms}
                       <span class="text-neutral-500">({step.result.duration_ms}ms)</span>
                     {/if}
                   </div>
                   {#if step.result?.exit_code !== undefined}
-                    <span class="px-1.5 py-0.5 rounded text-[10px] {step.result.exit_code === 0 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}">
-                      Exit: {step.result.exit_code}
+                    <span class="px-1.5 py-0.5 rounded text-[10px] {step.result.exit_code === 0 ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800' : 'bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800'}">
+                      {t('promptStudio.exitCode', { code: step.result.exit_code })}
                     </span>
                   {/if}
                 </div>
 
                 <!-- Terminal-like stdout/stderr block -->
-                <div class="bg-black text-neutral-200 font-mono text-xs rounded p-3 overflow-x-auto max-h-48 overflow-y-auto space-y-1">
+                <div class="bg-white dark:bg-black text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-transparent font-mono text-xs rounded p-3 overflow-x-auto max-h-48 overflow-y-auto space-y-1">
                   {#if step.status === 'running' && !step.result}
-                    <div class="text-sky-400 flex items-center gap-2">
+                    <div class="text-sky-600 dark:text-sky-400 flex items-center gap-2">
                       <span class="animate-pulse">▶</span>
-                      <span>Executing command on host {selectedHost ? selectedHost.label : ''}...</span>
+                      <span>{t('promptStudio.executingOnHost', { host: selectedHost ? selectedHost.label : '' })}</span>
                     </div>
                   {/if}
 
                   {#if step.result?.stdout}
-                    <pre class="text-neutral-300 whitespace-pre-wrap">{step.result.stdout}</pre>
+                    <pre class="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">{step.result.stdout}</pre>
                   {/if}
 
                   {#if step.result?.stderr}
-                    <pre class="text-rose-400 whitespace-pre-wrap">{step.result.stderr}</pre>
+                    <pre class="text-rose-600 dark:text-rose-400 whitespace-pre-wrap">{step.result.stderr}</pre>
                   {/if}
                 </div>
               </div>
@@ -907,7 +885,7 @@
             onclick={handleReset}
             class="w-full sm:w-auto px-5 py-2.5 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 font-medium text-sm transition-colors cursor-pointer"
           >
-            Cancel / Reset
+            {t('promptStudio.cancelReset')}
           </button>
 
           <button
@@ -919,7 +897,7 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
             </svg>
-            <span>Approve & Execute on Host ({approvedCount} Steps)</span>
+            <span>{t('promptStudio.approveExecute', { count: approvedCount })}</span>
           </button>
         </div>
       {/if}
@@ -934,13 +912,13 @@
             </svg>
             <div>
               <p class="font-semibold text-sm text-sky-900 dark:text-sky-200">
-                Executing step {currentExecutingIndex + 1} of {steps.length}...
+                {t('promptStudio.executingStep', { current: currentExecutingIndex + 1, total: steps.length })}
               </p>
-              <p class="text-xs text-sky-700 dark:text-sky-400">Running commands sequentially on target host.</p>
+              <p class="text-xs text-sky-700 dark:text-sky-400">{t('promptStudio.sequential')}</p>
             </div>
           </div>
           <span class="text-xs font-mono font-bold px-2.5 py-1 rounded bg-sky-500/20 text-sky-600 dark:text-sky-300">
-            {executionSuccessCount} Succeeded • {executionFailedCount} Failed
+            {t('promptStudio.progress', { ok: executionSuccessCount, failed: executionFailedCount })}
           </span>
         </div>
       {/if}
@@ -949,7 +927,7 @@
       {#if viewMode === 'completed'}
         <div class="bg-white dark:bg-neutral-900 border {executionFailedCount === 0 ? 'border-emerald-500/50 dark:border-emerald-500/30 bg-emerald-50/20 dark:bg-emerald-950/20' : 'border-amber-500/50 dark:border-amber-500/30 bg-amber-50/20 dark:bg-amber-950/20'} rounded-xl p-5 shadow-md space-y-4">
           <div class="flex items-start gap-3">
-            <div class="w-10 h-10 rounded-full {executionFailedCount === 0 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-amber-500/20 text-amber-500'} flex items-center justify-center shrink-0">
+            <div class="w-10 h-10 rounded-full {executionFailedCount === 0 ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-500' : 'bg-amber-500/20 text-amber-600 dark:text-amber-500'} flex items-center justify-center shrink-0">
               {#if executionFailedCount === 0}
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
@@ -962,12 +940,12 @@
             </div>
             <div class="flex-1">
               <h3 class="font-bold text-base text-neutral-900 dark:text-white">
-                {executionFailedCount === 0 ? 'All Steps Executed Successfully!' : 'Execution Completed With Warnings'}
+                {executionFailedCount === 0 ? t('promptStudio.allSucceeded') : t('promptStudio.completedWarnings')}
               </h3>
               <p class="text-xs md:text-sm text-neutral-600 dark:text-neutral-400 mt-0.5">
-                {executionSuccessCount} steps succeeded on host <span class="font-semibold text-neutral-900 dark:text-white">{selectedHost ? selectedHost.label : 'target'}</span>.
+                {t('promptStudio.succeededOn', { count: executionSuccessCount })} <span class="font-semibold text-neutral-900 dark:text-white">{selectedHost ? selectedHost.label : t('promptStudio.targetFallback')}</span>.
                 {#if executionFailedCount > 0}
-                  {executionFailedCount} steps encountered errors.
+                  {t('promptStudio.failedSteps', { count: executionFailedCount })}
                 {/if}
               </p>
             </div>
@@ -983,18 +961,18 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span>Open Terminal Session</span>
+                <span>{t('promptStudio.openTerminal')}</span>
               </a>
             {/if}
 
             <a
               href="/command-logs"
-              class="px-4 py-2 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:text-white text-neutral-800 dark:text-neutral-300 font-medium text-xs flex items-center gap-2 transition-colors"
+              class="px-4 py-2 rounded-lg bg-neutral-200 dark:bg-neutral-800 hover:bg-neutral-300 dark:hover:bg-neutral-700 dark:hover:text-white text-neutral-800 dark:text-neutral-300 font-medium text-xs flex items-center gap-2 transition-colors"
             >
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <span>View in Command Logs</span>
+              <span>{t('promptStudio.viewLogs')}</span>
             </a>
 
             <button
@@ -1002,7 +980,7 @@
               onclick={handleReset}
               class="ml-auto px-4 py-2 rounded-lg text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors"
             >
-              Start New Task
+              {t('promptStudio.startNew')}
             </button>
           </div>
         </div>
