@@ -441,9 +441,11 @@ where
                 break;
             }
 
-            remote_file
-                .write_all(&buffer[..n])
-                .map_err(|e| sftp_err(format!("Failed to write remote chunk: {e}")))?;
+            if let Some(chunk) = buffer.get(..n) {
+                remote_file
+                    .write_all(chunk)
+                    .map_err(|e| sftp_err(format!("Failed to write remote chunk: {e}")))?;
+            }
 
             bytes_transferred += n as u64;
 
@@ -528,9 +530,11 @@ where
 
             {
                 let mut guard = local_file_arc.lock();
-                guard
-                    .write_all(&buffer[..n])
-                    .map_err(|e| sftp_err(format!("Failed to write to local file: {e}")))?;
+                if let Some(chunk) = buffer.get(..n) {
+                    guard
+                        .write_all(chunk)
+                        .map_err(|e| sftp_err(format!("Failed to write to local file: {e}")))?;
+                }
             }
 
             bytes_transferred += n as u64;
@@ -662,26 +666,32 @@ fn search_via_find(
         if parts.len() < 4 {
             continue;
         }
-        let path = parts[0].to_string();
-        let size: u64 = parts[1].parse().unwrap_or(0);
-        let mtime: u64 = parts[2].split('.').next().unwrap_or("0").parse().unwrap_or(0);
-        let is_dir = parts[3].trim() == "d";
+        let path = parts.first().copied().unwrap_or("").to_string();
+        let size: u64 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let mtime: u64 = parts
+            .get(2)
+            .and_then(|s| s.split('.').next())
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(0);
+        let is_dir = parts.get(3).map(|s| s.trim() == "d").unwrap_or(false);
 
         if !is_dir {
-            if let Some(min) = min_size {
-                if size < min {
-                    continue;
-                }
+            if min_size.is_some_and(|min| size < min) {
+                continue;
             }
-            if let Some(max) = max_size {
-                if size > max {
-                    continue;
-                }
+            if max_size.is_some_and(|max| size > max) {
+                continue;
             }
         }
 
         let name = path.split('/').next_back().unwrap_or(&path).to_string();
-        results.push(RemoteSearchItem { path, name, size, mtime, is_dir });
+        results.push(RemoteSearchItem {
+            path,
+            name,
+            size,
+            mtime,
+            is_dir,
+        });
     }
     Ok(results)
 }
@@ -742,11 +752,11 @@ fn sftp_walk(
         let size = stat.size.unwrap_or(0);
         let mtime = stat.mtime.unwrap_or(0);
 
-        if glob_match(&pattern, &name) {
+        if glob_match(pattern, &name) {
             if !is_dir {
                 let mut pass = true;
-                if let Some(min) = min_size { if size < min { pass = false; } }
-                if let Some(max) = max_size { if size > max { pass = false; } }
+                if min_size.is_some_and(|min| size < min) { pass = false; }
+                if max_size.is_some_and(|max| size > max) { pass = false; }
                 if pass {
                     acc.push(RemoteSearchItem { path: full_path.clone(), name, size, mtime, is_dir });
                 }
@@ -771,15 +781,17 @@ fn glob_match(pattern: &str, name: &str) -> bool {
 }
 
 fn glob_match_inner(p: &[char], s: &[char]) -> bool {
+    let p_rest = p.get(1..).unwrap_or(&[]);
+    let s_rest = s.get(1..).unwrap_or(&[]);
     match (p.first(), s.first()) {
         (None, None) => true,
         (Some(&'*'), _) => {
             // star can match zero or more chars
-            glob_match_inner(&p[1..], s) || (!s.is_empty() && glob_match_inner(p, &s[1..]))
+            glob_match_inner(p_rest, s) || (!s.is_empty() && glob_match_inner(p, s_rest))
         }
-        (Some(&'?'), Some(_)) => glob_match_inner(&p[1..], &s[1..]),
+        (Some(&'?'), Some(_)) => glob_match_inner(p_rest, s_rest),
         (Some(pc), Some(sc)) => {
-            pc.to_lowercase().eq(sc.to_lowercase()) && glob_match_inner(&p[1..], &s[1..])
+            pc.to_lowercase().eq(sc.to_lowercase()) && glob_match_inner(p_rest, s_rest)
         }
         _ => false,
     }
@@ -859,7 +871,9 @@ pub fn calculate_remote_checksum(
                     .read(&mut buf)
                     .map_err(|e| sftp_err(format!("Failed to read remote chunk: {e}")))?;
                 if n == 0 { break; }
-                hasher.update(&buf[..n]);
+                if let Some(chunk) = buf.get(..n) {
+                    hasher.update(chunk);
+                }
             }
             Ok(hex::encode(hasher.finalize()))
         } else {
@@ -869,7 +883,9 @@ pub fn calculate_remote_checksum(
                     .read(&mut buf)
                     .map_err(|e| sftp_err(format!("Failed to read remote chunk: {e}")))?;
                 if n == 0 { break; }
-                hasher.update(&buf[..n]);
+                if let Some(chunk) = buf.get(..n) {
+                    hasher.update(chunk);
+                }
             }
             Ok(hex::encode(hasher.finalize()))
         }

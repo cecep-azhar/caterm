@@ -70,7 +70,7 @@ impl RemoteFileSystem for ScpFileSystem {
                 if parts.len() < 9 {
                     continue;
                 }
-                let name = parts[8..].join(" ");
+                let name = parts.get(8..).map(|p| p.join(" ")).unwrap_or_default();
                 if name == "." || name == ".." {
                     continue;
                 }
@@ -324,9 +324,11 @@ impl RemoteFileSystem for ScpFileSystem {
                     break;
                 }
 
-                channel
-                    .write_all(&buffer[..n])
-                    .map_err(|e| scp_err(format!("Failed to write SCP chunk: {e}")))?;
+                if let Some(chunk) = buffer.get(..n) {
+                    channel
+                        .write_all(chunk)
+                        .map_err(|e| scp_err(format!("Failed to write SCP chunk: {e}")))?;
+                }
 
                 bytes_transferred += n as u64;
 
@@ -402,9 +404,11 @@ impl RemoteFileSystem for ScpFileSystem {
 
                 {
                     let mut guard = local_file_arc.lock();
-                    guard
-                        .write_all(&buffer[..n])
-                        .map_err(|e| scp_err(format!("Failed to write local file chunk: {e}")))?;
+                    if let Some(chunk) = buffer.get(..n) {
+                        guard
+                            .write_all(chunk)
+                            .map_err(|e| scp_err(format!("Failed to write local file chunk: {e}")))?;
+                    }
                 }
 
                 bytes_transferred += n as u64;

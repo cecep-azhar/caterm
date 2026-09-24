@@ -269,9 +269,11 @@ impl RemoteFileSystem for FtpFileSystem {
                 break;
             }
 
-            data_stream
-                .write_all(&buffer[..n])
-                .map_err(|e| ftp_err(format!("FTP write failed: {e}")))?;
+            if let Some(chunk) = buffer.get(..n) {
+                data_stream
+                    .write_all(chunk)
+                    .map_err(|e| ftp_err(format!("FTP write failed: {e}")))?;
+            }
 
             bytes_transferred += n as u64;
 
@@ -345,9 +347,11 @@ impl RemoteFileSystem for FtpFileSystem {
                 break;
             }
 
-            local_file
-                .write_all(&buffer[..n])
-                .map_err(|e| ftp_err(format!("Failed to write local file: {e}")))?;
+            if let Some(chunk) = buffer.get(..n) {
+                local_file
+                    .write_all(chunk)
+                    .map_err(|e| ftp_err(format!("Failed to write local file: {e}")))?;
+            }
 
             bytes_transferred += n as u64;
 

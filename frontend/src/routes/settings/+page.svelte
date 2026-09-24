@@ -2,9 +2,10 @@
   import { validateVaultPassword, MIN_VAULT_PASSWORD_LEN } from '$lib/api/vault';
   import { exportEncryptedBackup, importEncryptedBackup } from '$lib/api/backup';
   import AiSettingsForm from '$lib/components/AiSettingsForm.svelte';
+  import FeedbackWidget from '$lib/components/FeedbackWidget.svelte';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
 
-  let activeTab = $state('updates'); // 'updates' | 'ai' | 'subscription' | 'sync' | 'security' | 'backup' | 'shortcuts'
+  let activeTab = $state('updates'); // 'updates' | 'ai' | 'subscription' | 'sync' | 'security' | 'backup' | 'shortcuts' | 'feedback'
   let vaultPassword = $state('');
   let showVaultPassword = $state(false);
   let vaultMessage = $state('');
@@ -138,6 +139,11 @@
       onclick={() => activeTab = 'shortcuts'} 
       class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'shortcuts' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
       Shortcuts
+    </button>
+    <button
+      onclick={() => activeTab = 'feedback'}
+      class="pb-3 whitespace-nowrap text-sm font-medium transition-colors border-b-2 {activeTab === 'feedback' ? 'border-sky-500 text-white' : 'border-transparent text-neutral-400 hover:text-neutral-200'}">
+      Feedback
     </button>
   </div>
 
@@ -435,5 +441,7 @@
         </div>
       </div>
     </div>
+  {:else if activeTab === 'feedback'}
+    <FeedbackWidget />
   {/if}
 </div>

@@ -103,6 +103,8 @@ const COMMANDS: &[&str] = &[
     "ai_execute_step",
     // System / Memory
     "trim_memory",
+    // Feedback
+    "submit_feedback",
 ];
 
 fn main() {

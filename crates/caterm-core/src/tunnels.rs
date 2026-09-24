@@ -259,7 +259,7 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                     let guard = sess_inner.lock();
                                     match guard.channel_direct_tcpip(
                                         &t_addr,
-                                        target_port as u16,
+                                        target_port,
                                         None,
                                     ) {
                                         Ok(c) => c,
@@ -278,7 +278,10 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                         Ok(0) => break,
                                         Ok(n) => {
                                             active = true;
-                                            if channel.write_all(&buf[..n]).is_err() {
+                                            if channel
+                                                .write_all(buf.get(..n).unwrap_or(&[]))
+                                                .is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -292,7 +295,10 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                         Ok(0) => break,
                                         Ok(n) => {
                                             active = true;
-                                            if local_stream.write_all(&buf[..n]).is_err() {
+                                            if local_stream
+                                                .write_all(buf.get(..n).unwrap_or(&[]))
+                                                .is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -347,7 +353,10 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                     Ok(0) => break,
                                     Ok(n) => {
                                         active = true;
-                                        if remote_stream.write_all(&buf[..n]).is_err() {
+                                        if remote_stream
+                                            .write_all(buf.get(..n).unwrap_or(&[]))
+                                            .is_err()
+                                        {
                                             break;
                                         }
                                     }
@@ -358,7 +367,10 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                     Ok(0) => break,
                                     Ok(n) => {
                                         active = true;
-                                        if local_stream.write_all(&buf[..n]).is_err() {
+                                        if local_stream
+                                            .write_all(buf.get(..n).unwrap_or(&[]))
+                                            .is_err()
+                                        {
                                             break;
                                         }
                                     }
@@ -398,53 +410,62 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                             thread::spawn(move || {
                                 local_stream.set_nonblocking(false).ok();
                                 let mut buf = [0u8; 512];
-                                if local_stream.read_exact(&mut buf[0..2]).is_err() || buf[0] != 5 {
+                                let Some(head) = buf.get_mut(0..2) else { return; };
+                                if local_stream.read_exact(head).is_err() || head.first() != Some(&5) {
                                     return;
                                 }
-                                let nmethods = buf[1] as usize;
-                                if local_stream.read_exact(&mut buf[0..nmethods]).is_err() {
+                                let nmethods = head.get(1).copied().unwrap_or(0) as usize;
+                                let Some(methods_buf) = buf.get_mut(0..nmethods) else { return; };
+                                if local_stream.read_exact(methods_buf).is_err() {
                                     return;
                                 }
                                 if local_stream.write_all(&[5, 0]).is_err() {
                                     return;
                                 }
 
-                                if local_stream.read_exact(&mut buf[0..4]).is_err()
-                                    || buf[0] != 5
-                                    || buf[1] != 1
+                                let Some(req_head) = buf.get_mut(0..4) else { return; };
+                                if local_stream.read_exact(req_head).is_err()
+                                    || req_head.first() != Some(&5)
+                                    || req_head.get(1) != Some(&1)
                                 {
                                     return;
                                 }
-                                let atyp = buf[3];
-                                let target_host;
-                                if atyp == 1 {
-                                    if local_stream.read_exact(&mut buf[0..4]).is_err() {
+                                let atyp = req_head.get(3).copied().unwrap_or(0);
+                                let target_host = if atyp == 1 {
+                                    let Some(ip_buf) = buf.get_mut(0..4) else { return; };
+                                    if local_stream.read_exact(ip_buf).is_err() {
                                         return;
                                     }
-                                    target_host =
-                                        format!("{}.{}.{}.{}", buf[0], buf[1], buf[2], buf[3]);
+                                    format!(
+                                        "{}.{}.{}.{}",
+                                        ip_buf.first().copied().unwrap_or(0),
+                                        ip_buf.get(1).copied().unwrap_or(0),
+                                        ip_buf.get(2).copied().unwrap_or(0),
+                                        ip_buf.get(3).copied().unwrap_or(0)
+                                    )
                                 } else if atyp == 3 {
-                                    if local_stream.read_exact(&mut buf[0..1]).is_err() {
+                                    let Some(len_buf) = buf.get_mut(0..1) else { return; };
+                                    if local_stream.read_exact(len_buf).is_err() {
                                         return;
                                     }
-                                    let len = buf[0] as usize;
-                                    if local_stream.read_exact(&mut buf[0..len]).is_err() {
+                                    let len = len_buf.first().copied().unwrap_or(0) as usize;
+                                    let Some(domain_buf) = buf.get_mut(0..len) else { return; };
+                                    if local_stream.read_exact(domain_buf).is_err() {
                                         return;
                                     }
-                                    target_host = String::from_utf8_lossy(&buf[0..len]).to_string();
-                                } else if atyp == 4 {
-                                    if local_stream.read_exact(&mut buf[0..16]).is_err() {
-                                        return;
-                                    }
-                                    return; // IPv6 not implemented
+                                    String::from_utf8_lossy(domain_buf).to_string()
                                 } else {
                                     return;
-                                }
+                                };
 
-                                if local_stream.read_exact(&mut buf[0..2]).is_err() {
+                                let Some(port_buf) = buf.get_mut(0..2) else { return; };
+                                if local_stream.read_exact(port_buf).is_err() {
                                     return;
                                 }
-                                let target_port = u16::from_be_bytes([buf[0], buf[1]]);
+                                let target_port = u16::from_be_bytes([
+                                    port_buf.first().copied().unwrap_or(0),
+                                    port_buf.get(1).copied().unwrap_or(0),
+                                ]);
 
                                 let mut channel = {
                                     let guard = sess_inner.lock();
@@ -473,7 +494,10 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                         Ok(0) => break,
                                         Ok(n) => {
                                             active = true;
-                                            if channel.write_all(&buf2[..n]).is_err() {
+                                            if channel
+                                                .write_all(buf2.get(..n).unwrap_or(&[]))
+                                                .is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -485,7 +509,10 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                         Ok(0) => break,
                                         Ok(n) => {
                                             active = true;
-                                            if local_stream.write_all(&buf2[..n]).is_err() {
+                                            if local_stream
+                                                .write_all(buf2.get(..n).unwrap_or(&[]))
+                                                .is_err()
+                                            {
                                                 break;
                                             }
                                         }
@@ -520,17 +547,19 @@ pub fn stop_tunnel(id: &str) -> Result<(), CatermError> {
     if let Some(active) = ACTIVE_TUNNELS.lock().remove(id) {
         active.shutdown_signal.store(true, Ordering::Relaxed);
 
-        if let Ok(tunnels) = list_tunnels() {
-            if let Some(tun) = tunnels.iter().find(|t| t.id == id) {
-                let _ = crate::audit::log_event(
-                    "TUNNEL_STOP",
-                    Some(&tun.host_id),
-                    &format!(
-                        "Stopped tunnel ({:?}) on port {}",
-                        tun.forward_type, tun.bind_port
-                    ),
-                );
-            }
+        if let Some(tun) = list_tunnels()
+            .ok()
+            .as_ref()
+            .and_then(|tunnels| tunnels.iter().find(|t| t.id == id))
+        {
+            let _ = crate::audit::log_event(
+                "TUNNEL_STOP",
+                Some(&tun.host_id),
+                &format!(
+                    "Stopped tunnel ({:?}) on port {}",
+                    tun.forward_type, tun.bind_port
+                ),
+            );
         }
     }
     Ok(())

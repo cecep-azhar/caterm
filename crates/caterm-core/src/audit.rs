@@ -15,10 +15,19 @@ pub struct CommandLog {
 static SECRET_REGEX: OnceLock<Regex> = OnceLock::new();
 
 pub(crate) fn mask_secrets(text: &str) -> String {
-    let re = SECRET_REGEX.get_or_init(|| {
-        Regex::new(r#"(?i)(password|pass|secret|token|key)\s*(=|:|\s)\s*['"]?([^'"\s]+)['"]?"#)
-            .unwrap()
-    });
+    let re = match SECRET_REGEX.get() {
+        Some(r) => r,
+        None => {
+            if let Ok(compiled) = Regex::new(r#"(?i)(password|pass|secret|token|key)\s*(=|:|\s)\s*['"]?([^'"\s]+)['"]?"#) {
+                let _ = SECRET_REGEX.set(compiled);
+            }
+            if let Some(r) = SECRET_REGEX.get() {
+                r
+            } else {
+                return text.to_string();
+            }
+        }
+    };
     re.replace_all(text, "$1$2***").to_string()
 }
 
@@ -51,20 +60,16 @@ pub fn get_logs(
             .to_string();
     let mut params: Vec<rusqlite::types::Value> = Vec::new();
 
-    if let Some(hid) = host_id_filter {
-        if !hid.is_empty() {
-            query.push_str(" AND host_id = ?");
-            params.push(hid.to_string().into());
-        }
+    if let Some(hid) = host_id_filter.filter(|h| !h.is_empty()) {
+        query.push_str(" AND host_id = ?");
+        params.push(hid.to_string().into());
     }
 
-    if let Some(s) = search {
-        if !s.is_empty() {
-            query.push_str(" AND (event_type LIKE ? OR details LIKE ?)");
-            let like_str = format!("%{}%", s);
-            params.push(like_str.clone().into());
-            params.push(like_str.into());
-        }
+    if let Some(s) = search.filter(|s| !s.is_empty()) {
+        query.push_str(" AND (event_type LIKE ? OR details LIKE ?)");
+        let like_str = format!("%{}%", s);
+        params.push(like_str.clone().into());
+        params.push(like_str.into());
     }
 
     query.push_str(" ORDER BY timestamp DESC");

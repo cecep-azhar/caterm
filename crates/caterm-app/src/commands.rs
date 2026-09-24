@@ -4,7 +4,7 @@
 //! `caterm-core` for the guard that enforces this.
 
 use caterm_core::{
-    CatermError, ai, audit, backup, groups, investigations, keys, monitor, sftp, snippets, ssh,
+    CatermError, ai, audit, backup, feedback, groups, investigations, keys, monitor, sftp, snippets, ssh,
     store, sync, teams, tunnels, vault, vfs,
 };
 
@@ -509,7 +509,7 @@ pub async fn save_ai_settings(
 ) -> Result<ai::AiSettings, CatermError> {
     let s = settings
         .or(input)
-        .unwrap_or_else(|| ai::AiSettings::default());
+        .unwrap_or_default();
     run_blocking(move || ai::save_ai_settings(s)).await
 }
 
@@ -632,5 +632,11 @@ pub async fn trim_memory() -> Result<(), CatermError> {
         Ok(())
     }).await
 }
+
+#[tauri::command]
+pub async fn submit_feedback(rating: i32, content: String) -> Result<(), CatermError> {
+    run_blocking(move || feedback::submit_feedback(rating, &content)).await
+}
+
 
 

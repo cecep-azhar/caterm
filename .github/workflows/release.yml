@@ -100,3 +100,20 @@ jobs:
             target/release/bundle/deb/*.deb
             target/release/bundle/rpm/*.rpm
             target/release/bundle/appimage/*.AppImage
+
+  notify-release:
+    name: Notify Release (GCC & n8n)
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger GCC Release Notification
+        env:
+          GCC_API_KEY: ${{ secrets.GCC_API_KEY }}
+          VERSION: ${{ github.ref_name }}
+          CHANGELOG_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+        run: |
+          curl -f -s -X POST "https://gcc.fathforce.com/api/v1/newsletter/notify" \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${GCC_API_KEY}" \
+            -d "{\"version\": \"${VERSION}\", \"changelog_url\": \"${CHANGELOG_URL}\"}"
+

@@ -191,6 +191,7 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::window_start_dragging,
             commands::open_external_url,
             commands::trim_memory,
+            commands::submit_feedback,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

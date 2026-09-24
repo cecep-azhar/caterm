@@ -201,7 +201,7 @@ mod tests {
         let src_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src");
         let mut violations: Vec<String> = Vec::new();
         scan_pub_fns(&src_dir, &mut violations);
-        std::fs::write("violations.txt", format!("{violations:#?}")); for v in &violations {
+        for v in &violations {
             println!("VIOLATION: {}", v);
         }
         assert!(

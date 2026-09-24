@@ -271,7 +271,7 @@ impl RemoteFileSystem for S3FileSystem {
             None => {
                 let mut resp = self.sign_and_execute("GET", "/", &[], &[], &[])?;
                 let status = resp.status().as_u16();
-                if status < 200 || status >= 300 {
+                if !(200..300).contains(&status) {
                     return Err(io_err(format!(
                         "S3 ListAllMyBuckets returned HTTP {status}"
                     )));
@@ -339,7 +339,7 @@ impl RemoteFileSystem for S3FileSystem {
                 let path = format!("/{bucket}");
                 let mut resp = self.sign_and_execute("GET", &path, &query_params, &[], &[])?;
                 let status = resp.status().as_u16();
-                if status < 200 || status >= 300 {
+                if !(200..300).contains(&status) {
                     return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
                 }
 
@@ -461,7 +461,7 @@ impl RemoteFileSystem for S3FileSystem {
                 let path = format!("/{bucket}/{key}");
                 let resp = self.sign_and_execute("HEAD", &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
-                if status < 200 || status >= 300 {
+                if !(200..300).contains(&status) {
                     // Check if it's a virtual folder
                     let entries = self.list_dir(remote_path)?;
                     if !entries.is_empty() {
@@ -516,7 +516,7 @@ impl RemoteFileSystem for S3FileSystem {
         let path = format!("/{b}/{k}");
         let mut resp = self.sign_and_execute("GET", &path, &[], &[], &[])?;
         let status = resp.status().as_u16();
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 GetObject returned HTTP {status}")));
         }
 
@@ -533,7 +533,7 @@ impl RemoteFileSystem for S3FileSystem {
         let path = format!("/{b}/{k}");
         let resp = self.sign_and_execute("PUT", &path, &[], data, &[])?;
         let status = resp.status().as_u16();
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 PutObject returned HTTP {status}")));
         }
         Ok(())
@@ -548,7 +548,7 @@ impl RemoteFileSystem for S3FileSystem {
                 let path = format!("/{b}");
                 let resp = self.sign_and_execute("PUT", &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
-                if status < 200 || status >= 300 {
+                if !(200..300).contains(&status) {
                     return Err(io_err(format!("S3 CreateBucket returned HTTP {status}")));
                 }
                 Ok(())
@@ -559,7 +559,7 @@ impl RemoteFileSystem for S3FileSystem {
                 let path = format!("/{b}/{clean_key}");
                 let resp = self.sign_and_execute("PUT", &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
-                if status < 200 || status >= 300 {
+                if !(200..300).contains(&status) {
                     return Err(io_err(format!(
                         "S3 create folder marker returned HTTP {status}"
                     )));
@@ -583,7 +583,7 @@ impl RemoteFileSystem for S3FileSystem {
                 let path = format!("/{b}");
                 let resp = self.sign_and_execute("DELETE", &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
-                if status < 200 || status >= 300 {
+                if !(200..300).contains(&status) {
                     return Err(io_err(format!("S3 DeleteBucket returned HTTP {status}")));
                 }
                 Ok(())
@@ -592,7 +592,7 @@ impl RemoteFileSystem for S3FileSystem {
                 let path = format!("/{b}/{k}");
                 let resp = self.sign_and_execute("DELETE", &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
-                if status < 200 || status >= 300 {
+                if !(200..300).contains(&status) {
                     // Also try deleting folder marker if failed
                     let folder_path = format!("/{b}/{k}/");
                     let _ = self.sign_and_execute("DELETE", &folder_path, &[], &[], &[]);
@@ -622,7 +622,7 @@ impl RemoteFileSystem for S3FileSystem {
             &[("x-amz-copy-source", &copy_source)],
         )?;
         let status = resp.status().as_u16();
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 CopyObject failed: HTTP {status}")));
         }
 
@@ -695,7 +695,7 @@ impl RemoteFileSystem for S3FileSystem {
         let status = resp.status().as_u16();
         crate::sftp::clear_cancel_token(transfer_id);
 
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 upload PUT returned HTTP {status}")));
         }
         Ok(())
@@ -719,7 +719,7 @@ impl RemoteFileSystem for S3FileSystem {
         let path = format!("/{b}/{k}");
         let resp = self.sign_and_execute("GET", &path, &[], &[], &[])?;
         let status = resp.status().as_u16();
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 GetObject returned HTTP {status}")));
         }
 

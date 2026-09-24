@@ -34,6 +34,7 @@
   import { listHosts, saveHost, type HostRecord, type ConnectionProtocol } from '$lib/api/hosts';
   import RemoteFileEditor from '$lib/components/RemoteFileEditor.svelte';
   import DirectorySync from '$lib/components/DirectorySync.svelte';
+  import PageContainer from '$lib/components/PageContainer.svelte';
 
   interface TransferItem {
     id: string;
@@ -244,8 +245,38 @@
   }
 
 
-  // Context menu
-  let ctxMenu = $state<{ x: number; y: number; item: SftpFileEntry } | null>(null);
+  // Context menu — shared for both local & remote panes
+  type CtxEntry = (SftpFileEntry | LocalFileEntry) & { pane?: 'local' | 'remote' };
+  let ctxMenu = $state<{ x: number; y: number; item: CtxEntry; pane: 'local' | 'remote' } | null>(null);
+
+  function openRemoteCtxMenu(e: MouseEvent, item: SftpFileEntry) {
+    e.preventDefault();
+    e.stopPropagation();
+    activePane = 'remote';
+    if (!remoteSelectedPaths.has(item.path)) {
+      remoteSelectedPaths.clear();
+      remoteSelectedPaths.add(item.path);
+      remoteLastSelected = item;
+    }
+    ctxMenu = { x: e.clientX, y: e.clientY, item: item as CtxEntry, pane: 'remote' };
+  }
+
+  function openLocalCtxMenu(e: MouseEvent, item: LocalFileEntry) {
+    e.preventDefault();
+    e.stopPropagation();
+    activePane = 'local';
+    if (!localSelectedPaths.has(item.path)) {
+      localSelectedPaths.clear();
+      localSelectedPaths.add(item.path);
+      localLastSelected = item as LocalFileEntry;
+    }
+    ctxMenu = { x: e.clientX, y: e.clientY, item: item as CtxEntry, pane: 'local' };
+  }
+
+  /** @deprecated use openRemoteCtxMenu / openLocalCtxMenu */
+  function openCtxMenu(e: MouseEvent, item: SftpFileEntry) {
+    openRemoteCtxMenu(e, item);
+  }
 
   function openCompressModal() {
     const selected = [...remoteSelectedPaths];
@@ -302,12 +333,6 @@
 
   function isArchive(name: string): boolean {
     return /\.(tar\.gz|tgz|tar\.bz2|tar\.xz|tar|zip)$/i.test(name);
-  }
-
-  function openCtxMenu(e: MouseEvent, item: SftpFileEntry) {
-    e.preventDefault();
-    e.stopPropagation();
-    ctxMenu = { x: e.clientX, y: e.clientY, item };
   }
 
   function closeCtxMenu() { ctxMenu = null; }
@@ -597,6 +622,38 @@
     }
   }
 
+  let showNewFileModal = $state(false);
+  let newFileTargetPane = $state<'local' | 'remote'>('remote');
+  let newFileName = $state('');
+
+  function openNewFileModal(pane: 'local' | 'remote') {
+    newFileTargetPane = pane;
+    newFileName = '';
+    showNewFileModal = true;
+  }
+
+  async function confirmNewFile() {
+    if (!newFileName.trim()) return;
+    const filename = newFileName.trim();
+    showNewFileModal = false;
+
+    try {
+      if (newFileTargetPane === 'local') {
+        const dest = joinPath(localPath, filename);
+        await localWriteFile(dest, []);
+        notifySuccess(`Created local file "${filename}"`);
+        await fetchLocalFiles();
+      } else {
+        const dest = joinPath(remotePath, filename);
+        await writeRemoteFile(currentHostId, dest, []);
+        notifySuccess(`Created remote file "${filename}"`);
+        await fetchRemoteFiles();
+      }
+    } catch (e: any) {
+      errorMsg = `Failed to create file: ${e?.message || e}`;
+    }
+  }
+
   function openRenameModal() {
     if (activePane === 'local' && localLastSelected) {
       renameItem = { pane: 'local', path: localLastSelected.path, name: localLastSelected.name };
@@ -881,7 +938,8 @@
   });
 </script>
 
-<div class="h-full flex flex-col space-y-3 text-neutral-800 dark:text-neutral-200">
+<PageContainer noPadding class="h-full">
+<div class="h-full flex flex-col space-y-3 p-3 text-neutral-800 dark:text-neutral-200">
   <!-- Top Bar: Host Selector & Controls -->
   <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#181c22] p-3 rounded-lg border border-neutral-200 dark:border-slate-800 shadow-xs">
     <div class="flex items-center gap-3">
@@ -1006,7 +1064,7 @@
         </div>
 
         <!-- Local File Table -->
-        <div class="flex-1 overflow-auto text-xs font-mono">
+        <div class="flex-1 overflow-auto text-xs font-mono" oncontextmenu={(e) => e.preventDefault()}>
           <table class="w-full border-collapse">
             <thead class="sticky top-0 bg-neutral-100/95 dark:bg-slate-900/95 text-neutral-600 dark:text-slate-400 border-b border-neutral-200 dark:border-slate-800 select-none">
               <tr>
@@ -1036,6 +1094,7 @@
                     ondblclick={() => item.is_dir ? navigateLocal(item.path) : openEditorModal()}
                     draggable="true"
                     ondragstart={(e) => onDragStart(e, 'local', item)}
+                    oncontextmenu={(e) => openLocalCtxMenu(e, item)}
                   >
                     <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
                       {#if item.is_dir}
@@ -1219,7 +1278,7 @@
       {/if}
 
       <!-- Remote File Table -->
-      <div class="flex-1 overflow-auto text-xs font-mono">
+      <div class="flex-1 overflow-auto text-xs font-mono" oncontextmenu={(e) => e.preventDefault()}>
         <table class="w-full border-collapse">
           <thead class="sticky top-0 bg-neutral-100/95 dark:bg-slate-900/95 text-neutral-600 dark:text-slate-400 border-b border-neutral-200 dark:border-slate-800 select-none">
             <tr>
@@ -1250,7 +1309,7 @@
                   ondblclick={() => item.is_dir ? navigateRemote(item.path) : openEditorModal()}
                   draggable="true"
                   ondragstart={(e) => onDragStart(e, 'remote', item)}
-                  oncontextmenu={(e) => openCtxMenu(e, item)}
+                  oncontextmenu={(e) => openRemoteCtxMenu(e, item)}
                 >
                   <td class="py-1.5 px-3 flex items-center gap-2 truncate max-w-[200px]">
                     {#if item.is_dir}
@@ -1379,6 +1438,37 @@
 </div>
 
 <!-- MODAL: NEW FOLDER -->
+{#if showNewFileModal}
+  <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+    <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
+      <h3 class="text-sm font-bold text-neutral-900 dark:text-slate-200">
+        New File ({newFileTargetPane === 'local' ? 'Local' : 'Remote'})
+      </h3>
+      <input
+        type="text"
+        bind:value={newFileName}
+        placeholder="filename.txt"
+        onkeydown={(e) => e.key === 'Enter' && confirmNewFile()}
+        class="w-full bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-3 py-1.5 text-xs text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+      />
+      <div class="flex justify-end gap-2 pt-2">
+        <button
+          onclick={() => (showNewFileModal = false)}
+          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={confirmNewFile}
+          class="px-3 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-medium"
+        >
+          Create
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 {#if showNewFolderModal}
   <div class="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded-lg max-w-sm w-full p-4 space-y-3 shadow-xl">
@@ -1594,51 +1684,175 @@
   <div
     class="fixed inset-0 z-50"
     onclick={closeCtxMenu}
+    oncontextmenu={(e) => { e.preventDefault(); closeCtxMenu(); }}
     role="presentation"
   >
     <div
-      class="fixed bg-white dark:bg-[#1e232a] border border-neutral-200 dark:border-slate-700 rounded shadow-xl py-1 z-50 text-xs min-w-[140px]"
-      style={`top: ${ctxMenu.y}px; left: ${ctxMenu.x}px;`}
+      class="fixed bg-white dark:bg-[#1a1f29] border border-neutral-200 dark:border-white/10 rounded-lg shadow-2xl py-1 z-50 text-xs min-w-[180px] font-sans"
+      style={`top: ${Math.min(ctxMenu.y, 400)}px; left: ${Math.min(ctxMenu.x, 800)}px;`}
       onclick={(e) => e.stopPropagation()}
       role="menu"
+      tabindex="-1"
     >
-      <button
-        class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-700/60 flex items-center gap-2"
-        onclick={() => {
-          const item = ctxMenu!.item;
-          closeCtxMenu();
-          if (!remoteSelectedPaths.has(item.path)) {
-            remoteSelectedPaths.clear();
-            remoteSelectedPaths.add(item.path);
-            remoteLastSelected = item;
-          }
-          openCompressModal();
-        }}
-      >
-        <span>🗜️</span> Compress...
-      </button>
-
-      {#if isArchive(ctxMenu.item.name)}
-        <div class="my-1 border-t border-neutral-200 dark:border-slate-700"></div>
+      {#if ctxMenu.pane === 'remote'}
+        <!-- Remote Actions -->
         <button
-          class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-700/60 flex items-center gap-2"
-          onclick={() => {
-            const item = ctxMenu!.item;
-            closeCtxMenu();
-            openExtractHere(item);
-          }}
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); handleCopyTransfer(); }}
         >
-          <span>📦</span> Extract Here
+          <span class="flex items-center gap-2"><span>📥</span> Download</span>
+          <span class="text-[10px] text-neutral-400 font-mono">F5</span>
         </button>
+
+        {#if !ctxMenu.item.is_dir}
+          <button
+            class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+            onclick={() => { closeCtxMenu(); openEditorModal(); }}
+          >
+            <span class="flex items-center gap-2"><span>✏️</span> Edit / View</span>
+            <span class="text-[10px] text-neutral-400 font-mono">F4</span>
+          </button>
+        {/if}
+
         <button
-          class="w-full text-left px-3 py-1.5 hover:bg-neutral-100 dark:hover:bg-slate-700/60 flex items-center gap-2"
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); openRenameModal(); }}
+        >
+          <span class="flex items-center gap-2"><span>🏷️</span> Rename</span>
+          <span class="text-[10px] text-neutral-400 font-mono">F2</span>
+        </button>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 hover:text-rose-400 flex items-center justify-between text-rose-600 dark:text-rose-400"
+          onclick={() => { closeCtxMenu(); openDeleteModal(); }}
+        >
+          <span class="flex items-center gap-2"><span>🗑️</span> Delete</span>
+          <span class="text-[10px] opacity-70 font-mono">Del</span>
+        </button>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { const item = ctxMenu!.item as SftpFileEntry; closeCtxMenu(); openChmodModal(item); }}
+        >
+          <span class="flex items-center gap-2"><span>🔒</span> Permissions (Chmod)</span>
+        </button>
+
+        <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); openNewFileModal('remote'); }}
+        >
+          <span class="flex items-center gap-2"><span>📄</span> New File</span>
+        </button>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); openNewFolderModal('remote'); }}
+        >
+          <span class="flex items-center gap-2"><span>📁</span> New Folder</span>
+          <span class="text-[10px] text-neutral-400 font-mono">F7</span>
+        </button>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
           onclick={() => {
             const item = ctxMenu!.item;
             closeCtxMenu();
-            openExtractTo(item);
+            navigator.clipboard.writeText(item.path);
+            notifySuccess(`Copied path: ${item.path}`);
           }}
         >
-          <span>📂</span> Extract to...
+          <span class="flex items-center gap-2"><span>📋</span> Copy Path</span>
+        </button>
+
+        <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center gap-2 text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); openCompressModal(); }}
+        >
+          <span>🗜️</span> Compress...
+        </button>
+
+        {#if isArchive(ctxMenu.item.name)}
+          <button
+            class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center gap-2 text-neutral-800 dark:text-neutral-200"
+            onclick={() => { const item = ctxMenu!.item as SftpFileEntry; closeCtxMenu(); openExtractHere(item); }}
+          >
+            <span>📦</span> Extract Here
+          </button>
+          <button
+            class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center gap-2 text-neutral-800 dark:text-neutral-200"
+            onclick={() => { const item = ctxMenu!.item as SftpFileEntry; closeCtxMenu(); openExtractTo(item); }}
+          >
+            <span>📂</span> Extract to...
+          </button>
+        {/if}
+
+      {:else}
+        <!-- Local Actions -->
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); handleCopyTransfer(); }}
+        >
+          <span class="flex items-center gap-2"><span>📤</span> Upload</span>
+          <span class="text-[10px] text-neutral-400 font-mono">F5</span>
+        </button>
+
+        {#if !ctxMenu.item.is_dir}
+          <button
+            class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+            onclick={() => { closeCtxMenu(); openEditorModal(); }}
+          >
+            <span class="flex items-center gap-2"><span>✏️</span> Edit / View</span>
+            <span class="text-[10px] text-neutral-400 font-mono">F4</span>
+          </button>
+        {/if}
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); openRenameModal(); }}
+        >
+          <span class="flex items-center gap-2"><span>🏷️</span> Rename</span>
+          <span class="text-[10px] text-neutral-400 font-mono">F2</span>
+        </button>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-rose-500/10 hover:text-rose-400 flex items-center justify-between text-rose-600 dark:text-rose-400"
+          onclick={() => { closeCtxMenu(); openDeleteModal(); }}
+        >
+          <span class="flex items-center gap-2"><span>🗑️</span> Delete</span>
+          <span class="text-[10px] opacity-70 font-mono">Del</span>
+        </button>
+
+        <div class="my-1 border-t border-neutral-200 dark:border-white/10"></div>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); openNewFileModal('local'); }}
+        >
+          <span class="flex items-center gap-2"><span>📄</span> New File</span>
+        </button>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => { closeCtxMenu(); openNewFolderModal('local'); }}
+        >
+          <span class="flex items-center gap-2"><span>📁</span> New Folder</span>
+          <span class="text-[10px] text-neutral-400 font-mono">F7</span>
+        </button>
+
+        <button
+          class="w-full text-left px-3 py-1.5 hover:bg-cyan-500/10 hover:text-cyan-400 flex items-center justify-between text-neutral-800 dark:text-neutral-200"
+          onclick={() => {
+            const item = ctxMenu!.item;
+            closeCtxMenu();
+            navigator.clipboard.writeText(item.path);
+            notifySuccess(`Copied path: ${item.path}`);
+          }}
+        >
+          <span class="flex items-center gap-2"><span>📋</span> Copy Path</span>
         </button>
       {/if}
     </div>
@@ -1737,4 +1951,5 @@
     </div>
   </div>
 {/if}
+</PageContainer>
 

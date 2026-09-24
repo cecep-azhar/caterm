@@ -23,18 +23,16 @@ fn percent_decode(s: &str) -> String {
     let bytes = s.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
-        if let Some(&b'%') = bytes.get(i) {
-            if let (Some(&h1), Some(&h2)) = (bytes.get(i + 1), bytes.get(i + 2)) {
+        if let Some(&b'%') = bytes.get(i)
+            && let (Some(&h1), Some(&h2)) = (bytes.get(i + 1), bytes.get(i + 2)) {
                 let hex_bytes = [h1, h2];
-                if let Ok(hex_str) = std::str::from_utf8(&hex_bytes) {
-                    if let Ok(byte) = u8::from_str_radix(hex_str, 16) {
+                if let Ok(hex_str) = std::str::from_utf8(&hex_bytes)
+                    && let Ok(byte) = u8::from_str_radix(hex_str, 16) {
                         out.push(byte);
                         i += 3;
                         continue;
                     }
-                }
             }
-        }
         if let Some(&b) = bytes.get(i) {
             out.push(b);
         }
@@ -332,7 +330,7 @@ impl RemoteFileSystem for WebDavFileSystem {
             .map_err(|e| io_err(format!("WebDAV GET failed: {e}")))?;
 
         let status = resp.status().as_u16();
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("WebDAV GET returned HTTP {status}")));
         }
 
@@ -359,7 +357,7 @@ impl RemoteFileSystem for WebDavFileSystem {
             .map_err(|e| io_err(format!("WebDAV PUT failed: {e}")))?;
 
         let status = resp.status().as_u16();
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("WebDAV PUT returned HTTP {status}")));
         }
 
@@ -560,7 +558,7 @@ impl RemoteFileSystem for WebDavFileSystem {
             .map_err(|e| io_err(format!("WebDAV GET failed: {e}")))?;
 
         let status = resp.status().as_u16();
-        if status < 200 || status >= 300 {
+        if !(200..300).contains(&status) {
             return Err(io_err(format!("WebDAV GET returned HTTP {status}")));
         }
 

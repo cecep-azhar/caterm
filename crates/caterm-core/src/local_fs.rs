@@ -219,7 +219,9 @@ pub fn calculate_local_checksum(path: &Path, algorithm: &str) -> Result<String, 
                 .read(&mut buf)
                 .map_err(|e| io_err(format!("Failed reading local file '{}': {e}", path.display())))?;
             if n == 0 { break; }
-            hasher.update(&buf[..n]);
+            if let Some(chunk) = buf.get(..n) {
+                hasher.update(chunk);
+            }
         }
         Ok(hex::encode(hasher.finalize()))
     } else {
@@ -229,7 +231,9 @@ pub fn calculate_local_checksum(path: &Path, algorithm: &str) -> Result<String, 
                 .read(&mut buf)
                 .map_err(|e| io_err(format!("Failed reading local file '{}': {e}", path.display())))?;
             if n == 0 { break; }
-            hasher.update(&buf[..n]);
+            if let Some(chunk) = buf.get(..n) {
+                hasher.update(chunk);
+            }
         }
         Ok(hex::encode(hasher.finalize()))
     }

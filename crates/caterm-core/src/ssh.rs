@@ -383,7 +383,6 @@ fn drain_utf8(buf: &mut Vec<u8>) -> String {
 /// otherwise flushed the moment the stream goes quiet, so interactive echo is never delayed;
 /// this only bounds a continuous firehose (`cat` on a large file, `tail -f` on a busy log),
 /// which would otherwise emit one IPC event per 4 KiB read and flood the webview.
-
 /// Takes bytes off the wire: decoded into `pending` for push delivery, or appended to the
 /// session's buffer when no sink is installed.
 fn absorb_pty_bytes(
@@ -476,7 +475,7 @@ fn connect_local() -> Result<SshSession, CatermError> {
             match stdout.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let chunk = buf[..n].to_vec();
+                    let chunk = buf.get(..n).map(|b| b.to_vec()).unwrap_or_default();
                     if push {
                         let text = String::from_utf8_lossy(&chunk).to_string();
                         emit(SshEvent::Output {
@@ -506,7 +505,7 @@ fn connect_local() -> Result<SshSession, CatermError> {
             match stderr.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let chunk = buf[..n].to_vec();
+                    let chunk = buf.get(..n).map(|b| b.to_vec()).unwrap_or_default();
                     if push {
                         emit(SshEvent::Output {
                             session_id: err_session_id.clone(),

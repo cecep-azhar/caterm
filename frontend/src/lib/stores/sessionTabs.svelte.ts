@@ -9,6 +9,7 @@
 // host id used to make a second Connect to an already-open host a silent no-op.
 
 import type { HostRecord } from '$lib/api/hosts';
+import { recordSessionClosed } from '$lib/stores/feedbackStore.svelte';
 
 export interface SessionTab {
   /** Unique per open session. Never the host id — a host may have several tabs. */
@@ -56,6 +57,7 @@ export function openTabOnce(host: HostRecord): string {
 
 export function closeTab(id: string) {
   tabs = tabs.filter((t) => t.id !== id);
+  recordSessionClosed();
 }
 
 export function closeAllTabs() {

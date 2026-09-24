@@ -23,6 +23,8 @@
   } from '$lib/stores/theme.svelte';
   import { getToasts, showToast } from '$lib/stores/uiNotifications.svelte';
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
+import FeedbackWidget from '$lib/components/FeedbackWidget.svelte';
+import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
   import { onMount, onDestroy } from 'svelte';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { invoke } from '@tauri-apps/api/core';
@@ -46,6 +48,7 @@
 
   const theme = getTheme();
   const aiChat = getAiChatState();
+  const feedbackPrompt = getFeedbackPromptState();
   const isDarkTheme = $derived(theme.name === 'dark');
 
   onMount(() => {
@@ -749,6 +752,17 @@
 
       {#if aiChat.open}
         <AiChatPanel onClose={closeAiChat} />
+      {/if}
+
+      {#if feedbackPrompt.show}
+        <!-- Contextual feedback prompt after 3rd SSH session close. Dismissible, opt-in only. -->
+        <div class="absolute bottom-5 right-5 z-50 w-[400px] max-w-[calc(100vw-2.5rem)] shadow-2xl">
+          <FeedbackWidget
+            dismissible={true}
+            onDismiss={() => feedbackPrompt.close()}
+            onSubmitted={() => feedbackPrompt.markSubmitted()}
+          />
+        </div>
       {/if}
     </div>
   </main>

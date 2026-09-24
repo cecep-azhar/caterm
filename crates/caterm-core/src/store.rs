@@ -296,7 +296,7 @@ pub fn get_host(id: &str) -> Result<HostRecord, CatermError> {
         "SELECT id, label, address, port, username, auth_method, tags, os, protocol, created_at, updated_at, secret_enc \
          FROM hosts WHERE id = ?1",
         params![id],
-        |row| row_to_host(row),
+        row_to_host,
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("host {id} not found: {e}"))))
 }
