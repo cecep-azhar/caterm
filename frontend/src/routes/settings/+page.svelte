@@ -14,7 +14,7 @@
   import { PRO_PRICING, formatUsd, type BillingInterval } from '$lib/pro/pricing';
   import { openExternalUrl } from '$lib/utils/url';
   import { errorText } from '$lib/errors';
-  import { getPerformancePrefs, setPerformancePrefs } from '$lib/api/performance';
+	import { getPerformancePrefs, setPerformancePrefs, type PerformancePrefs } from '$lib/api/performance';
   import { t, intlLocale } from '$lib/i18n/index.svelte';
   import ProLoginForm from '$lib/components/ProLoginForm.svelte';
   import { getPro, refreshProStatus, checkProServer, syncPro, setProStatus } from '$lib/stores/pro.svelte';
@@ -221,36 +221,62 @@
       const stored = localStorage.getItem('caterm_max_audit_records');
       if (stored) maxAuditRecords = parseInt(stored, 10) || 1000;
     } catch {}
-    getPerformancePrefs()
-      .then((prefs) => (gpuAcceleration = prefs.gpuAcceleration))
-      .catch(() => {}); // browser preview: no backend, keep the default
-  });
+		getPerformancePrefs()
+			.then((prefs) => {
+				gpuAcceleration = prefs.gpuAcceleration ?? false;
+				backgroundMemorySaving = prefs.backgroundMemorySaving ?? true;
+				scrollbackLines = prefs.scrollbackLines ?? 5000;
+				inactiveSessionSleep = prefs.inactiveSessionSleep ?? true;
+				lowPowerMode = prefs.lowPowerMode ?? false;
+			})
+			.catch(() => {}); // browser preview: no backend, keep default
+	});
 
-  // Performance: GPU on/off is read when the window is created, so it needs a restart.
-  let gpuAcceleration = $state(true);
-  let isSavingPerformance = $state(false);
+	// Performance preferences state
+	let gpuAcceleration = $state(false);
+	let backgroundMemorySaving = $state(true);
+	let scrollbackLines = $state(5000);
+	let inactiveSessionSleep = $state(true);
+	let lowPowerMode = $state(false);
+	let isSavingPerformance = $state(false);
 
-  async function toggleGpuAcceleration() {
-    const next = !gpuAcceleration;
-    isSavingPerformance = true;
-    try {
-      await setPerformancePrefs({ gpuAcceleration: next });
-      gpuAcceleration = next;
-    } catch (err) {
-      showToast(t('settings.performance.saveFailed', { error: errorText(err) }), 'error');
-      return;
-    } finally {
-      isSavingPerformance = false;
-    }
-    const restart = await confirmModal(
-      t('settings.performance.restartBody'),
-      t('settings.performance.restartTitle'),
-      false,
-      t('settings.performance.restartNow'),
-      t('settings.performance.later')
-    );
-    if (restart) await relaunch();
-  }
+	async function saveAllPerformancePrefs(partial: Partial<PerformancePrefs>, isGpuChange = false) {
+		isSavingPerformance = true;
+		const updated: PerformancePrefs = {
+			gpuAcceleration: partial.gpuAcceleration ?? gpuAcceleration,
+			backgroundMemorySaving: partial.backgroundMemorySaving ?? backgroundMemorySaving,
+			scrollbackLines: partial.scrollbackLines ?? scrollbackLines,
+			inactiveSessionSleep: partial.inactiveSessionSleep ?? inactiveSessionSleep,
+			lowPowerMode: partial.lowPowerMode ?? lowPowerMode
+		};
+		try {
+			await setPerformancePrefs(updated);
+			gpuAcceleration = updated.gpuAcceleration;
+			backgroundMemorySaving = updated.backgroundMemorySaving;
+			scrollbackLines = updated.scrollbackLines;
+			inactiveSessionSleep = updated.inactiveSessionSleep;
+			lowPowerMode = updated.lowPowerMode;
+			if (!isGpuChange) {
+				showToast(t('settings.performance.saved'), 'success');
+			}
+		} catch (err) {
+			showToast(t('settings.performance.saveFailed', { error: errorText(err) }), 'error');
+			return;
+		} finally {
+			isSavingPerformance = false;
+		}
+
+		if (isGpuChange) {
+			const restart = await confirmModal(
+				t('settings.performance.restartBody'),
+				t('settings.performance.restartTitle'),
+				false,
+				t('settings.performance.restartNow'),
+				t('settings.performance.later')
+			);
+			if (restart) await relaunch();
+		}
+	}
 
   function handleSaveAuditSettings(e: Event) {
     e.preventDefault();
@@ -844,40 +870,111 @@
         </form>
       </div>
     </div>
-  {:else if activeTab === 'performance'}
-    <div class="{CARD} space-y-6">
-      <div>
-        <h2 class="text-lg font-semibold text-neutral-900 dark:text-white">{t('settings.performance.title')}</h2>
-        <p class="{MUTED} text-sm mt-1">{t('settings.performance.subtitle')}</p>
-      </div>
+	{:else if activeTab === 'performance'}
+		<div class="{CARD} space-y-6">
+			<div>
+				<h2 class="text-lg font-semibold text-neutral-900 dark:text-white">{t('settings.performance.title')}</h2>
+				<p class="{MUTED} text-sm mt-1">{t('settings.performance.subtitle')}</p>
+			</div>
 
-      <div class="{SUBCARD} flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.backgroundTitle')}</p>
-          <p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.backgroundBody')}</p>
-        </div>
-        <span class="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">{t('settings.performance.alwaysOn')}</span>
-      </div>
+			<!-- 1. Background Memory Saving (Toggleable, On by default) -->
+			<div class="{SUBCARD} flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.backgroundTitle')}</p>
+					<p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.backgroundBody')}</p>
+					<p class="text-[11px] text-neutral-500 mt-2">{t('settings.performance.recommended')}</p>
+				</div>
+				<button
+					type="button"
+					role="switch"
+					aria-checked={backgroundMemorySaving}
+					aria-label={t('settings.performance.backgroundTitle')}
+					disabled={isSavingPerformance}
+					onclick={() => saveAllPerformancePrefs({ backgroundMemorySaving: !backgroundMemorySaving })}
+					class="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 {backgroundMemorySaving ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'} cursor-pointer"
+				>
+					<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {backgroundMemorySaving ? 'translate-x-5' : ''}"></span>
+				</button>
+			</div>
 
-      <div class="{SUBCARD} flex items-start justify-between gap-4">
-        <div class="min-w-0">
-          <p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.gpuTitle')}</p>
-          <p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.gpuBody')}</p>
-          <p class="text-[11px] text-neutral-500 mt-2">{t('settings.performance.recommended')} · {t('settings.performance.restartNote')}</p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={gpuAcceleration}
-          aria-label={t('settings.performance.gpuTitle')}
-          disabled={isSavingPerformance}
-          onclick={toggleGpuAcceleration}
-          class="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 {gpuAcceleration ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'}"
-        >
-          <span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {gpuAcceleration ? 'translate-x-5' : ''}"></span>
-        </button>
-      </div>
-    </div>
+			<!-- 2. GPU Acceleration (Off by default) -->
+			<div class="{SUBCARD} flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.gpuTitle')}</p>
+					<p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.gpuBody')}</p>
+					<p class="text-[11px] text-neutral-500 mt-2">{t('settings.performance.recommendedGpuOff')} · {t('settings.performance.restartNote')}</p>
+				</div>
+				<button
+					type="button"
+					role="switch"
+					aria-checked={gpuAcceleration}
+					aria-label={t('settings.performance.gpuTitle')}
+					disabled={isSavingPerformance}
+					onclick={() => saveAllPerformancePrefs({ gpuAcceleration: !gpuAcceleration }, true)}
+					class="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 {gpuAcceleration ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'} cursor-pointer"
+				>
+					<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {gpuAcceleration ? 'translate-x-5' : ''}"></span>
+				</button>
+			</div>
+
+			<!-- 3. Terminal Scrollback Buffer Limit -->
+			<div class="{SUBCARD} flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.scrollbackTitle')}</p>
+					<p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.scrollbackBody')}</p>
+				</div>
+				<select
+					value={scrollbackLines}
+					disabled={isSavingPerformance}
+					onchange={(e) => saveAllPerformancePrefs({ scrollbackLines: parseInt(e.currentTarget.value, 10) })}
+					class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shrink-0 cursor-pointer"
+				>
+					<option value={1000}>{t('settings.performance.scrollback1k')}</option>
+					<option value={5000}>{t('settings.performance.scrollback5k')}</option>
+					<option value={10000}>{t('settings.performance.scrollback10k')}</option>
+					<option value={50000}>{t('settings.performance.scrollback50k')}</option>
+				</select>
+			</div>
+
+			<!-- 4. Inactive Tab Sleep / Power Saver -->
+			<div class="{SUBCARD} flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.sleepTitle')}</p>
+					<p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.sleepBody')}</p>
+					<p class="text-[11px] text-neutral-500 mt-2">{t('settings.performance.recommended')}</p>
+				</div>
+				<button
+					type="button"
+					role="switch"
+					aria-checked={inactiveSessionSleep}
+					aria-label={t('settings.performance.sleepTitle')}
+					disabled={isSavingPerformance}
+					onclick={() => saveAllPerformancePrefs({ inactiveSessionSleep: !inactiveSessionSleep })}
+					class="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 {inactiveSessionSleep ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'} cursor-pointer"
+				>
+					<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {inactiveSessionSleep ? 'translate-x-5' : ''}"></span>
+				</button>
+			</div>
+
+			<!-- 5. Low-Power Mode (30 FPS Limiter) -->
+			<div class="{SUBCARD} flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.lowPowerTitle')}</p>
+					<p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.lowPowerBody')}</p>
+				</div>
+				<button
+					type="button"
+					role="switch"
+					aria-checked={lowPowerMode}
+					aria-label={t('settings.performance.lowPowerTitle')}
+					disabled={isSavingPerformance}
+					onclick={() => saveAllPerformancePrefs({ lowPowerMode: !lowPowerMode })}
+					class="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 {lowPowerMode ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'} cursor-pointer"
+				>
+					<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {lowPowerMode ? 'translate-x-5' : ''}"></span>
+				</button>
+			</div>
+		</div>
   {:else if activeTab === 'shortcuts'}
     <div class="{CARD} space-y-6">
       <div>

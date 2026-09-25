@@ -22,7 +22,7 @@ pub fn create_main_window(app: &tauri::App) -> tauri::Result<WebviewWindow> {
         .ok_or(tauri::Error::WindowNotFound)?;
 
     let mut builder = tauri::WebviewWindowBuilder::from_config(app.handle(), &config)?;
-    if !prefs::load_performance_prefs().map(|p| p.gpu_acceleration).unwrap_or(true) {
+    if !prefs::load_performance_prefs().map(|p| p.gpu_acceleration).unwrap_or(false) {
         let base = config.additional_browser_args.clone().unwrap_or_default();
         builder = builder.additional_browser_args(&format!("{base} {NO_GPU_ARGS}"));
     }

@@ -109,7 +109,7 @@ pub fn run_with_start(start: std::time::Instant) {
             			if let Some(settings) = inner.settings() {
             				let enable_gpu = caterm_core::prefs::load_performance_prefs()
             					.map(|p| p.gpu_acceleration)
-            					.unwrap_or(true);
+            					.unwrap_or(false);
             				settings.set_enable_webgl(enable_gpu);
             			}
             		}).ok();

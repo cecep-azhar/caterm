@@ -14,15 +14,28 @@ const FILE_NAME: &str = "performance.json";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct PerformancePrefs {
-    /// GPU-accelerated rendering in the WebView. Off trades memory for CPU: the WebView
-    /// renders in software, which is lighter on RAM but heavier when scrolling terminals.
-    pub gpu_acceleration: bool,
+	/// GPU-accelerated rendering for the WebView. Off by default to conserve memory.
+	pub gpu_acceleration: bool,
+	/// Automatic trimming of memory working set when app is idle or minimized.
+	pub background_memory_saving: bool,
+	/// Max scrollback history lines stored in memory per terminal session.
+	pub scrollback_lines: u32,
+	/// Sleep/throttle background inactive terminal sessions to reduce CPU usage.
+	pub inactive_session_sleep: bool,
+	/// Low power mode (30 FPS limiter) for battery saving and low-end hardware.
+	pub low_power_mode: bool,
 }
 
 impl Default for PerformancePrefs {
-    fn default() -> Self {
-        Self { gpu_acceleration: true }
-    }
+	fn default() -> Self {
+		Self {
+			gpu_acceleration: false,
+			background_memory_saving: true,
+			scrollback_lines: 5000,
+			inactive_session_sleep: true,
+			low_power_mode: false,
+		}
+	}
 }
 
 /// If anything fails: missing, unreadable or corrupt file falls back to defaults, because a bad
@@ -80,7 +93,13 @@ mod tests {
     #[test]
     fn round_trips() {
         let dir = scratch_dir("roundtrip");
-        let prefs = PerformancePrefs { gpu_acceleration: false };
+        let prefs = PerformancePrefs {
+        	gpu_acceleration: true,
+        	background_memory_saving: false,
+        	scrollback_lines: 10000,
+        	inactive_session_sleep: false,
+        	low_power_mode: true,
+        };
         save_to(&dir, &prefs).unwrap();
         assert_eq!(load_from(&dir), prefs);
         let _ = std::fs::remove_dir_all(&dir);
