@@ -968,6 +968,8 @@ const id: Dictionary = {
 			sleepBody: 'Mengurangi frekuensi rendering dan polling untuk tab terminal yang tidak aktif agar menghemat penggunaan CPU.',
 			lowPowerTitle: 'Mode Hemat Daya (Pembatas 30 FPS)',
 			lowPowerBody: 'Membatasi frame rate rendering terminal hingga 30 FPS untuk menghemat daya baterai laptop dan menurunkan beban CPU.',
+			lockAnimationTitle: 'Animasi layar kunci',
+			lockAnimationBody: 'Efek background particle-flow dekoratif di layar kunci. Aktif secara default — matikan untuk membebaskan proses GPU-accelerated yang dipakainya selama sesi berjalan.',
 			recommended: 'Disarankan',
 			restartNote: 'Berlaku setelah CATerm dimulai ulang.',
 			restartTitle: 'Perlu mulai ulang',

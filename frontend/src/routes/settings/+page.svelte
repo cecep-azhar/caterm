@@ -474,25 +474,6 @@
         </button>
       </div>
 
-      <div class="pt-5 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4">
-        <div>
-          <p class="text-sm font-medium text-neutral-900 dark:text-white">Lock screen animation</p>
-          <p class="text-xs text-neutral-500 dark:text-neutral-400">
-            Decorative background effect on the lock screen. Keeps a GPU-accelerated process
-            resident for the whole session, so it's off by default — turn it on for the visual
-            effect if memory use isn't a concern on your machine.
-          </p>
-        </div>
-        <label class="inline-flex items-center cursor-pointer shrink-0">
-          <input
-            type="checkbox"
-            class="sr-only peer"
-            checked={!appearance.reduceMotion}
-            onchange={(e) => setReduceMotion(!(e.currentTarget as HTMLInputElement).checked)}
-          />
-          <div class="w-9 h-5 bg-neutral-300 dark:bg-neutral-700 peer-checked:bg-sky-600 rounded-full transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:translate-x-4"></div>
-        </label>
-      </div>
     </div>
   {:else if activeTab === 'updates'}
     <div class="{CARD} space-y-4">
@@ -1001,6 +982,24 @@
 					class="relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 {lowPowerMode ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'} cursor-pointer"
 				>
 					<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {lowPowerMode ? 'translate-x-5' : ''}"></span>
+				</button>
+			</div>
+
+			<!-- 6. Lock Screen Animation (On by default) -->
+			<div class="{SUBCARD} flex items-start justify-between gap-4">
+				<div class="min-w-0">
+					<p class="text-sm font-medium text-neutral-900 dark:text-white">{t('settings.performance.lockAnimationTitle')}</p>
+					<p class="text-xs {MUTED} mt-1 leading-relaxed">{t('settings.performance.lockAnimationBody')}</p>
+				</div>
+				<button
+					type="button"
+					role="switch"
+					aria-checked={!appearance.reduceMotion}
+					aria-label={t('settings.performance.lockAnimationTitle')}
+					onclick={() => setReduceMotion(!appearance.reduceMotion)}
+					class="relative shrink-0 w-11 h-6 rounded-full transition-colors {!appearance.reduceMotion ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'} cursor-pointer"
+				>
+					<span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform {!appearance.reduceMotion ? 'translate-x-5' : ''}"></span>
 				</button>
 			</div>
 		</div>

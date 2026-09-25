@@ -967,6 +967,8 @@ const en = {
 			sleepBody: 'Throttles rendering timers and polling for background inactive terminal tabs to lower CPU usage.',
 			lowPowerTitle: 'Low-Power Mode (30 FPS Limiter)',
 			lowPowerBody: 'Limits terminal frame rate to 30 FPS instead of 60 FPS to maximize battery life and minimize CPU utilization.',
+			lockAnimationTitle: 'Lock screen animation',
+			lockAnimationBody: 'Decorative particle-flow background on the lock screen. On by default; turn it off to free up the GPU-accelerated process it keeps resident for the whole session.',
 			recommended: 'Recommended',
 			restartNote: 'Takes effect after CATerm restarts.',
 			restartTitle: 'Restart required',
