@@ -14,8 +14,11 @@
   import LanguageSwitcher from './LanguageSwitcher.svelte';
   import ProLoginForm from './ProLoginForm.svelte';
   import type { ProAccount } from '$lib/api/pro';
+  import { getTheme, setTheme } from '$lib/stores/theme.svelte';
 
   let { onUnlocked }: { onUnlocked: () => void } = $props();
+
+  const theme = getTheme();
 
   let password = $state('');
   let showPassword = $state(false);
@@ -309,6 +312,27 @@
   <!-- Top Bar Controls -->
   <div class="absolute top-0 right-0 z-20 flex items-center gap-1.5 p-3 sm:p-4 no-drag">
     <LanguageSwitcher />
+
+    <div class="flex items-center p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-800" role="group" aria-label={t('shell.theme')}>
+      <button
+        onclick={() => setTheme('light')}
+        aria-pressed={theme.name !== 'dark'}
+        class="p-1 rounded-md transition-colors {theme.name !== 'dark' ? 'bg-white text-amber-500 shadow-sm' : 'hover:text-neutral-900 dark:hover:text-white'}"
+        title={t('shell.lightTheme')}
+        aria-label={t('shell.lightTheme')}
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+      </button>
+      <button
+        onclick={() => setTheme('dark')}
+        aria-pressed={theme.name === 'dark'}
+        class="p-1 rounded-md transition-colors {theme.name === 'dark' ? 'bg-neutral-800 text-white' : 'hover:text-neutral-900'}"
+        title={t('shell.darkTheme')}
+        aria-label={t('shell.darkTheme')}
+      >
+        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+      </button>
+    </div>
 
     <div class="flex items-center gap-0.5 ml-1 border-l border-neutral-200 dark:border-neutral-800 pl-2">
       <button
