@@ -214,6 +214,13 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::pro_account,
             commands::pro_revoke_device,
             commands::pro_logout,
+            commands::pro_team,
+            commands::pro_team_invite,
+            commands::pro_team_cancel_invite,
+            commands::pro_team_remove_member,
+            commands::pro_team_accept,
+            commands::pro_team_decline,
+            commands::pro_team_leave,
             commands::submit_feedback,
         ])
         .run(tauri::generate_context!())

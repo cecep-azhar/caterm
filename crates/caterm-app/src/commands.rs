@@ -679,6 +679,41 @@ pub async fn pro_logout() -> Result<(), CatermError> {
 }
 
 #[tauri::command]
+pub async fn pro_team() -> Result<caterm_core::pro::ProTeamView, CatermError> {
+    run_blocking(caterm_core::pro::team).await
+}
+
+#[tauri::command]
+pub async fn pro_team_invite(email: String, locale: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+    run_blocking(move || caterm_core::pro::team_invite(&email, &locale)).await
+}
+
+#[tauri::command]
+pub async fn pro_team_cancel_invite(invite_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+    run_blocking(move || caterm_core::pro::team_cancel_invite(&invite_id)).await
+}
+
+#[tauri::command]
+pub async fn pro_team_remove_member(account_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+    run_blocking(move || caterm_core::pro::team_remove_member(&account_id)).await
+}
+
+#[tauri::command]
+pub async fn pro_team_accept(invitation_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+    run_blocking(move || caterm_core::pro::team_accept(&invitation_id)).await
+}
+
+#[tauri::command]
+pub async fn pro_team_decline(invitation_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+    run_blocking(move || caterm_core::pro::team_decline(&invitation_id)).await
+}
+
+#[tauri::command]
+pub async fn pro_team_leave() -> Result<caterm_core::pro::ProTeamView, CatermError> {
+    run_blocking(caterm_core::pro::team_leave).await
+}
+
+#[tauri::command]
 pub async fn submit_feedback(rating: i32, content: String) -> Result<(), CatermError> {
     run_blocking(move || feedback::submit_feedback(rating, &content)).await
 }

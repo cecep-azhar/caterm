@@ -9,6 +9,9 @@
 //!   heartbeat (valid ≤ 14 days). The public key is compiled in; the client can verify but
 //!   never mint tokens.
 //!
+//! - Devices are counted per account: a Pro account may activate 5, a free account that is a
+//!   member of someone's team 1. Membership grants the `team` tier while the owner is entitled.
+//!
 //! Errors are `CatermError::Pro` whose message is the server's stable code
 //! (`INVALID_CREDENTIALS`, `DEVICE_LIMIT_EXCEEDED`, `NETWORK`, ...) so the UI can translate it.
 
@@ -200,15 +203,15 @@ fn request(method: &str, path: &str, bearer: Option<&str>, body: Option<&Value>)
         .build()
         .into();
     let url = format!("{}{path}", api_base());
-    let result = match (method, body) {
-        ("GET", _) => {
-            let mut req = agent.get(&url);
+    let result = match method {
+        "GET" | "DELETE" => {
+            let mut req = if method == "GET" { agent.get(&url) } else { agent.delete(&url) };
             if let Some(token) = bearer {
                 req = req.header("Authorization", &format!("Bearer {token}"));
             }
             req.call()
         }
-        (_, body) => {
+        _ => {
             let mut req = agent.post(&url).header("Content-Type", "application/json");
             if let Some(token) = bearer {
                 req = req.header("Authorization", &format!("Bearer {token}"));
@@ -230,6 +233,19 @@ fn api_error(status: u16, body: &Value) -> CatermError {
     }
 }
 
+/// Server ids (UUIDs) are interpolated into paths: refuse anything else.
+fn path_id(id: &str) -> Result<&str, CatermError> {
+    if !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+        Ok(id)
+    } else {
+        Err(pro_err("BAD_REQUEST"))
+    }
+}
+
+fn parse<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Option<T> {
+    body.get(key).filter(|v| !v.is_null()).and_then(|v| serde_json::from_value(v.clone()).ok())
+}
+
 // ---- Wire types ------------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -247,8 +263,85 @@ pub struct ProLicense {
     pub tier: String,
     pub trial_ends_at: Option<i64>,
     pub current_period_end: Option<i64>,
-    pub max_devices: i64,
     pub entitled: bool,
+}
+
+/// What the account may do right now: through its own licence (`tier` "pro") or as a member
+/// of an entitled owner's team (`tier` "team").
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProAccess {
+    pub entitled: bool,
+    pub tier: Option<String>,
+    pub features: Vec<String>,
+    pub device_limit: i64,
+}
+
+/// Another account as shown to someone else.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProPerson {
+    pub email: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProMembership {
+    pub team_id: String,
+    pub owner: ProPerson,
+    pub joined_at: i64,
+    /// False while the owner is not subscribed.
+    pub active: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProTeamMember {
+    pub account_id: String,
+    pub email: String,
+    pub name: String,
+    pub joined_at: i64,
+    pub active_devices: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProTeamInvite {
+    pub id: String,
+    pub email: String,
+    pub invited_at: i64,
+    pub expires_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProOwnedTeam {
+    pub id: String,
+    pub active: bool,
+    pub members: Vec<ProTeamMember>,
+    pub invites: Vec<ProTeamInvite>,
+}
+
+/// A pending invitation addressed to the signed-in account's email.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProInvitation {
+    pub id: String,
+    pub owner: ProPerson,
+    pub invited_at: i64,
+    pub expires_at: i64,
+}
+
+/// Everything team-related for the signed-in account; every team call returns it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProTeamView {
+    pub owned: Option<ProOwnedTeam>,
+    pub can_invite: bool,
+    pub max_members: i64,
+    pub membership: Option<ProMembership>,
+    pub invitations: Vec<ProInvitation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -459,12 +552,19 @@ pub struct ProStatus {
     pub key_configured: bool,
 }
 
+/// This device could not be activated: the account already uses `limit` devices.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceLimit {
+    pub limit: i64,
+    pub devices: Vec<ProDevice>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncOutcome {
     pub status: ProStatus,
-    /// Set when this device could not be activated because the account is at its limit.
-    pub device_limit: Option<Vec<ProDevice>>,
+    pub device_limit: Option<DeviceLimit>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -472,6 +572,8 @@ pub struct SyncOutcome {
 pub struct AccountDetails {
     pub account: Option<ProAccount>,
     pub license: Option<ProLicense>,
+    pub access: Option<ProAccess>,
+    pub membership: Option<ProMembership>,
     pub devices: Vec<ProDevice>,
 }
 
@@ -584,8 +686,11 @@ pub fn status() -> Result<ProStatus, CatermError> {
 
 fn apply_license_response(conn: &Connection, status: u16, body: &Value) -> Result<SyncOutcome, CatermError> {
     if status == 409 && body.get("error").and_then(Value::as_str) == Some("DEVICE_LIMIT_EXCEEDED") {
-        let devices = serde_json::from_value(body.get("devices").cloned().unwrap_or(Value::Null)).unwrap_or_default();
-        return Ok(SyncOutcome { status: self::status()?, device_limit: Some(devices) });
+        let limit = DeviceLimit {
+            limit: body.get("device_limit").and_then(Value::as_i64).unwrap_or(1),
+            devices: parse(body, "devices").unwrap_or_default(),
+        };
+        return Ok(SyncOutcome { status: self::status()?, device_limit: Some(limit) });
     }
     if !(200..300).contains(&status) {
         return Err(api_error(status, body));
@@ -622,19 +727,64 @@ pub fn account_details() -> Result<AccountDetails, CatermError> {
     }
     Ok(AccountDetails {
         account: body.get("account").and_then(account_from),
-        license: body.get("license").and_then(|l| serde_json::from_value(l.clone()).ok()),
-        devices: serde_json::from_value(body.get("devices").cloned().unwrap_or(Value::Null)).unwrap_or_default(),
+        license: parse(&body, "license"),
+        access: parse(&body, "access"),
+        membership: parse(&body, "membership"),
+        devices: parse(&body, "devices").unwrap_or_default(),
     })
 }
 
 pub fn revoke_device(device_id: &str) -> Result<(), CatermError> {
     let conn = open_db()?;
-    let (status, body) = authed(&conn, "POST", &format!("/license/devices/{device_id}/revoke"), None)?;
+    let path = format!("/license/devices/{}/revoke", path_id(device_id)?);
+    let (status, body) = authed(&conn, "POST", &path, None)?;
     if status == 204 || status == 200 {
         Ok(())
     } else {
         Err(api_error(status, &body))
     }
+}
+
+// ---- Team ------------------------------------------------------------------------------------
+
+fn team_call(method: &str, path: &str, body: Option<&Value>) -> Result<ProTeamView, CatermError> {
+    let conn = open_db()?;
+    let (status, value) = authed(&conn, method, path, body)?;
+    if !(200..300).contains(&status) {
+        return Err(api_error(status, &value));
+    }
+    serde_json::from_value(value).map_err(|_| pro_err("BAD_RESPONSE"))
+}
+
+pub fn team() -> Result<ProTeamView, CatermError> {
+    team_call("GET", "/team", None)
+}
+
+/// Invites `email` to the signed-in owner's team; `locale` is used for the invite email when
+/// the invitee has no account yet.
+pub fn team_invite(email: &str, locale: &str) -> Result<ProTeamView, CatermError> {
+    team_call("POST", "/team/invites", Some(&json!({ "email": email.trim(), "locale": locale })))
+}
+
+pub fn team_cancel_invite(invite_id: &str) -> Result<ProTeamView, CatermError> {
+    team_call("DELETE", &format!("/team/invites/{}", path_id(invite_id)?), None)
+}
+
+pub fn team_remove_member(account_id: &str) -> Result<ProTeamView, CatermError> {
+    team_call("DELETE", &format!("/team/members/{}", path_id(account_id)?), None)
+}
+
+/// Joining or leaving changes what this device may do: callers should [`sync`] afterwards.
+pub fn team_accept(invitation_id: &str) -> Result<ProTeamView, CatermError> {
+    team_call("POST", &format!("/team/invitations/{}/accept", path_id(invitation_id)?), None)
+}
+
+pub fn team_decline(invitation_id: &str) -> Result<ProTeamView, CatermError> {
+    team_call("POST", &format!("/team/invitations/{}/decline", path_id(invitation_id)?), None)
+}
+
+pub fn team_leave() -> Result<ProTeamView, CatermError> {
+    team_call("POST", "/team/leave", None)
 }
 
 /// Signs out on this device: revokes the refresh token on the server (best effort — being
@@ -726,6 +876,46 @@ mod tests {
         assert_eq!(err.code(), "CAT-PRO-000");
         assert_eq!(err.to_string(), "pro: INVALID_CREDENTIALS");
         assert_eq!(api_error(502, &Value::Null).to_string(), "pro: HTTP_502");
+    }
+
+    #[test]
+    fn member_token_carries_team_tier() {
+        let payload = json!({ "lic_id": "owner-lic", "account_id": "m", "hwid": "dev", "tier": "team",
+            "features": ["ai_hosted", "team_space"], "team_id": "t1", "iat": 0, "exp": 2_000, "nonce": "n" })
+        .to_string();
+        let sig = STANDARD.encode(key().sign(payload.as_bytes()).to_bytes());
+        match eval(&payload, &sig, "dev", 0, 1_000).0 {
+            Entitlement::Valid { tier, features, .. } => {
+                assert_eq!(tier, "team");
+                assert_eq!(features, vec!["ai_hosted", "team_space"]);
+            }
+            other => panic!("expected valid, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn team_view_parses_server_shape() {
+        let body = json!({
+            "owned": { "id": "t", "active": true,
+                "members": [{ "account_id": "a", "email": "m@x.io", "name": "M", "joined_at": 1, "active_devices": 1 }],
+                "invites": [{ "id": "i", "email": "n@x.io", "invited_at": 2, "expires_at": 3 }] },
+            "can_invite": true, "max_members": 6, "membership": null,
+            "invitations": [{ "id": "j", "owner": { "email": "o@x.io", "name": "" }, "invited_at": 4, "expires_at": 5 }]
+        });
+        let view: ProTeamView = serde_json::from_value(body).unwrap();
+        assert_eq!(view.owned.as_ref().unwrap().members[0].active_devices, 1);
+        assert_eq!(view.invitations[0].owner.email, "o@x.io");
+        let out = serde_json::to_value(&view).unwrap();
+        assert_eq!(out["maxMembers"], 6);
+        assert_eq!(out["owned"]["members"][0]["activeDevices"], 1);
+    }
+
+    #[test]
+    fn path_ids_are_restricted() {
+        assert!(path_id("0b8f5a8e-1c2d-4e5f-8a9b-0c1d2e3f4a5b").is_ok());
+        for bad in ["", "../account", "a/b", "a?b=c", "a b"] {
+            assert!(path_id(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

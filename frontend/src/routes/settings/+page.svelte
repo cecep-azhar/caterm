@@ -18,7 +18,9 @@
   import { t, intlLocale } from '$lib/i18n/index.svelte';
   import ProLoginForm from '$lib/components/ProLoginForm.svelte';
   import { getPro, refreshProStatus, checkProServer, syncPro, setProStatus } from '$lib/stores/pro.svelte';
-  import { proStartTrial, proAccount, proRevokeDevice, proLogout, proErrorCode, type ProDevice, type SyncOutcome } from '$lib/api/pro';
+  import { proStartTrial, proAccount, proRevokeDevice, proLogout, type ProDevice, type DeviceLimit, type SyncOutcome } from '$lib/api/pro';
+  import { proErrorMessage } from '$lib/pro/errors';
+  import ProTeamPanel from '$lib/components/ProTeamPanel.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   // Shared surface classes so every tab reads the same in light and dark mode.
@@ -30,7 +32,8 @@
   const pro = getPro();
   let showProLogin = $state(false);
   let proDevices = $state<ProDevice[] | null>(null);
-  let deviceLimitDevices = $state<ProDevice[] | null>(null);
+  let proDeviceLimit = $state<number | null>(null);
+  let deviceLimit = $state<DeviceLimit | null>(null);
   let proBusy = $state(false);
 
   $effect(() => {
@@ -65,6 +68,7 @@
     const lic = status.license;
     if (!status.keyConfigured) return { tone: 'amber', text: t('pro.account.stateKeyMissing') };
     if (ent.state === 'valid') {
+      if (ent.tier === 'team') return { tone: 'sky', text: t('pro.account.stateTeamMember') };
       if (lic?.status === 'trialing') {
         const end = lic.trialEndsAt ?? ent.expiresAt;
         const count = Math.max(0, Math.ceil((end - Date.now() / 1000) / 86400));
@@ -81,16 +85,9 @@
     return { tone: 'neutral', text: t('pro.account.stateNoPlan') };
   });
 
-  function proErrorMessage(err: unknown): string {
-    const code = proErrorCode(err);
-    const key = code ? `pro.errors.${code}` : '';
-    const text = key ? t(key) : '';
-    return text && text !== key ? text : errorText(err);
-  }
-
   function handleOutcome(outcome: SyncOutcome | null, successText: string) {
     if (!outcome) return;
-    if (outcome.deviceLimit) deviceLimitDevices = outcome.deviceLimit;
+    if (outcome.deviceLimit) deviceLimit = outcome.deviceLimit;
     else showToast(successText, 'success');
   }
 
@@ -130,7 +127,9 @@
 
   async function loadProDevices() {
     try {
-      proDevices = (await proAccount()).devices;
+      const details = await proAccount();
+      proDevices = details.devices;
+      proDeviceLimit = details.access?.deviceLimit ?? null;
     } catch (err) {
       showToast(proErrorMessage(err), 'error');
     }
@@ -140,8 +139,8 @@
     try {
       await proRevokeDevice(id);
       proDevices = proDevices?.filter((d) => d.id !== id) ?? null;
-      if (deviceLimitDevices) {
-        deviceLimitDevices = null;
+      if (deviceLimit) {
+        deviceLimit = null;
         await runProSync(); // a slot is free now: activate this device
       }
     } catch (err) {
@@ -546,6 +545,9 @@
             <p class="text-[11px] text-neutral-500">{t('pro.account.lastSync', { time: formatProTime(pro.status.lastSyncAt) })}</p>
           {/if}
           {#if proDevices}
+            {#if proDeviceLimit}
+              <p class="text-xs {MUTED}">{t('pro.account.deviceUsage', { used: proDevices.length, limit: proDeviceLimit })}</p>
+            {/if}
             {#if proDevices.length === 0}
               <p class="text-xs {MUTED}">{t('pro.devices.empty')}</p>
             {:else}
@@ -569,6 +571,10 @@
           {/if}
         {/if}
       </div>
+
+      {#if pro.status?.signedIn && !pro.status.pending}
+        <ProTeamPanel onOutcome={handleOutcome} />
+      {/if}
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <!-- Community: what everyone has today -->
@@ -918,15 +924,21 @@
     </div>
   {/if}
 
-  {#if deviceLimitDevices}
+  {#if deviceLimit}
     <div class="fixed inset-0 z-[100] bg-black/40 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
       <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
         <div>
           <h3 class="text-base font-bold text-neutral-900 dark:text-white">{t('pro.devices.limitTitle')}</h3>
-          <p class="text-xs {MUTED} mt-1">{t('pro.devices.limitBody')}</p>
+          <p class="text-xs {MUTED} mt-1">{t('pro.devices.limitBody', { count: deviceLimit.limit })}</p>
+          {#if deviceLimit.limit < PRO_PRICING.syncDevices}
+            <p class="text-xs text-sky-700 dark:text-sky-300 mt-2">
+              {t('pro.devices.limitUpsell', { count: PRO_PRICING.syncDevices })}
+              <button type="button" onclick={() => openExternalUrl(PRICING_URL)} class="font-semibold underline">{t('pro.devices.seePlans')}</button>
+            </p>
+          {/if}
         </div>
         <ul class="divide-y divide-neutral-200 dark:divide-neutral-800 border border-neutral-200 dark:border-neutral-800 rounded-md">
-          {#each deviceLimitDevices as device (device.id)}
+          {#each deviceLimit.devices as device (device.id)}
             <li class="flex items-center justify-between gap-3 px-3 py-2 text-xs">
               <div class="min-w-0">
                 <p class="font-medium text-neutral-900 dark:text-white truncate">{device.name}</p>
@@ -937,7 +949,7 @@
           {/each}
         </ul>
         <div class="flex justify-end">
-          <button type="button" onclick={() => (deviceLimitDevices = null)} class={SMALL_BUTTON}>{t('common.close')}</button>
+          <button type="button" onclick={() => (deviceLimit = null)} class={SMALL_BUTTON}>{t('common.close')}</button>
         </div>
       </div>
     </div>

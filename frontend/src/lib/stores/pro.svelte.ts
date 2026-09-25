@@ -24,8 +24,15 @@ export function getPro() {
     get status() {
       return status;
     },
+    /** This account's own Pro plan or trial is valid on this device. */
     get isPro() {
-      return status?.entitlement.state === 'valid';
+      const ent = status?.entitlement;
+      return ent?.state === 'valid' && ent.features.includes('cloud_sync');
+    },
+    /** Access through someone else's team only (free account in an entitled team). */
+    get isTeamMember() {
+      const ent = status?.entitlement;
+      return ent?.state === 'valid' && ent.tier === 'team';
     },
     /** null while unknown (not checked yet / browser preview). */
     get serverAvailable() {

@@ -119,6 +119,13 @@ const COMMANDS: &[&str] = &[
     "pro_account",
     "pro_revoke_device",
     "pro_logout",
+    "pro_team",
+    "pro_team_invite",
+    "pro_team_cancel_invite",
+    "pro_team_remove_member",
+    "pro_team_accept",
+    "pro_team_decline",
+    "pro_team_leave",
     // Feedback
     "submit_feedback",
 ];

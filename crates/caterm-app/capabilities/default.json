@@ -101,6 +101,13 @@
     "allow-pro-account",
     "allow-pro-revoke-device",
     "allow-pro-logout",
+    "allow-pro-team",
+    "allow-pro-team-invite",
+    "allow-pro-team-cancel-invite",
+    "allow-pro-team-remove-member",
+    "allow-pro-team-accept",
+    "allow-pro-team-decline",
+    "allow-pro-team-leave",
     "allow-submit-feedback",
     "process:allow-restart"
   ]
