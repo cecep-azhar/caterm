@@ -66,6 +66,7 @@
   let autocompleteEnabled = $state(true);
   let cursorX = $state(20);
   let cursorY = $state(60);
+  let cursorTop = $state(42);
   let currentInputLine = $state('');
   let commandHistory = $state<string[]>([]);
   let userSnippets = $state<SnippetRecord[]>([]);
@@ -81,26 +82,23 @@
       .catch(() => {});
   });
 
+  // Places the popup anchor just below the terminal cursor. The WebGL/Canvas renderers draw
+  // the cursor on a <canvas> (there is no `.xterm-cursor` element), so derive the cell size
+  // from the rendered `.xterm-screen` box instead of xterm's private render dimensions.
   function updateCursorPosition() {
-    if (!rootContainer) return;
-    const rootRect = rootContainer.getBoundingClientRect();
-    const cursorEl = terminalContainer?.querySelector('.xterm-cursor') as HTMLElement | null;
+    if (!rootContainer || !term) return;
+    const screenEl = terminalContainer?.querySelector('.xterm-screen') as HTMLElement | null;
+    if (!screenEl || term.cols === 0 || term.rows === 0) return;
 
-    if (cursorEl) {
-      const cursorRect = cursorEl.getBoundingClientRect();
-      cursorX = Math.round(cursorRect.left - rootRect.left);
-      cursorY = Math.round(cursorRect.bottom - rootRect.top + 4);
-    } else if (term) {
-      const termRect = terminalContainer?.getBoundingClientRect() ?? rootRect;
-      const cellWidth =
-        (term as any)._core?._renderService?.dimensions?.actualCellWidth || 9;
-      const cellHeight =
-        (term as any)._core?._renderService?.dimensions?.actualCellHeight || 18;
-      const offsetX = Math.round(termRect.left - rootRect.left);
-      const offsetY = Math.round(termRect.top - rootRect.top);
-      cursorX = offsetX + Math.round(term.buffer.active.cursorX * cellWidth);
-      cursorY = offsetY + Math.round((term.buffer.active.cursorY + 1) * cellHeight + 4);
-    }
+    const rootRect = rootContainer.getBoundingClientRect();
+    const screenRect = screenEl.getBoundingClientRect();
+    const cellWidth = screenRect.width / term.cols;
+    const cellHeight = screenRect.height / term.rows;
+    const buffer = term.buffer.active;
+
+    cursorX = Math.round(screenRect.left - rootRect.left + buffer.cursorX * cellWidth);
+    cursorTop = Math.round(screenRect.top - rootRect.top + buffer.cursorY * cellHeight);
+    cursorY = Math.round(screenRect.top - rootRect.top + (buffer.cursorY + 1) * cellHeight);
   }
 
   function updateSuggestions(input: string) {
@@ -430,6 +428,12 @@
       }
     });
 
+    // Keystrokes are sent before the shell echoes them back, so follow the real cursor once
+    // the echo has been rendered instead of using the pre-echo position.
+    terminal.onCursorMove(() => {
+      if (suggestions.length > 0) updateCursorPosition();
+    });
+
     let fitQueued = false;
     const applyFit = () => {
       fitQueued = false;
@@ -531,6 +535,7 @@
       selectedIndex={selectedSuggestionIndex}
       {cursorX}
       {cursorY}
+      {cursorTop}
       containerWidth={rootContainer?.clientWidth ?? 0}
       containerHeight={rootContainer?.clientHeight ?? 0}
       onSelect={applySuggestion}
