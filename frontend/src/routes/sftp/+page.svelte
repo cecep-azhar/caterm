@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { isTypingTarget } from '$lib/shortcuts';
   import { onMount, onDestroy } from 'svelte';
   import { page } from '$app/state';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -877,7 +878,10 @@
 
   // --- KEYBOARD SHORTCUTS ---
   function handleKeydown(e: KeyboardEvent) {
-    // If inside an input or modal, ignore global hotkeys
+    // Typing in a field (path, search, rename…) or holding a modifier is never a file command:
+    // Delete in the path box must delete text, not open "delete file".
+    if (isTypingTarget(e.target) || e.ctrlKey || e.altKey || e.metaKey) return;
+    // Nor while a dialog is open.
     if (
       showNewFolderModal ||
       showRenameModal ||

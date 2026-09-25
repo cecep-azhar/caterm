@@ -9,6 +9,16 @@ export const WEBSITE_URL = 'https://caterm.fathforce.com';
 export const AUTHOR_URL = 'https://cecepazhar.com';
 export const PRICING_URL = `${WEBSITE_URL}/#pricing`;
 
+/**
+ * Pricing page for the signed-in CATerm account: the landing page passes the account id on to
+ * Lemon Squeezy as checkout custom data, so the subscription lands on this account whatever email
+ * is typed at checkout. Only the opaque account id travels, never the email.
+ */
+export function pricingUrl(accountId?: string | null): string {
+  if (!accountId || !/^[0-9a-f-]{36}$/i.test(accountId)) return PRICING_URL;
+  return `${WEBSITE_URL}/?from=app&account=${accountId}#pricing`;
+}
+
 export function releaseNotesUrl(ver: string): string {
   return `${REPO_URL}/releases/tag/v${ver.replace(/^v/, '')}`;
 }

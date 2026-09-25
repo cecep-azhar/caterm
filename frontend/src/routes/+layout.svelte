@@ -9,7 +9,7 @@
   import SessionViewport from '$lib/components/SessionViewport.svelte';
   import { getAiChatState, toggleAiChat, closeAiChat } from '$lib/stores/aiChat.svelte';
   import { page } from '$app/state';
-  import { getTabs, closeTab, closeAllTabs, renameTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
+  import { getTabs, closeSessionTab, closeAllTabs, renameTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
     setLayout,
@@ -38,6 +38,9 @@
   import { t } from '$lib/i18n/index.svelte';
   import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
   import { navItems as getNavItems, settingsNavItem } from '$lib/navItems';
+  import CommandPalette from '$lib/components/CommandPalette.svelte';
+  import { getPalette, openPalette, closePalette } from '$lib/stores/commandPalette.svelte';
+  import { appCommandFor, type AppCommand } from '$lib/shortcuts';
 
   // Seconds since the last monitor poll; the label is derived so it re-renders the moment the
   // language changes instead of waiting for the next 5 s tick.
@@ -112,7 +115,12 @@
     };
     document.addEventListener('contextmenu', handleContextMenu, true);
 
+    // Capture phase: runs before xterm (which would otherwise send the keys to the shell) and
+    // before any page handler. See $lib/shortcuts for which keys are app-level.
+    window.addEventListener('keydown', handleShortcut, true);
+
     return () => {
+      window.removeEventListener('keydown', handleShortcut, true);
       window.removeEventListener('click', handleGlobalClick, true);
       document.removeEventListener('contextmenu', handleContextMenu, true);
       shortViewport.removeEventListener('change', collapseWhenShort);
@@ -319,18 +327,80 @@
    * Both drop the vault key from backend memory, not just the UI.
    */
   function lockApp() {
+    closePalette();
     isUnlocked = false;
     onVaultLocked();
     lockVault().catch((err) => console.warn('lock_vault failed:', err));
   }
 
   async function signOut() {
+    closePalette();
     closeAllTabs();
     isUnlocked = false;
     onVaultLocked();
     await goto('/');
     lockVault().catch((err) => console.warn('lock_vault failed:', err));
     showToast(t('shell.signedOut'), 'info');
+  }
+
+  // ---- Keyboard shortcuts (list and rules in $lib/shortcuts) -----------------------------------
+  const palette = getPalette();
+
+  function currentTabIndex(): number {
+    const index = sessionTabs.findIndex((tab) => tab.id === view.selectedTabId);
+    return index < 0 ? 0 : index;
+  }
+
+  function showTab(index: number) {
+    const tab = sessionTabs[index];
+    if (!tab) return;
+    setSelectedTabId(tab.id);
+    if (!page.url.pathname.startsWith('/session')) void goto('/session');
+  }
+
+  /** Runs the command; false when there is nothing to act on, so the key passes through. */
+  function runCommand(cmd: AppCommand): boolean {
+    const onSession = page.url.pathname.startsWith('/session');
+    switch (cmd.type) {
+      case 'palette':
+        if (palette.open && palette.mode === 'all') closePalette();
+        else openPalette('all');
+        return true;
+      case 'newSession':
+        openPalette('hosts');
+        return true;
+      case 'settings':
+        void goto('/settings');
+        return true;
+      case 'lock':
+        lockApp();
+        return true;
+      case 'tab': {
+        if (sessionTabs.length === 0) return false;
+        showTab(cmd.index < 0 ? sessionTabs.length - 1 : cmd.index);
+        return true;
+      }
+      case 'cycleTab': {
+        if (sessionTabs.length === 0) return false;
+        // Away from the terminal the first press just brings the current session back.
+        const next = onSession ? (currentTabIndex() + cmd.step + sessionTabs.length) % sessionTabs.length : currentTabIndex();
+        showTab(next);
+        return true;
+      }
+      case 'closeTab': {
+        if (!onSession || sessionTabs.length === 0) return false;
+        closeSessionTab(sessionTabs[currentTabIndex()].id);
+        return true;
+      }
+    }
+  }
+
+  function handleShortcut(e: KeyboardEvent) {
+    if (!isUnlocked) return;
+    const cmd = appCommandFor(e);
+    if (!cmd || !runCommand(cmd)) return;
+    e.preventDefault();
+    e.stopPropagation();
   }
 
   // $derived (not a plain const): labels re-resolve through t() whenever the locale changes.
@@ -359,6 +429,9 @@
 />
 
 <NotificationCenter />
+{#if isUnlocked}
+  <CommandPalette onLock={lockApp} />
+{/if}
 
 {#if !isUnlocked}
   <LockScreen onUnlocked={() => { isUnlocked = true; void onVaultUnlocked(); }} />
@@ -443,7 +516,7 @@
               </a>
             {/if}
             <button
-              onclick={() => closeTab(tab.id)}
+              onclick={() => closeSessionTab(tab.id)}
               class="p-0.5 mr-1 rounded hover:bg-neutral-300 dark:hover:bg-neutral-700 hover:text-rose-600 dark:hover:text-rose-400"
               title={t('shell.closeSessionNamed', { label: tabLabel(tab) })}
               aria-label={t('shell.closeSessionNamed', { label: tabLabel(tab) })}
@@ -755,7 +828,7 @@
       </button>
       <button
         role="menuitem"
-        onclick={() => { const id = menuTab.id; tabMenu = null; closeTab(id); }}
+        onclick={() => { const id = menuTab.id; tabMenu = null; closeSessionTab(id); }}
         class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12" /></svg>

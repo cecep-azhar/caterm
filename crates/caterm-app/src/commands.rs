@@ -544,10 +544,18 @@ pub async fn ai_chat(
 }
 
 fn do_open_url(url: &str) -> Result<(), CatermError> {
+    // Web and mail links only: this must never become a way to launch local files or other
+    // protocol handlers from the WebView.
+    let lower = url.trim_start().to_ascii_lowercase();
+    if !(lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:")) {
+        return Err(caterm_core::error::ValidationError::Generic(format!("refusing to open non-web URL: {url}")).into());
+    }
     #[cfg(target_os = "linux")]
     let res = std::process::Command::new("xdg-open").arg(url).spawn();
+    // rundll32 hands the URL straight to the default browser. `cmd /C start` re-parsed it, so an
+    // `&` in a query string split the command (and it flashed a console window).
     #[cfg(target_os = "windows")]
-    let res = std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn();
+    let res = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", url]).spawn();
     #[cfg(target_os = "macos")]
     let res = std::process::Command::new("open").arg(url).spawn();
     res.map(|_| ()).map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into())

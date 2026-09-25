@@ -29,8 +29,37 @@ pub fn create_main_window(app: &tauri::App) -> tauri::Result<WebviewWindow> {
 
     let window = builder.build()?;
     memory::install(&window);
+    disable_browser_accelerators(&window);
     Ok(window)
 }
+
+/// Release builds turn off WebView2's *browser* shortcuts: F5/Ctrl+R would reload the whole
+/// app (dropping every SSH session and locking the vault), Ctrl+P opens a print dialog, Ctrl+F
+/// Edge's find bar, Ctrl+plus/minus zoom the whole UI. Editing keys (copy, paste, undo) keep
+/// working. Debug builds keep them so reload and DevTools stay available while developing.
+#[cfg(all(windows, not(debug_assertions)))]
+fn disable_browser_accelerators(window: &WebviewWindow) {
+    let _ = window.with_webview(|webview| {
+        use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+        use windows_core::Interface;
+
+        // SAFETY: plain COM calls on the live controller, on the UI thread (see set_low_memory).
+        unsafe {
+            let Ok(core) = webview.controller().CoreWebView2() else {
+                return;
+            };
+            let Ok(settings) = core.Settings() else {
+                return;
+            };
+            if let Ok(settings3) = settings.cast::<ICoreWebView2Settings3>() {
+                let _ = settings3.SetAreBrowserAcceleratorKeysEnabled(false);
+            }
+        }
+    });
+}
+
+#[cfg(not(all(windows, not(debug_assertions))))]
+fn disable_browser_accelerators(_window: &WebviewWindow) {}
 
 /// Tells WebView2 to shrink (drop caches, compact the heap) while CATerm is in the
 /// background, and to go back to normal the moment it is in front again. This is the

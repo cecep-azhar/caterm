@@ -900,13 +900,32 @@ const en = {
     },
     shortcuts: {
       title: 'Keyboard Shortcuts',
-      subtitle: 'Global and tab navigation shortcuts.',
+      subtitle: 'They work everywhere, including inside a terminal. Plain Ctrl + letter keys stay with the shell (Ctrl + C, Ctrl + D, Ctrl + K…).',
       global: 'Global',
       sessions: 'Sessions',
-      switchTab: 'Switch to tab',
-      commandPalette: 'Command palette',
-      newSession: 'New session',
-      switchToTab: 'Switch to Tab {{n}}'
+      terminal: 'Terminal',
+      sftp: 'SFTP',
+      or: 'or',
+      commandPalette: 'Command palette (Ctrl + K works outside the terminal)',
+      openSettings: 'Open settings',
+      lockVault: 'Lock the vault',
+      newSession: 'New session (pick a host)',
+      switchToTabRange: 'Go to session tab 1–8',
+      lastTab: 'Go to the last session tab',
+      nextTab: 'Next session tab',
+      previousTab: 'Previous session tab',
+      closeTab: 'Close the current session tab',
+      copySelection: 'Copy selection (Ctrl + C copies only when text is selected)',
+      paste: 'Paste',
+      fontBigger: 'Larger terminal text',
+      fontSmaller: 'Smaller terminal text',
+      fontReset: 'Reset terminal text size',
+      autocompleteAccept: 'Accept the autocomplete suggestion',
+      sftpCopy: 'Transfer the selection to the other pane',
+      sftpNewFolder: 'New folder',
+      sftpDelete: 'Delete the selection',
+      sftpRename: 'Rename',
+      sftpEdit: 'Edit the file'
     },
     performance: {
       title: 'Performance',
@@ -1292,7 +1311,7 @@ const en = {
       signedOut: 'Signed out of your CATerm account.',
       lastSync: 'Last synced {{time}}',
       trialStarted: 'Your {{days}}-day Pro trial has started.',
-      checkoutHint: 'At checkout, use the same email as your CATerm account so the subscription lands on it.',
+      checkoutHint: 'Subscribe from here while signed in: the checkout is linked to this CATerm account, so the subscription lands on it whatever email you use to pay.',
       stateTrial: 'Trial — {{count}} day left',
       stateTrial_plural: 'Trial — {{count}} days left',
       stateActive: 'Pro active — renews {{date}}',
@@ -1384,6 +1403,20 @@ const en = {
       declined: 'Invitation declined.',
       leaveFirst: 'You\'re already in a team. Leave it first to accept another invitation.'
     }
+  },
+  palette: {
+    title: 'Command palette',
+    placeholder: 'Search hosts, sessions, pages and actions…',
+    placeholderHosts: 'Connect to… (type a host name or address)',
+    empty: 'Nothing matches.',
+    groupHosts: 'Hosts',
+    groupSessions: 'Open sessions',
+    groupPages: 'Pages',
+    groupActions: 'Actions',
+    localTerminal: 'Local terminal',
+    toggleTheme: 'Switch light / dark theme',
+    toggleAi: 'Show / hide AI assistant',
+    lockVault: 'Lock the vault'
   }
 };
 

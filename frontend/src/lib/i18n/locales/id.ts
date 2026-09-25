@@ -901,13 +901,32 @@ const id: Dictionary = {
     },
     shortcuts: {
       title: 'Pintasan Keyboard',
-      subtitle: 'Pintasan global dan navigasi tab.',
+      subtitle: 'Berlaku di mana saja, termasuk di dalam terminal. Ctrl + huruf biasa tetap milik shell (Ctrl + C, Ctrl + D, Ctrl + K…).',
       global: 'Global',
       sessions: 'Sesi',
-      switchTab: 'Pindah ke tab',
-      commandPalette: 'Palet perintah',
-      newSession: 'Sesi baru',
-      switchToTab: 'Pindah ke Tab {{n}}'
+      terminal: 'Terminal',
+      sftp: 'SFTP',
+      or: 'atau',
+      commandPalette: 'Palet perintah (Ctrl + K berlaku di luar terminal)',
+      openSettings: 'Buka pengaturan',
+      lockVault: 'Kunci vault',
+      newSession: 'Sesi baru (pilih host)',
+      switchToTabRange: 'Ke tab sesi 1–8',
+      lastTab: 'Ke tab sesi terakhir',
+      nextTab: 'Tab sesi berikutnya',
+      previousTab: 'Tab sesi sebelumnya',
+      closeTab: 'Tutup tab sesi yang aktif',
+      copySelection: 'Salin seleksi (Ctrl + C menyalin hanya jika ada teks terpilih)',
+      paste: 'Tempel',
+      fontBigger: 'Perbesar teks terminal',
+      fontSmaller: 'Perkecil teks terminal',
+      fontReset: 'Kembalikan ukuran teks terminal',
+      autocompleteAccept: 'Terima saran autocomplete',
+      sftpCopy: 'Pindahkan pilihan ke panel seberang',
+      sftpNewFolder: 'Folder baru',
+      sftpDelete: 'Hapus pilihan',
+      sftpRename: 'Ganti nama',
+      sftpEdit: 'Edit file'
     },
     performance: {
       title: 'Performa',
@@ -1293,7 +1312,7 @@ const id: Dictionary = {
       signedOut: 'Berhasil keluar dari akun CATerm.',
       lastSync: 'Terakhir sinkron {{time}}',
       trialStarted: 'Trial Pro {{days}} hari sudah dimulai.',
-      checkoutHint: 'Saat checkout, gunakan email yang sama dengan akun CATerm agar langganan masuk ke akun ini.',
+      checkoutHint: 'Berlangganan dari sini selagi masuk: checkout terhubung ke akun CATerm ini, jadi langganan masuk ke akun ini apa pun email pembayarannya.',
       stateTrial: 'Trial — sisa {{count}} hari',
       stateTrial_plural: 'Trial — sisa {{count}} hari',
       stateActive: 'Pro aktif — diperpanjang {{date}}',
@@ -1385,6 +1404,20 @@ const id: Dictionary = {
       declined: 'Undangan ditolak.',
       leaveFirst: 'Anda sudah tergabung di sebuah tim. Keluar dulu untuk menerima undangan lain.'
     }
+  },
+  palette: {
+    title: 'Palet perintah',
+    placeholder: 'Cari host, sesi, halaman, dan aksi…',
+    placeholderHosts: 'Sambungkan ke… (ketik nama atau alamat host)',
+    empty: 'Tidak ada yang cocok.',
+    groupHosts: 'Host',
+    groupSessions: 'Sesi terbuka',
+    groupPages: 'Halaman',
+    groupActions: 'Aksi',
+    localTerminal: 'Terminal lokal',
+    toggleTheme: 'Ganti tema terang / gelap',
+    toggleAi: 'Tampilkan / sembunyikan asisten AI',
+    lockVault: 'Kunci vault'
   }
 };
 

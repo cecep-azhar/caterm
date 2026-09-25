@@ -10,7 +10,7 @@
   import { relaunch } from '@tauri-apps/plugin-process';
   import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
   import { getUpdater, checkForUpdates, installUpdate } from '$lib/stores/updater.svelte';
-  import { APP_VERSION, releaseNotesUrl, PRICING_URL } from '$lib/appInfo';
+  import { APP_VERSION, releaseNotesUrl, pricingUrl } from '$lib/appInfo';
   import { PRO_PRICING, formatUsd, type BillingInterval } from '$lib/pro/pricing';
   import { openExternalUrl } from '$lib/utils/url';
   import { errorText } from '$lib/errors';
@@ -21,6 +21,7 @@
   import { proStartTrial, proAccount, proRevokeDevice, proLogout, type ProDevice, type DeviceLimit, type SyncOutcome } from '$lib/api/pro';
   import { proErrorMessage } from '$lib/pro/errors';
   import ProTeamPanel from '$lib/components/ProTeamPanel.svelte';
+  import { SHORTCUT_GROUPS } from '$lib/shortcuts';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   // Shared surface classes so every tab reads the same in light and dark mode.
@@ -180,15 +181,6 @@
     t('settings.subscription.featureLogs'),
     t('settings.subscription.featureCommunity')
   ]);
-
-  const SHORTCUT_GROUPS: { title: string; items: { label: string; keys: string; vars?: Record<string, number> }[] }[] = [
-    { title: 'global', items: [{ label: 'commandPalette', keys: 'Ctrl + K' }] },
-    { title: 'sessions', items: [{ label: 'newSession', keys: 'Ctrl + Shift + T' }] },
-    {
-      title: 'switchTab',
-      items: [1, 2, 3].map((n) => ({ label: 'switchToTab', keys: `Ctrl + ${n}`, vars: { n } }))
-    }
-  ];
 
   const TABS = ['profile', 'updates', 'ai', 'subscription', 'security', 'backup', 'performance', 'shortcuts'] as const;
   type SettingsTab = (typeof TABS)[number];
@@ -650,7 +642,7 @@
             {/if}
             <button
               type="button"
-              onclick={() => openExternalUrl(PRICING_URL)}
+              onclick={() => openExternalUrl(pricingUrl(pro.status?.account?.id))}
               class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors"
             >
               {t('settings.subscription.subscribe')}
@@ -897,10 +889,15 @@
         {#each SHORTCUT_GROUPS as group, gi (group.title)}
           <h3 class="text-sm font-semibold text-neutral-600 dark:text-neutral-300 uppercase tracking-wider {gi > 0 ? 'pt-2' : ''}">{t(`settings.shortcuts.${group.title}`)}</h3>
           <div class="space-y-2">
-            {#each group.items as item (item.keys)}
-              <div class="flex justify-between items-center p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-md">
+            {#each group.items as item (item.label)}
+              <div class="flex justify-between items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-md">
                 <span class="text-sm text-neutral-800 dark:text-neutral-200">{t(`settings.shortcuts.${item.label}`, item.vars)}</span>
-                <kbd class="px-2 py-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 text-xs rounded font-mono">{item.keys}</kbd>
+                <span class="flex flex-wrap justify-end items-center gap-1.5 text-xs text-neutral-500">
+                  {#each item.keys as combo, ci (ci)}
+                    {#if ci > 0}<span>{t('settings.shortcuts.or')}</span>{/if}
+                    <kbd class="px-2 py-1 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-300 text-xs rounded font-mono whitespace-nowrap">{combo.join(' + ')}</kbd>
+                  {/each}
+                </span>
               </div>
             {/each}
           </div>
@@ -933,7 +930,7 @@
           {#if deviceLimit.limit < PRO_PRICING.syncDevices}
             <p class="text-xs text-sky-700 dark:text-sky-300 mt-2">
               {t('pro.devices.limitUpsell', { count: PRO_PRICING.syncDevices })}
-              <button type="button" onclick={() => openExternalUrl(PRICING_URL)} class="font-semibold underline">{t('pro.devices.seePlans')}</button>
+              <button type="button" onclick={() => openExternalUrl(pricingUrl(pro.status?.account?.id))} class="font-semibold underline">{t('pro.devices.seePlans')}</button>
             </p>
           {/if}
         </div>
