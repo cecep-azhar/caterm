@@ -42,11 +42,13 @@ pub async fn window_maximize(#[allow(unused_variables)] window: tauri::Window) {
 
 #[tauri::command]
 pub async fn window_close(#[allow(unused_variables)] window: tauri::Window) {
+    #[cfg(not(target_os = "android"))]
     let _ = window.close();
 }
 
 #[tauri::command]
 pub async fn window_start_dragging(#[allow(unused_variables)] window: tauri::Window) {
+    #[cfg(not(target_os = "android"))]
     let _ = window.start_dragging();
 }
 
@@ -552,13 +554,21 @@ fn do_open_url(url: &str) -> Result<(), CatermError> {
     }
     #[cfg(target_os = "linux")]
     let res = std::process::Command::new("xdg-open").arg(url).spawn();
-    // rundll32 hands the URL straight to the default browser. `cmd /C start` re-parsed it, so an
-    // `&` in a query string split the command (and it flashed a console window).
+    // rundll32 hands the URL straight to the default browser. `cmd /C start` re-parsed it, and
+    // an `&` in the query string would split the command (and it flashed a console window).
     #[cfg(target_os = "windows")]
     let res = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", url]).spawn();
     #[cfg(target_os = "macos")]
     let res = std::process::Command::new("open").arg(url).spawn();
-    res.map(|_| ()).map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into())
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    let res: Result<(), std::io::Error> = Ok(());
+
+    #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+    let result = res.map(|_| ()).map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into());
+    #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
+    let result = res.map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into());
+
+    result
 }
 
 #[tauri::command]
