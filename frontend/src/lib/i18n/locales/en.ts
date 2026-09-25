@@ -1248,6 +1248,86 @@ const en = {
     queuedOneUpload: 'Queued "{{name}}" for upload.',
     queuedOneDownload: 'Queued "{{name}}" for download.',
     copiedPath: 'Copied path: {{path}}'
+  },
+  pro: {
+    lock: {
+      vaultTab: 'Local vault',
+      proTab: 'Pro Login',
+      signedInAs: 'Signed in to CATerm Pro as {{email}}. Unlock your vault to finish.'
+    },
+    login: {
+      title: 'Sign in to CATerm Pro',
+      registerTitle: 'Create a CATerm Pro account',
+      forgotTitle: 'Reset your Pro password',
+      checkEmailTitle: 'Check your email',
+      checkEmailBody: 'We sent a confirmation link to {{email}}. Open it, then sign in here.',
+      separateNote: 'Your Pro account is separate from your vault master password — the vault never leaves this device.',
+      name: 'Name',
+      email: 'Email',
+      password: 'Password',
+      confirmPassword: 'Confirm password',
+      signIn: 'Sign in',
+      createAccount: 'Create account',
+      sendResetLink: 'Send reset link',
+      working: 'Please wait…',
+      noAccount: 'No account yet? Sign up',
+      forgot: 'Forgot password?',
+      backToLogin: 'Back to sign in',
+      resendVerification: 'Resend confirmation email',
+      sendSetPassword: 'Email me a link to set a password',
+      verificationResent: 'Confirmation email sent — check your inbox.',
+      resetSent: 'If that email has an account, a link is on its way.'
+    },
+    account: {
+      title: 'CATerm Pro account',
+      signedOutBody: 'Sign in or create an account to start the trial and activate Pro on this device.',
+      signInOrRegister: 'Sign in / Sign up',
+      sync: 'Sync now',
+      syncing: 'Syncing…',
+      synced: 'Pro status synced.',
+      devices: 'Devices',
+      signOut: 'Sign out',
+      signOutTitle: 'Sign out of CATerm Pro',
+      signOutConfirm: 'Pro features stop on this device until you sign in again. Your vault and hosts are not affected.',
+      signedOut: 'Signed out of CATerm Pro.',
+      lastSync: 'Last synced {{time}}',
+      trialStarted: 'Your {{days}}-day Pro trial has started.',
+      checkoutHint: 'At checkout, use the same email as your Pro account so the subscription lands on it.',
+      stateTrial: 'Trial — {{count}} day left',
+      stateTrial_plural: 'Trial — {{count}} days left',
+      stateActive: 'Pro active — renews {{date}}',
+      stateActiveNoDate: 'Pro active',
+      stateCancelled: 'Pro until {{date}} (cancelled)',
+      statePastDue: 'Payment pending — Pro stays on while it retries',
+      stateExpired: 'Pro has ended',
+      stateNoPlan: 'No Pro plan yet',
+      stateNeedsSync: 'Sync needed to confirm Pro',
+      stateKeyMissing: 'This build is not set up for Pro'
+    },
+    devices: {
+      thisDevice: 'This device',
+      lastSeen: 'Last seen {{time}}',
+      remove: 'Remove',
+      empty: 'No devices activated yet.',
+      limitTitle: 'Device limit reached',
+      limitBody: 'This account already uses all its device slots. Remove one to activate this device.'
+    },
+    errors: {
+      INVALID_CREDENTIALS: 'Email or password is incorrect.',
+      EMAIL_NOT_VERIFIED: 'Confirm your email first — check your inbox for the link.',
+      PASSWORD_NOT_SET: 'This account was created by a purchase and has no password yet.',
+      EMAIL_TAKEN: 'An account with this email already exists. Sign in instead.',
+      INVALID_EMAIL: 'That email address doesn\'t look right.',
+      WEAK_PASSWORD: 'Use at least 8 characters for the password.',
+      PASSWORD_MISMATCH: 'The passwords don\'t match.',
+      TRIAL_ALREADY_USED: 'A trial was already used on this account or this device.',
+      SESSION_EXPIRED: 'Your Pro session expired. Sign in again.',
+      NOT_SIGNED_IN: 'Sign in to CATerm Pro first.',
+      RATE_LIMITED: 'Too many attempts. Wait a minute and try again.',
+      NETWORK: 'Can\'t reach the CATerm Pro server. Check your connection.',
+      NOT_FOUND: 'That item no longer exists.',
+      HWID_UNAVAILABLE: 'Couldn\'t identify this device.'
+    }
   }
 };
 

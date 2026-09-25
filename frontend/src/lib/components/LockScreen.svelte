@@ -12,6 +12,8 @@
   import { invoke } from '@tauri-apps/api/core';
   import { t } from '$lib/i18n/index.svelte';
   import LanguageSwitcher from './LanguageSwitcher.svelte';
+  import ProLoginForm from './ProLoginForm.svelte';
+  import type { ProAccount } from '$lib/api/pro';
 
   export let onUnlocked: () => void;
 
@@ -21,6 +23,16 @@
   let successMsg = '';
   let isLoading = false;
   let isSetup = false;
+
+  // Pro Login: a separate account from the vault. Signing in here only links this device;
+  // the session is saved once the vault below is unlocked (see stores/pro onVaultUnlocked).
+  let loginMode: 'vault' | 'pro' = 'vault';
+  let proAccount: ProAccount | null = null;
+
+  function handleProSignedIn(account: ProAccount) {
+    proAccount = account;
+    loginMode = 'vault';
+  }
 
   // First-run profile (Free plan: name + preset avatar, no email).
   const profile = getProfile();
@@ -307,6 +319,30 @@
       	<p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{t('lock.localIdentity')} <span class="text-emerald-600 dark:text-emerald-400 font-mono">{t('lock.encrypted')}</span></p>
       </div>
 
+      <div class="grid grid-cols-2 p-1 rounded-lg bg-neutral-200/60 dark:bg-neutral-900 text-xs font-semibold" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={loginMode === 'vault'}
+          onclick={() => (loginMode = 'vault')}
+          class="py-1.5 rounded-md transition-colors {loginMode === 'vault' ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
+        >{t('pro.lock.vaultTab')}</button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={loginMode === 'pro'}
+          onclick={() => (loginMode = 'pro')}
+          class="py-1.5 rounded-md transition-colors {loginMode === 'pro' ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
+        >{t('pro.lock.proTab')}</button>
+      </div>
+
+      {#if proAccount && loginMode === 'vault'}
+        <div class="p-3 text-xs rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-800 dark:text-sky-300 text-center">
+          {t('pro.lock.signedInAs', { email: proAccount.email })}
+        </div>
+      {/if}
+
+      {#if loginMode === 'vault'}
       {#if successMsg}
       	<div class="p-3 text-xs rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-center">
       		{successMsg}
@@ -378,6 +414,9 @@
           {/if}
         </button>
       </div>
+      {:else}
+        <ProLoginForm onSignedIn={handleProSignedIn} />
+      {/if}
 
       <div class="flex items-center justify-between text-xs text-neutral-500 pt-4 border-t border-neutral-200 dark:border-neutral-900">
         {#if !isSetup}

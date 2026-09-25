@@ -1,6 +1,7 @@
 <script lang="ts">
   import "../app.css";
   import LockScreen from '$lib/components/LockScreen.svelte';
+  import { onVaultUnlocked, onVaultLocked } from '$lib/stores/pro.svelte';
   import NotificationCenter from '$lib/components/NotificationCenter.svelte';
   import Logo from '$lib/components/Logo.svelte';
   import WorkspaceMenu from '$lib/components/WorkspaceMenu.svelte';
@@ -318,12 +319,14 @@
    */
   function lockApp() {
     isUnlocked = false;
+    onVaultLocked();
     lockVault().catch((err) => console.warn('lock_vault failed:', err));
   }
 
   async function signOut() {
     closeAllTabs();
     isUnlocked = false;
+    onVaultLocked();
     await goto('/');
     lockVault().catch((err) => console.warn('lock_vault failed:', err));
     showToast(t('shell.signedOut'), 'info');
@@ -418,7 +421,7 @@
 <NotificationCenter />
 
 {#if !isUnlocked}
-  <LockScreen onUnlocked={() => isUnlocked = true} />
+  <LockScreen onUnlocked={() => { isUnlocked = true; void onVaultUnlocked(); }} />
 {:else}
 <!-- Shell: one title bar across the full width, then sidebar + content panel. Title bar and
      sidebar share the app background with no dividers; the content sits on a raised panel with

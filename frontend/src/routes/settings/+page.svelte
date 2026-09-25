@@ -15,13 +15,158 @@
   import { openExternalUrl } from '$lib/utils/url';
   import { errorText } from '$lib/errors';
   import { getPerformancePrefs, setPerformancePrefs } from '$lib/api/performance';
-  import { t } from '$lib/i18n/index.svelte';
+  import { t, intlLocale } from '$lib/i18n/index.svelte';
+  import ProLoginForm from '$lib/components/ProLoginForm.svelte';
+  import { getPro, refreshProStatus, checkProServer, syncPro, setProStatus } from '$lib/stores/pro.svelte';
+  import { proStartTrial, proAccount, proRevokeDevice, proLogout, proErrorCode, type ProDevice, type SyncOutcome } from '$lib/api/pro';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   // Shared surface classes so every tab reads the same in light and dark mode.
   const CARD = 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-6 shadow-sm dark:shadow-none text-neutral-900 dark:text-white';
   const SUBCARD = 'border border-neutral-200 dark:border-neutral-800 rounded-lg p-5 bg-neutral-50 dark:bg-neutral-950';
   const MUTED = 'text-neutral-500 dark:text-neutral-400';
+
+  // ---- CATerm Pro account (Subscription tab) ----------------------------------------------
+  const pro = getPro();
+  let showProLogin = $state(false);
+  let proDevices = $state<ProDevice[] | null>(null);
+  let deviceLimitDevices = $state<ProDevice[] | null>(null);
+  let proBusy = $state(false);
+
+  $effect(() => {
+    if (activeTab === 'subscription') {
+      void refreshProStatus();
+      void checkProServer();
+    }
+  });
+
+  // Literal class strings per tone so Tailwind's scanner sees them.
+  const TONE: Record<string, string> = {
+    sky: 'bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/30',
+    emerald: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+    amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/30',
+    rose: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30',
+    neutral: 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border-neutral-300 dark:border-neutral-700'
+  };
+  const SMALL_BUTTON = 'px-3 py-1.5 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors';
+
+  function formatProDate(ts: number | null | undefined): string {
+    return ts ? new Date(ts * 1000).toLocaleDateString(intlLocale(), { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  }
+
+  function formatProTime(ts: number | null | undefined): string {
+    return ts ? new Date(ts * 1000).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  }
+
+  const proState = $derived.by(() => {
+    const status = pro.status;
+    if (!status?.signedIn) return null;
+    const ent = status.entitlement;
+    const lic = status.license;
+    if (!status.keyConfigured) return { tone: 'amber', text: t('pro.account.stateKeyMissing') };
+    if (ent.state === 'valid') {
+      if (lic?.status === 'trialing') {
+        const end = lic.trialEndsAt ?? ent.expiresAt;
+        const count = Math.max(0, Math.ceil((end - Date.now() / 1000) / 86400));
+        return { tone: 'sky', text: t('pro.account.stateTrial', { count }) };
+      }
+      if (lic?.status === 'cancelled') return { tone: 'amber', text: t('pro.account.stateCancelled', { date: formatProDate(lic.currentPeriodEnd) }) };
+      if (lic?.status === 'past_due') return { tone: 'amber', text: t('pro.account.statePastDue') };
+      return lic?.currentPeriodEnd
+        ? { tone: 'emerald', text: t('pro.account.stateActive', { date: formatProDate(lic.currentPeriodEnd) }) }
+        : { tone: 'emerald', text: t('pro.account.stateActiveNoDate') };
+    }
+    if (ent.state === 'expired' || (lic && !lic.entitled)) return { tone: 'rose', text: t('pro.account.stateExpired') };
+    if (ent.state === 'revalidationRequired' || ent.state === 'invalid' || lic) return { tone: 'amber', text: t('pro.account.stateNeedsSync') };
+    return { tone: 'neutral', text: t('pro.account.stateNoPlan') };
+  });
+
+  function proErrorMessage(err: unknown): string {
+    const code = proErrorCode(err);
+    const key = code ? `pro.errors.${code}` : '';
+    const text = key ? t(key) : '';
+    return text && text !== key ? text : errorText(err);
+  }
+
+  function handleOutcome(outcome: SyncOutcome | null, successText: string) {
+    if (!outcome) return;
+    if (outcome.deviceLimit) deviceLimitDevices = outcome.deviceLimit;
+    else showToast(successText, 'success');
+  }
+
+  async function runProSync() {
+    proBusy = true;
+    try {
+      handleOutcome(await syncPro(), t('pro.account.synced'));
+    } catch (err) {
+      showToast(proErrorMessage(err), 'error');
+    } finally {
+      proBusy = false;
+    }
+  }
+
+  async function handleProSignedIn() {
+    showProLogin = false;
+    await refreshProStatus();
+    await runProSync();
+  }
+
+  async function startProTrial() {
+    if (!pro.status?.signedIn) {
+      showProLogin = true;
+      return;
+    }
+    proBusy = true;
+    try {
+      const outcome = await proStartTrial();
+      setProStatus(outcome.status);
+      handleOutcome(outcome, t('pro.account.trialStarted', { days: PRO_PRICING.trialDays }));
+    } catch (err) {
+      showToast(proErrorMessage(err), 'error');
+    } finally {
+      proBusy = false;
+    }
+  }
+
+  async function loadProDevices() {
+    try {
+      proDevices = (await proAccount()).devices;
+    } catch (err) {
+      showToast(proErrorMessage(err), 'error');
+    }
+  }
+
+  async function removeProDevice(id: string) {
+    try {
+      await proRevokeDevice(id);
+      proDevices = proDevices?.filter((d) => d.id !== id) ?? null;
+      if (deviceLimitDevices) {
+        deviceLimitDevices = null;
+        await runProSync(); // a slot is free now: activate this device
+      }
+    } catch (err) {
+      showToast(proErrorMessage(err), 'error');
+    }
+  }
+
+  async function signOutPro() {
+    const ok = await confirmModal(
+      t('pro.account.signOutConfirm'),
+      t('pro.account.signOutTitle'),
+      true,
+      t('pro.account.signOut'),
+      t('common.cancel')
+    );
+    if (!ok) return;
+    try {
+      await proLogout();
+      proDevices = null;
+      await refreshProStatus();
+      showToast(t('pro.account.signedOut'), 'info');
+    } catch (err) {
+      showToast(proErrorMessage(err), 'error');
+    }
+  }
   const LABEL_BASE = 'block text-xs font-medium text-neutral-600 dark:text-neutral-400 uppercase';
   const LABEL = `${LABEL_BASE} mb-1`;
   const INPUT = 'w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded text-sm text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500';
@@ -366,6 +511,65 @@
         <p class="{MUTED} text-sm mt-1">{t('settings.subscription.subtitle')}</p>
       </div>
 
+      <!-- CATerm Pro account on this device -->
+      <div class="{SUBCARD} space-y-3">
+        {#if !pro.status?.signedIn}
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p class="text-sm font-semibold text-neutral-900 dark:text-white">{t('pro.account.title')}</p>
+              <p class="text-xs {MUTED} mt-0.5">{t('pro.account.signedOutBody')}</p>
+            </div>
+            <button type="button" onclick={() => (showProLogin = true)} class="px-4 py-2 rounded-md text-sm font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors shrink-0">
+              {t('pro.account.signInOrRegister')}
+            </button>
+          </div>
+        {:else}
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-sm font-semibold text-neutral-900 dark:text-white truncate">{pro.status.account?.name || pro.status.account?.email}</p>
+              <p class="text-xs {MUTED} truncate">{pro.status.account?.email}</p>
+              {#if proState}
+                <span class="inline-block mt-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full border {TONE[proState.tone]}">{proState.text}</span>
+              {/if}
+            </div>
+            <div class="flex flex-wrap gap-2 shrink-0">
+              <button type="button" onclick={runProSync} disabled={proBusy || pro.syncing} class={SMALL_BUTTON}>
+                {pro.syncing ? t('pro.account.syncing') : t('pro.account.sync')}
+              </button>
+              <button type="button" onclick={loadProDevices} class={SMALL_BUTTON}>{t('pro.account.devices')}</button>
+              <button type="button" onclick={signOutPro} class="px-3 py-1.5 text-xs font-medium rounded-md border border-rose-300 dark:border-rose-900 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors">
+                {t('pro.account.signOut')}
+              </button>
+            </div>
+          </div>
+          {#if pro.status.lastSyncAt}
+            <p class="text-[11px] text-neutral-500">{t('pro.account.lastSync', { time: formatProTime(pro.status.lastSyncAt) })}</p>
+          {/if}
+          {#if proDevices}
+            {#if proDevices.length === 0}
+              <p class="text-xs {MUTED}">{t('pro.devices.empty')}</p>
+            {:else}
+              <ul class="divide-y divide-neutral-200 dark:divide-neutral-800 border border-neutral-200 dark:border-neutral-800 rounded-md bg-white dark:bg-neutral-900">
+                {#each proDevices as device (device.id)}
+                  <li class="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                    <div class="min-w-0">
+                      <p class="font-medium text-neutral-900 dark:text-white truncate">
+                        {device.name}
+                        {#if device.current}<span class="ml-1.5 text-[10px] px-1.5 py-px rounded-full {TONE.sky} border">{t('pro.devices.thisDevice')}</span>{/if}
+                      </p>
+                      <p class="text-neutral-500 truncate">{device.os} · v{device.clientVersion} · {t('pro.devices.lastSeen', { time: formatProTime(device.lastSeenAt) })}</p>
+                    </div>
+                    {#if !device.current}
+                      <button type="button" onclick={() => removeProDevice(device.id)} class="text-rose-600 dark:text-rose-400 hover:underline shrink-0">{t('pro.devices.remove')}</button>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+            {/if}
+          {/if}
+        {/if}
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
         <!-- Community: what everyone has today -->
         <div class="{SUBCARD} space-y-2">
@@ -427,10 +631,17 @@
           </ul>
 
           <div class="flex flex-col sm:flex-row gap-2">
-            <button disabled class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/40 text-sky-700/70 dark:text-sky-300/70 cursor-not-allowed" title={t('settings.subscription.comingSoon')}>
-              {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
-              <span class="block text-[10px] font-normal">{t('settings.subscription.comingSoon')}</span>
-            </button>
+            {#if pro.serverAvailable === false}
+              <button disabled class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/40 text-sky-700/70 dark:text-sky-300/70 cursor-not-allowed" title={t('settings.subscription.comingSoon')}>
+                {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
+                <span class="block text-[10px] font-normal">{t('settings.subscription.comingSoon')}</span>
+              </button>
+            {:else if !pro.status?.license}
+              <!-- Signed out: opens Pro Login first. A license (trial or paid) hides the trial. -->
+              <button type="button" onclick={startProTrial} disabled={proBusy} class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/60 text-sky-700 dark:text-sky-300 hover:bg-sky-500/10 disabled:opacity-50 transition-colors">
+                {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
+              </button>
+            {/if}
             <button
               type="button"
               onclick={() => openExternalUrl(PRICING_URL)}
@@ -441,6 +652,9 @@
             </button>
           </div>
           <p class="text-[11px] text-neutral-500">{t('settings.subscription.trialNote')}</p>
+          {#if pro.status?.signedIn}
+            <p class="text-[11px] text-neutral-500">{t('pro.account.checkoutHint')}</p>
+          {/if}
         </div>
       </div>
 
@@ -685,6 +899,46 @@
             {/each}
           </div>
         {/each}
+      </div>
+    </div>
+  {/if}
+  {#if showProLogin}
+    <div class="fixed inset-0 z-[100] bg-black/40 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="relative bg-neutral-50 dark:bg-[#0a0a0a] border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+        <button
+          type="button"
+          onclick={() => (showProLogin = false)}
+          class="absolute top-3 right-3 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+          aria-label={t('common.close')}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+        <ProLoginForm onSignedIn={handleProSignedIn} />
+      </div>
+    </div>
+  {/if}
+
+  {#if deviceLimitDevices}
+    <div class="fixed inset-0 z-[100] bg-black/40 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+        <div>
+          <h3 class="text-base font-bold text-neutral-900 dark:text-white">{t('pro.devices.limitTitle')}</h3>
+          <p class="text-xs {MUTED} mt-1">{t('pro.devices.limitBody')}</p>
+        </div>
+        <ul class="divide-y divide-neutral-200 dark:divide-neutral-800 border border-neutral-200 dark:border-neutral-800 rounded-md">
+          {#each deviceLimitDevices as device (device.id)}
+            <li class="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+              <div class="min-w-0">
+                <p class="font-medium text-neutral-900 dark:text-white truncate">{device.name}</p>
+                <p class="text-neutral-500 truncate">{device.os} · {t('pro.devices.lastSeen', { time: formatProTime(device.lastSeenAt) })}</p>
+              </div>
+              <button type="button" onclick={() => removeProDevice(device.id)} class="text-rose-600 dark:text-rose-400 hover:underline shrink-0">{t('pro.devices.remove')}</button>
+            </li>
+          {/each}
+        </ul>
+        <div class="flex justify-end">
+          <button type="button" onclick={() => (deviceLimitDevices = null)} class={SMALL_BUTTON}>{t('common.close')}</button>
+        </div>
       </div>
     </div>
   {/if}

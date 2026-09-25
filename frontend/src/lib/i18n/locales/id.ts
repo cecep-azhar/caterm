@@ -1249,6 +1249,86 @@ const id: Dictionary = {
     queuedOneUpload: '"{{name}}" masuk antrean unggah.',
     queuedOneDownload: '"{{name}}" masuk antrean unduh.',
     copiedPath: 'Path disalin: {{path}}'
+  },
+  pro: {
+    lock: {
+      vaultTab: 'Vault lokal',
+      proTab: 'Pro Login',
+      signedInAs: 'Masuk ke CATerm Pro sebagai {{email}}. Buka vault Anda untuk menyelesaikan.'
+    },
+    login: {
+      title: 'Masuk ke CATerm Pro',
+      registerTitle: 'Buat akun CATerm Pro',
+      forgotTitle: 'Reset password Pro',
+      checkEmailTitle: 'Cek email Anda',
+      checkEmailBody: 'Kami mengirim tautan konfirmasi ke {{email}}. Buka tautannya, lalu masuk di sini.',
+      separateNote: 'Akun Pro terpisah dari master password vault — vault tidak pernah meninggalkan perangkat ini.',
+      name: 'Nama',
+      email: 'Email',
+      password: 'Password',
+      confirmPassword: 'Konfirmasi password',
+      signIn: 'Masuk',
+      createAccount: 'Buat akun',
+      sendResetLink: 'Kirim tautan reset',
+      working: 'Mohon tunggu…',
+      noAccount: 'Belum punya akun? Daftar',
+      forgot: 'Lupa password?',
+      backToLogin: 'Kembali ke login',
+      resendVerification: 'Kirim ulang email konfirmasi',
+      sendSetPassword: 'Kirim tautan untuk membuat password',
+      verificationResent: 'Email konfirmasi terkirim — cek kotak masuk Anda.',
+      resetSent: 'Jika email itu terdaftar, tautannya sedang dikirim.'
+    },
+    account: {
+      title: 'Akun CATerm Pro',
+      signedOutBody: 'Masuk atau buat akun untuk memulai trial dan mengaktifkan Pro di perangkat ini.',
+      signInOrRegister: 'Masuk / Daftar',
+      sync: 'Sinkronkan',
+      syncing: 'Menyinkronkan…',
+      synced: 'Status Pro tersinkron.',
+      devices: 'Perangkat',
+      signOut: 'Keluar',
+      signOutTitle: 'Keluar dari CATerm Pro',
+      signOutConfirm: 'Fitur Pro berhenti di perangkat ini sampai Anda masuk lagi. Vault dan host Anda tidak terpengaruh.',
+      signedOut: 'Berhasil keluar dari CATerm Pro.',
+      lastSync: 'Terakhir sinkron {{time}}',
+      trialStarted: 'Trial Pro {{days}} hari sudah dimulai.',
+      checkoutHint: 'Saat checkout, gunakan email yang sama dengan akun Pro agar langganan masuk ke akun ini.',
+      stateTrial: 'Trial — sisa {{count}} hari',
+      stateTrial_plural: 'Trial — sisa {{count}} hari',
+      stateActive: 'Pro aktif — diperpanjang {{date}}',
+      stateActiveNoDate: 'Pro aktif',
+      stateCancelled: 'Pro sampai {{date}} (dibatalkan)',
+      statePastDue: 'Pembayaran tertunda — Pro tetap aktif selama dicoba ulang',
+      stateExpired: 'Pro sudah berakhir',
+      stateNoPlan: 'Belum berlangganan Pro',
+      stateNeedsSync: 'Perlu sinkron untuk memastikan Pro',
+      stateKeyMissing: 'Build ini belum disiapkan untuk Pro'
+    },
+    devices: {
+      thisDevice: 'Perangkat ini',
+      lastSeen: 'Terakhir aktif {{time}}',
+      remove: 'Lepaskan',
+      empty: 'Belum ada perangkat yang diaktifkan.',
+      limitTitle: 'Batas perangkat tercapai',
+      limitBody: 'Akun ini sudah memakai semua slot perangkat. Lepaskan salah satu untuk mengaktifkan perangkat ini.'
+    },
+    errors: {
+      INVALID_CREDENTIALS: 'Email atau password salah.',
+      EMAIL_NOT_VERIFIED: 'Konfirmasi email Anda dulu — cek tautan di kotak masuk.',
+      PASSWORD_NOT_SET: 'Akun ini dibuat dari pembelian dan belum punya password.',
+      EMAIL_TAKEN: 'Akun dengan email ini sudah ada. Silakan masuk.',
+      INVALID_EMAIL: 'Alamat email tidak valid.',
+      WEAK_PASSWORD: 'Gunakan minimal 8 karakter untuk password.',
+      PASSWORD_MISMATCH: 'Password tidak sama.',
+      TRIAL_ALREADY_USED: 'Trial sudah pernah dipakai di akun atau perangkat ini.',
+      SESSION_EXPIRED: 'Sesi Pro Anda berakhir. Silakan masuk lagi.',
+      NOT_SIGNED_IN: 'Masuk ke CATerm Pro terlebih dahulu.',
+      RATE_LIMITED: 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.',
+      NETWORK: 'Tidak bisa terhubung ke server CATerm Pro. Periksa koneksi Anda.',
+      NOT_FOUND: 'Item itu sudah tidak ada.',
+      HWID_UNAVAILABLE: 'Tidak dapat mengenali perangkat ini.'
+    }
   }
 };
 

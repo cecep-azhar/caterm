@@ -3,14 +3,15 @@
 // localStorage (not the vault) on purpose: the lock screen has to greet the user by name
 // *before* the vault is unlocked.
 //
-// Pro (email login, custom photo, PRO emblem) is not built yet — there is no licensing system
-// to decide who is Pro, so every profile is Free.
+// The plan comes from CATerm Pro (a separate email account, see stores/pro): a profile shows
+// as Pro only while this device holds a valid signed licence. The name/avatar stay local.
+import { getPro } from '$lib/stores/pro.svelte';
 
 const STORAGE_KEY = 'caterm_profile_v1';
 export const DEFAULT_PROFILE_NAME = 'CATerm User';
 export const DEFAULT_AVATAR = 'rocket';
 
-export type Plan = 'free';
+export type Plan = 'free' | 'pro';
 
 interface StoredProfile {
   name: string;
@@ -42,7 +43,8 @@ export function getProfile() {
       return avatar;
     },
     get plan(): Plan {
-      return 'free';
+      // Pro only when this device holds a valid signed licence (see stores/pro).
+      return getPro().isPro ? 'pro' : 'free';
     }
   };
 }
