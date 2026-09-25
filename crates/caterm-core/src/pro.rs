@@ -162,11 +162,21 @@ fn evaluate(
 
 // ---- Device identity -------------------------------------------------------------------------
 
-/// Stable per-machine id: SHA-256 of the OS machine id (MachineGuid / machine-id / IOPlatformUUID,
-/// no admin rights needed) and the OS. A clean OS reinstall yields a new id — the same limit
-/// every software-only licence has (licensing notes §7.2).
+#[cfg(not(target_os = "android"))]
+fn get_machine_uid() -> Result<String, CatermError> {
+    machine_uid::get().map_err(|e| pro_err(format!("HWID_UNAVAILABLE: {e}")))
+}
+
+#[cfg(target_os = "android")]
+fn get_machine_uid() -> Result<String, CatermError> {
+    Ok("caterm-android-client".to_string())
+}
+
+/// Stable per-machine id: SHA-256 of the machine-id (MachineGuid / machine-id / IOPlatformUUID,
+/// no admin rights needed) + OS. A clean OS reinstall yields a new id; the same limit
+/// as every other software-only licence (licensing notes 7.2).
 pub fn hwid() -> Result<String, CatermError> {
-    let machine = machine_uid::get().map_err(|e| pro_err(format!("HWID_UNAVAILABLE: {e}")))?;
+    let machine = get_machine_uid()?;
     let mut hasher = Sha256::new();
     hasher.update(b"caterm-pro-hwid-v1\0");
     hasher.update(machine.trim().as_bytes());
