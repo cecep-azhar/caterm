@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { getAppearance } from '$lib/stores/appearance.svelte';
+
+  const appearance = getAppearance();
 
   interface Props {
     targetX?: number;
@@ -448,6 +451,8 @@
   const onFocus = () => handleVisibility(true);
 
   onMount(() => {
+  	if (appearance.reduceMotion) return;
+
   	ctx = canvas.getContext('2d');
   	resize();
   	initStreamers();
@@ -478,8 +483,17 @@
   });
 </script>
 
-<canvas
-  bind:this={canvas}
-  class="absolute inset-0 pointer-events-none w-full h-full z-0"
-  aria-hidden="true"
-></canvas>
+{#if appearance.reduceMotion}
+  <!-- Static CSS fallback: no canvas element at all, so no GPU-composited layer. -->
+  <div
+    class="absolute inset-0 pointer-events-none w-full h-full z-0"
+    style="background: radial-gradient(circle at {targetX}px {targetY}px, rgba(56,189,248,0.12), transparent 55%)"
+    aria-hidden="true"
+  ></div>
+{:else}
+  <canvas
+    bind:this={canvas}
+    class="absolute inset-0 pointer-events-none w-full h-full z-0"
+    aria-hidden="true"
+  ></canvas>
+{/if}

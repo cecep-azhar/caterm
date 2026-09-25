@@ -9,6 +9,7 @@
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import { relaunch } from '@tauri-apps/plugin-process';
   import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
+  import { getAppearance, setReduceMotion } from '$lib/stores/appearance.svelte';
   import { getUpdater, checkForUpdates, installUpdate } from '$lib/stores/updater.svelte';
   import { APP_VERSION, releaseNotesUrl, pricingUrl } from '$lib/appInfo';
   import { PRO_PRICING, formatUsd, type BillingInterval } from '$lib/pro/pricing';
@@ -195,6 +196,7 @@
 
   // Profile (Free plan: display name + preset avatar)
   const profile = getProfile();
+  const appearance = getAppearance();
   let profileName = $state(profile.name);
   let profileAvatar = $state(profile.avatar);
   const profileDirty = $derived(profileName.trim() !== profile.name || profileAvatar !== profile.avatar);
@@ -463,6 +465,26 @@
           class="px-3 py-1.5 text-xs font-medium rounded-md border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
           {t('settings.profile.changeMasterPassword')}
         </button>
+      </div>
+
+      <div class="pt-5 border-t border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-4">
+        <div>
+          <p class="text-sm font-medium text-neutral-900 dark:text-white">Lock screen animation</p>
+          <p class="text-xs text-neutral-500 dark:text-neutral-400">
+            Decorative background effect on the lock screen. Keeps a GPU-accelerated process
+            resident for the whole session, so it's off by default — turn it on for the visual
+            effect if memory use isn't a concern on your machine.
+          </p>
+        </div>
+        <label class="inline-flex items-center cursor-pointer shrink-0">
+          <input
+            type="checkbox"
+            class="sr-only peer"
+            checked={!appearance.reduceMotion}
+            onchange={(e) => setReduceMotion(!(e.currentTarget as HTMLInputElement).checked)}
+          />
+          <div class="w-9 h-5 bg-neutral-300 dark:bg-neutral-700 peer-checked:bg-sky-600 rounded-full transition-colors relative after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:after:translate-x-4"></div>
+        </label>
       </div>
     </div>
   {:else if activeTab === 'updates'}
