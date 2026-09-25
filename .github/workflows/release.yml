@@ -108,7 +108,9 @@ jobs:
         with:
           files: |
             target/release/bundle/deb/*.deb
+            target/release/bundle/deb/*.deb.sig
             target/release/bundle/rpm/*.rpm
+            target/release/bundle/rpm/*.rpm.sig
             target/release/bundle/appimage/*.AppImage
             target/release/bundle/appimage/*.AppImage.sig
 
@@ -144,19 +146,59 @@ jobs:
           cat latest.json
           gh release upload "$TAG" latest.json --clobber --repo "$GITHUB_REPOSITORY"
 
-  notify-release:
-    name: Notify Release (GCC & n8n)
+  publish-gcc:
+    name: Publish to GCC (downloads, auto-update, email)
     needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+      GCC_API_KEY: ${{ secrets.GCC_API_KEY }}
+      GCC_BASE_URL: ${{ vars.GCC_BASE_URL || 'https://gcc.fathforce.com' }}
     steps:
-      - name: Trigger GCC Release Notification
-        env:
-          GCC_API_KEY: ${{ secrets.GCC_API_KEY }}
-          VERSION: ${{ github.ref_name }}
-          CHANGELOG_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+      # Mirrors the GitHub release into GCC's Storage module (R2/MinIO), which
+      # serves caterm.fathforce.com/dl/..., the updater manifest at
+      # /api/releases/caterm/latest.json, and emails newsletter subscribers.
+      # GCC_API_KEY must belong to a superadmin (the Storage module is
+      # superadmin-only) and GCC must have a release app with slug "caterm".
+      - name: Download release assets
         run: |
-          curl -f -s -X POST "https://gcc.fathforce.com/api/v1/newsletter/notify" \
-            -H "Content-Type: application/json" \
-            -H "X-API-Key: ${GCC_API_KEY}" \
-            -d "{\"version\": \"${VERSION}\", \"changelog_url\": \"${CHANGELOG_URL}\"}"
+          set -euo pipefail
+          mkdir dist
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir dist
+          rm -f dist/latest.json
+          ls -la dist
 
+      - name: Upload installers, then signatures
+        run: |
+          set -euo pipefail
+          upload() {
+            local file="$1" name
+            name=$(basename "$file")
+            echo "::group::$name"
+            curl --fail-with-body -sS --retry 3 --retry-all-errors \
+              -X POST "${GCC_BASE_URL}/api/v1/releases/caterm/versions/${TAG}/assets?name=$(jq -rn --arg n "$name" '$n|@uri')" \
+              -H "X-API-Key: ${GCC_API_KEY}" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@${file}"
+            echo
+            echo "::endgroup::"
+          }
+          # A .sig attaches to its installer, so installers go first.
+          for f in dist/*; do
+            if [[ "$f" != *.sig ]]; then upload "$f"; fi
+          done
+          for f in dist/*.sig; do
+            if [[ -e "$f" ]]; then upload "$f"; fi
+          done
+
+      - name: Publish and notify subscribers
+        run: |
+          set -euo pipefail
+          notes=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json body --jq .body)
+          jq -n --arg notes "$notes" '{notes: $notes, channel: "stable", notify: true}' > publish.json
+          curl --fail-with-body -sS \
+            -X POST "${GCC_BASE_URL}/api/v1/releases/caterm/versions/${TAG}/publish" \
+            -H "X-API-Key: ${GCC_API_KEY}" \
+            -H "Content-Type: application/json" \
+            --data-binary @publish.json
