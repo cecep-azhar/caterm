@@ -189,6 +189,13 @@
   const requestedTab = page.url.searchParams.get('tab') ?? '';
   let activeTab = $state<SettingsTab>((TABS as readonly string[]).includes(requestedTab) ? (requestedTab as SettingsTab) : 'profile');
 
+  // Subscription only makes sense once the user has a CATerm account (Cloud): a purely local
+  // vault has nothing to subscribe to. Hidden until sign-in, shown for both free-cloud and Pro.
+  const visibleTabs = $derived(TABS.filter((tab) => tab !== 'subscription' || pro.status?.signedIn));
+  $effect(() => {
+    if (activeTab === 'subscription' && pro.status && !pro.status.signedIn) activeTab = 'profile';
+  });
+
   const updater = getUpdater();
   const downloadPercent = $derived(
     updater.progress.total ? Math.round((updater.progress.downloaded / updater.progress.total) * 100) : null
@@ -407,7 +414,7 @@
 
   <!-- Settings Tabs -->
   <div class="border-b border-neutral-200 dark:border-neutral-800 flex gap-4 overflow-x-auto" role="tablist">
-    {#each TABS as tab (tab)}
+    {#each visibleTabs as tab (tab)}
       <button
         role="tab"
         aria-selected={activeTab === tab}

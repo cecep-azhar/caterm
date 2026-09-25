@@ -8,6 +8,7 @@ export const REPO_URL = 'https://github.com/cecep-azhar/caterm';
 export const WEBSITE_URL = 'https://caterm.fathforce.com';
 export const AUTHOR_URL = 'https://cecepazhar.com';
 export const PRICING_URL = `${WEBSITE_URL}/#pricing`;
+export const GITHUB_SPONSORS_URL = 'https://github.com/sponsors/cecep-azhar';
 
 /**
  * Pricing page for the signed-in CATerm account: the landing page passes the account id on to

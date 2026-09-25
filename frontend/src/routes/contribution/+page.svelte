@@ -1,6 +1,11 @@
 <script lang="ts">
   import { t } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import SponsorWall from '$lib/components/SponsorWall.svelte';
+  import VpsRecommendation from '$lib/components/VpsRecommendation.svelte';
+  import { getProfile } from '$lib/stores/profile.svelte';
+
+  const profile = getProfile();
   let copied = $state(false);
 
   function copyPaypal() {
@@ -50,6 +55,14 @@
       </button>
     </div>
   </div>
+
+  {#if profile.plan !== 'pro'}
+    <!-- Sponsors + VPS recommendation: hidden once the user is Pro, no ads/promo clutter for paying users. -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <SponsorWall />
+      <VpsRecommendation />
+    </div>
+  {/if}
 
   <!-- Other Contribution Ways -->
   <div class="space-y-4 pt-2">

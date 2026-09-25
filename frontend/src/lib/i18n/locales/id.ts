@@ -330,6 +330,24 @@ const id: Dictionary = {
     websiteTitle: 'Situs Resmi',
     websiteBody: 'Kunjungi https://caterm.fathforce.com untuk dokumentasi, catatan rilis, dan pembaruan.'
   },
+  sponsorWall: {
+    title: 'Sponsor',
+    subtitle: 'Semua pendukung CATerm di GitHub Sponsors, diurutkan berdasarkan tingkat.',
+    tierPlatinum: 'Platinum',
+    tierGold: 'Gold',
+    tierSilver: 'Silver',
+    tierContributor: 'Contributor',
+    minAmount: '${{amount}}+/bln',
+    anyAmount: 'Berapa saja',
+    emptyTier: 'Belum ada sponsor di tingkat ini — jadilah yang pertama!',
+    cta: 'Jadi Sponsor di GitHub'
+  },
+  vpsRecommendation: {
+    tagline: 'Tempat maintainer CATerm menguji server',
+    body: 'Butuh VPS untuk mencoba SSH client CATerm? Hostinger yang kami pakai untuk testing. Daftar lewat tautan ini juga ikut mendukung CATerm tanpa biaya tambahan buat kamu.',
+    cta: 'Lihat Paket VPS Hostinger',
+    affiliateDisclosure: 'Tautan afiliasi — kami bisa dapat komisi jika kamu membeli lewat tautan ini.'
+  },
   hosts: {
     title: 'Host',
     subtitle: '{{count}} host tersimpan dalam {{groups}} grup',

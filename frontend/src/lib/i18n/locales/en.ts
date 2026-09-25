@@ -329,6 +329,24 @@ const en = {
     websiteTitle: 'Official Website',
     websiteBody: 'Visit https://caterm.fathforce.com for documentation, release notes, and updates.'
   },
+  sponsorWall: {
+    title: 'Sponsors',
+    subtitle: 'Everyone who backs CATerm on GitHub Sponsors, recognized by tier.',
+    tierPlatinum: 'Platinum',
+    tierGold: 'Gold',
+    tierSilver: 'Silver',
+    tierContributor: 'Contributor',
+    minAmount: '${{amount}}+/mo',
+    anyAmount: 'Any amount',
+    emptyTier: 'No sponsors in this tier yet — be the first!',
+    cta: 'Become a Sponsor on GitHub'
+  },
+  vpsRecommendation: {
+    tagline: 'Where CATerm’s maintainer hosts test servers',
+    body: 'Need a VPS to try CATerm’s SSH client against? Hostinger is what we use for testing. Signing up through this link also supports CATerm at no extra cost to you.',
+    cta: 'View Hostinger VPS Plans',
+    affiliateDisclosure: 'Affiliate link — we may earn a commission if you purchase through it.'
+  },
   hosts: {
     title: 'Hosts',
     subtitle: '{{count}} saved host across {{groups}} group',
