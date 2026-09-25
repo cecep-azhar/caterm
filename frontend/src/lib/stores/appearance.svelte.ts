@@ -20,10 +20,10 @@ function load(): StoredAppearance | null {
 }
 
 const initial = typeof localStorage === 'undefined' ? null : load();
-// Decorative canvas backgrounds (lock screen grid flow) are GPU-accelerated and
-// keep a WebView2 GPU process resident for the whole session, so they default to
-// off; users who want the visual flair back can opt in from Settings.
-let reduceMotion = $state(initial?.reduceMotion ?? true);
+// Decorative canvas background (lock screen grid flow) is on by default; users who want to
+// claw back the GPU-accelerated process it keeps resident can turn it off in Settings ->
+// Performance.
+let reduceMotion = $state(initial?.reduceMotion ?? false);
 
 export function getAppearance() {
   return {
