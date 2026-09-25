@@ -290,9 +290,9 @@ mod tests {
 
     #[test]
     fn accepts_password_at_minimum_length_and_verifies_correctly() {
-        let dir = std::env::temp_dir().join("caterm_vault_test_temp_verify");
-        let _ = std::fs::remove_dir_all(&dir);
-        let _ = std::fs::create_dir_all(&dir);
+        // Isolated: this used to build a temp dir and then unlock the vault in the real data
+        // directory anyway, creating a vault with password "12345678" on a fresh machine.
+        let _data = crate::test_support::isolated_data_dir("vault_unlock");
 
         // Test lock and unlock
         assert!(unlock_vault("12345678").is_ok());
@@ -304,7 +304,6 @@ mod tests {
         assert!(unlock_vault("12345678").is_ok());
         assert!(is_unlocked().unwrap());
         assert!(lock_vault().is_ok());
-        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

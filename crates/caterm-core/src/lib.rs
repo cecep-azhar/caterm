@@ -54,3 +54,54 @@ pub use error::CatermError;
 pub use vfs::RemoteFileSystem;
 
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Test-only helpers shared across modules.
+#[cfg(test)]
+pub(crate) mod test_support {
+    use parking_lot::{Mutex, MutexGuard};
+    use std::ffi::OsString;
+    use std::path::PathBuf;
+
+    /// The `CATERM_DATA_DIR` env var and the unlocked-vault key are process-wide, and cargo
+    /// runs tests in parallel threads. Tests touching either hold this lock, so one test can't
+    /// swap the data directory or lock the vault underneath another.
+    static GLOBAL_STATE: Mutex<()> = Mutex::new(());
+
+    /// A throwaway data directory that `CATERM_DATA_DIR` points at for the lifetime of the
+    /// value. Dropping it locks the vault, restores the previous env value and deletes the dir,
+    /// so no test ever reads or writes the developer's real vault.
+    pub(crate) struct IsolatedDataDir {
+        pub(crate) path: PathBuf,
+        previous: Option<OsString>,
+        _guard: MutexGuard<'static, ()>,
+    }
+
+    pub(crate) fn isolated_data_dir(label: &str) -> IsolatedDataDir {
+        let guard = GLOBAL_STATE.lock();
+        let path = std::env::temp_dir().join(format!("caterm_test_{label}_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&path).expect("create isolated test data dir");
+        let previous = std::env::var_os("CATERM_DATA_DIR");
+        // SAFETY: tests that depend on CATERM_DATA_DIR hold GLOBAL_STATE (taken above), so no
+        // other such test reads or writes the variable while it changes.
+        #[allow(clippy::disallowed_methods)]
+        unsafe {
+            std::env::set_var("CATERM_DATA_DIR", &path);
+        }
+        IsolatedDataDir { path, previous, _guard: guard }
+    }
+
+    impl Drop for IsolatedDataDir {
+        fn drop(&mut self) {
+            let _ = crate::vault::lock_vault();
+            // SAFETY: still holding GLOBAL_STATE until this value (and its guard) is dropped.
+            #[allow(clippy::disallowed_methods)]
+            unsafe {
+                match &self.previous {
+                    Some(value) => std::env::set_var("CATERM_DATA_DIR", value),
+                    None => std::env::remove_var("CATERM_DATA_DIR"),
+                }
+            }
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+}

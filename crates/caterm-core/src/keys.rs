@@ -356,14 +356,10 @@ mod tests {
 
     #[test]
     fn generate_and_list_ed25519_key() {
-        let dir = std::env::temp_dir().join(format!("caterm_keys_{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        unsafe { std::env::set_var("CATERM_DATA_DIR", &dir); }
-crate::vault::unlock_vault("12345678").unwrap();
+        let _data = crate::test_support::isolated_data_dir("keys");
+        crate::vault::unlock_vault("12345678").unwrap();
 
-        
-        
-                let input = KeyInput {
+        let input = KeyInput {
             name: "Test Key".to_string(),
             algorithm: "Ed25519".to_string(),
         };

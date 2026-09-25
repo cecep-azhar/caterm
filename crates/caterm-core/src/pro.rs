@@ -76,6 +76,7 @@ fn public_key(version: u32) -> Option<VerifyingKey> {
     VerifyingKey::from_bytes(&bytes).ok()
 }
 
+/// # Infallible: only reads keys compiled into this build; there is nothing to fail.
 pub fn key_configured() -> bool {
     public_key(1).is_some()
 }
@@ -474,6 +475,8 @@ pub struct AccountDetails {
     pub devices: Vec<ProDevice>,
 }
 
+/// # Infallible: a reachability probe — an unreachable or disabled server *is* the answer
+/// (`false`), so there is no separate error to report.
 pub fn server_available() -> bool {
     matches!(request("GET", "/health", None, None), Ok((200, body)) if body.get("enabled").and_then(Value::as_bool) == Some(true))
 }
