@@ -219,7 +219,14 @@ const en = {
     deleteConfirm: 'Delete snippet "{{name}}"?',
     deleteTitle: 'Delete Snippet',
     copiedToClipboard: 'Copied to clipboard',
-    labelRequired: 'Label and command are required.'
+    labelRequired: 'Label and command are required.',
+    export: 'Export',
+    import: 'Import',
+    exportSuccess: 'Snippets exported successfully.',
+    exportFailed: 'Failed to export snippets.',
+    importSuccess: 'Imported {{imported}} snippets, skipped {{skipped}} duplicates.',
+    importFailed: 'Failed to import snippets.',
+    importInvalidFormat: 'Invalid snippets JSON format.'
   },
   portForwarding: {
     title: 'Port Forwarding',
@@ -1161,6 +1168,11 @@ const en = {
     minimize: 'Minimize',
     maximize: 'Maximize',
     close: 'Close',
+    closeWindow: 'Close CATerm',
+    closeConfirm: 'Are you sure you want to close CATerm?',
+    closeConfirmActiveSessions: 'You have {{count}} active terminal session(s). Closing the application will terminate all running connections. Are you sure you want to exit?',
+    signOutConfirm: 'Are you sure you want to sign out? This will lock your vault and close all active terminal sessions.',
+    signOutTitle: 'Sign Out',
     closeMenuBackdrop: 'Close menu backdrop',
     mobileNav: 'Mobile Navigation',
     closeNav: 'Close navigation',

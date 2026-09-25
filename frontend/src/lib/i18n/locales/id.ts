@@ -220,7 +220,14 @@ const id: Dictionary = {
     deleteConfirm: 'Hapus snippet "{{name}}"?',
     deleteTitle: 'Hapus Snippet',
     copiedToClipboard: 'Tersalin ke clipboard',
-    labelRequired: 'Label dan perintah wajib diisi.'
+    labelRequired: 'Label dan perintah wajib diisi.',
+    export: 'Ekspor',
+    import: 'Impor',
+    exportSuccess: 'Snippet berhasil diekspor.',
+    exportFailed: 'Gagal mengekspor snippet.',
+    importSuccess: 'Berhasil mengimpor {{imported}} snippet, {{skipped}} duplikat dilewati.',
+    importFailed: 'Gagal mengimpor snippet.',
+    importInvalidFormat: 'Format JSON snippet tidak valid.'
   },
   portForwarding: {
     title: 'Port Forwarding',
@@ -1162,6 +1169,11 @@ const id: Dictionary = {
     minimize: 'Perkecil',
     maximize: 'Perbesar',
     close: 'Tutup',
+    closeWindow: 'Tutup CATerm',
+    closeConfirm: 'Apakah Anda yakin ingin menutup CATerm?',
+    closeConfirmActiveSessions: 'Anda memiliki {{count}} sesi terminal yang masih aktif. Menutup aplikasi akan menghentikan semua koneksi yang berjalan. Anda yakin ingin keluar?',
+    signOutConfirm: 'Apakah Anda yakin ingin keluar? Tindakan ini akan mengunci vault dan menutup semua sesi terminal yang aktif.',
+    signOutTitle: 'Keluar',
     closeMenuBackdrop: 'Tutup latar menu',
     mobileNav: 'Navigasi Seluler',
     closeNav: 'Tutup navigasi',

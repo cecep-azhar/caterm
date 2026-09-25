@@ -1,9 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { injectIntoActiveSession, hasActiveSession } from '$lib/stores/activeSession.svelte';
-  import { listSnippets, saveSnippet as saveSnippetApi, deleteSnippet as deleteSnippetApi, type SnippetRecord } from '$lib/api/snippets';
+  import { listSnippets, saveSnippet as saveSnippetApi, deleteSnippet as deleteSnippetApi, type SnippetRecord, type SnippetInput } from '$lib/api/snippets';
   import { t } from '$lib/i18n/index.svelte';
+  import { showToast } from '$lib/stores/uiNotifications.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import { save, open } from '@tauri-apps/plugin-dialog';
+  import { writeTextFile, readTextFile } from '@tauri-apps/plugin-fs';
 
   let isAddModalOpen = $state(false);
   let creationStep = $state(1); // 1: command, 2: details
@@ -20,13 +23,184 @@
     tags: ""
   });
 
-  onMount(async () => {
+  async function loadSnippets() {
     try {
       snippets = await listSnippets();
+      backendAvailable = true;
     } catch {
       backendAvailable = false;
     }
+  }
+
+  onMount(async () => {
+    await loadSnippets();
   });
+
+  async function exportSnippets() {
+    try {
+      const allSnippets = await listSnippets();
+      const jsonContent = JSON.stringify(allSnippets, null, 2);
+      let saved = false;
+
+      try {
+        const filePath = await save({
+          defaultPath: 'caterm-snippets-export.json',
+          filters: [
+            {
+              name: 'JSON',
+              extensions: ['json']
+            }
+          ]
+        });
+
+        if (filePath) {
+          await writeTextFile(filePath, jsonContent);
+          saved = true;
+          showToast(t('snippets.exportSuccess'), 'success');
+        } else {
+          // User cancelled file dialog
+          return;
+        }
+      } catch {
+        // Fallback to standard web download if Tauri dialog/fs is unavailable
+      }
+
+      if (!saved) {
+        const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'caterm-snippets-export.json';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(t('snippets.exportSuccess'), 'success');
+      }
+    } catch (err) {
+      console.error('Export snippets failed', err);
+      showToast(t('snippets.exportFailed'), 'error');
+    }
+  }
+
+  async function processSnippetsJson(jsonText: string) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonText);
+    } catch {
+      showToast(t('snippets.importInvalidFormat'), 'error');
+      return;
+    }
+
+    if (!Array.isArray(parsed)) {
+      showToast(t('snippets.importInvalidFormat'), 'error');
+      return;
+    }
+
+    const currentSnippets = await listSnippets();
+    const existingIds = new Set(currentSnippets.map((s) => s.id));
+
+    let imported = 0;
+    let skipped = 0;
+
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') {
+        skipped++;
+        continue;
+      }
+
+      const rec = item as Partial<SnippetRecord>;
+      if (!rec.label || !rec.command) {
+        skipped++;
+        continue;
+      }
+
+      // Handle duplicate IDs gracefully: skip & report
+      if (rec.id && existingIds.has(rec.id)) {
+        skipped++;
+        continue;
+      }
+
+      const tags = Array.isArray(rec.tags)
+        ? rec.tags.map((tg) => String(tg).trim()).filter(Boolean)
+        : typeof rec.tags === 'string'
+          ? (rec.tags as string).split(',').map((tg) => tg.trim()).filter(Boolean)
+          : [];
+
+      const input: SnippetInput = {
+        id: rec.id || undefined,
+        label: String(rec.label),
+        description: String(rec.description || ''),
+        command: String(rec.command),
+        tags
+      };
+
+      try {
+        const saved = await saveSnippetApi(input);
+        existingIds.add(saved.id);
+        imported++;
+      } catch (err) {
+        console.error('Failed to save imported snippet', rec, err);
+        skipped++;
+      }
+    }
+
+    await loadSnippets();
+    showToast(t('snippets.importSuccess', { imported, skipped }), 'success');
+  }
+
+  async function importSnippets() {
+    try {
+      let fileLoaded = false;
+
+      try {
+        const selected = await open({
+          multiple: false,
+          filters: [
+            {
+              name: 'JSON',
+              extensions: ['json']
+            }
+          ]
+        });
+
+        if (selected) {
+          const filePath = Array.isArray(selected) ? selected[0] : selected;
+          if (filePath) {
+            const content = await readTextFile(filePath);
+            fileLoaded = true;
+            await processSnippetsJson(content);
+          }
+        } else {
+          // User cancelled
+          return;
+        }
+      } catch {
+        // Fallback to HTML file input if Tauri dialog/fs is unavailable
+      }
+
+      if (!fileLoaded) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json,application/json';
+        input.onchange = async () => {
+          const file = input.files?.[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+            const content = event.target?.result as string;
+            if (content) {
+              await processSnippetsJson(content);
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      }
+    } catch (err) {
+      console.error('Import snippets failed', err);
+      showToast(t('snippets.importFailed'), 'error');
+    }
+  }
 
   function resetModal() {
     editingId = null;
@@ -94,12 +268,36 @@
     subtitle={t('snippets.subtitle')}
   >
     {#snippet actions()}
-      <button
-        onclick={() => { resetModal(); isAddModalOpen = true; }}
-        class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-2 shadow shadow-sky-600/20">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-        {t('snippets.addSnippet')}
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          onclick={importSnippets}
+          class="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+          title={t('snippets.import')}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+          </svg>
+          <span>{t('snippets.import')}</span>
+        </button>
+        <button
+          onclick={exportSnippets}
+          disabled={snippets.length === 0}
+          class="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed text-neutral-700 dark:text-neutral-200 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 shadow-sm"
+          title={t('snippets.export')}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span>{t('snippets.export')}</span>
+        </button>
+        <button
+          onclick={() => { resetModal(); isAddModalOpen = true; }}
+          class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-2 shadow shadow-sky-600/20"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+          {t('snippets.addSnippet')}
+        </button>
+      </div>
     {/snippet}
   </PageHeader>
   {#if !backendAvailable}

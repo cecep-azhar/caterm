@@ -18,11 +18,11 @@
     type PaneLayout
   } from '$lib/stores/sessionView.svelte';
   import {
-    getTheme,
-    initTheme,
-    setTheme
+  	getTheme,
+  	initTheme,
+  	setTheme
   } from '$lib/stores/theme.svelte';
-  import { getToasts, showToast } from '$lib/stores/uiNotifications.svelte';
+  import { getToasts, showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
   import FeedbackModal from '$lib/components/FeedbackModal.svelte';
   import ProfileMenu from '$lib/components/ProfileMenu.svelte';
@@ -167,20 +167,34 @@
     }
   }
   async function closeWindow() {
-    try {
-      await invoke('window_close');
-    } catch (e) {
-      try {
-        if (appWindow) {
-          await appWindow.close();
-        } else if (typeof window !== 'undefined') {
-          const win = getCurrentWindow();
-          await win.close();
-        }
-      } catch (err) {
-        console.warn('Failed to close window:', err);
-      }
-    }
+  	const activeCount = sessionTabs.length;
+  	const message =
+  		activeCount > 0
+  			? t('shell.closeConfirmActiveSessions', { count: activeCount })
+  			: t('shell.closeConfirm');
+  	const confirmed = await confirmModal(
+  		message,
+  		t('shell.closeWindow'),
+  		activeCount > 0,
+  		t('shell.close'),
+  		t('common.cancel')
+  	);
+  	if (!confirmed) return;
+
+  	try {
+  		await invoke('window_close');
+  	} catch (e) {
+  		try {
+  			if (appWindow) {
+  				await appWindow.close();
+  			} else if (typeof window !== 'undefined') {
+  				const win = getCurrentWindow();
+  				await win.close();
+  			}
+  		} catch (err) {
+  			console.warn('Failed to close window:', err);
+  		}
+  	}
   }
 
   async function startDragging(e: MouseEvent) {
@@ -334,13 +348,22 @@
   }
 
   async function signOut() {
-    closePalette();
-    closeAllTabs();
-    isUnlocked = false;
-    onVaultLocked();
-    await goto('/');
-    lockVault().catch((err) => console.warn('lock_vault failed:', err));
-    showToast(t('shell.signedOut'), 'info');
+  	const confirmed = await confirmModal(
+  		t('shell.signOutConfirm'),
+  		t('shell.signOutTitle'),
+  		true,
+  		t('profileMenu.signOut'),
+  		t('common.cancel')
+  	);
+  	if (!confirmed) return;
+
+  	closePalette();
+  	closeAllTabs();
+  	isUnlocked = false;
+  	onVaultLocked();
+  	await goto('/');
+  	lockVault().catch((err) => console.warn('lock_vault failed:', err));
+  	showToast(t('shell.signedOut'), 'info');
   }
 
   // ---- Keyboard shortcuts (list and rules in $lib/shortcuts) -----------------------------------
