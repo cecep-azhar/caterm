@@ -254,10 +254,10 @@
     </div>
   </div>
 
-  <!-- Left Panel: Brand & Quote -->
+  <!-- Left Panel: Brand Quote -->
   <div
   	data-tauri-drag-region
-  	class="hidden lg:flex w-3/4 flex-col justify-between p-12 lg:p-16 xl:p-20 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800/60 relative overflow-hidden shrink-0"
+  	class="hidden lg:flex w-2/3 flex-col justify-between p-12 lg:p-16 xl:p-20 bg-white dark:bg-neutral-950 border-r border-neutral-200 dark:border-neutral-800/60 relative overflow-hidden shrink-0"
   	onmousedown={startDragging}
   >
   	<!-- Sky Blue Grid Flow Animation CATerm Logo -->
@@ -300,7 +300,7 @@
   <!-- Right Panel: Master Password Input Form -->
   <div
   	data-tauri-drag-region
-  	class="w-full lg:w-1/4 flex flex-col justify-center items-center p-6 sm:p-10 xl:p-12 bg-neutral-50 dark:bg-[#0a0a0a] relative z-10 shrink-0"
+  	class="w-full lg:w-1/3 flex flex-col justify-center items-center p-6 sm:p-10 xl:p-12 bg-neutral-50 dark:bg-[#0a0a0a] relative z-10 shrink-0"
   	onmousedown={startDragging}
   >
   	<div class="w-full max-w-sm space-y-8 no-drag">
