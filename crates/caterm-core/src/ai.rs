@@ -967,12 +967,56 @@ pub fn execute_plan_step(host_id: &str, command: &str) -> Result<AiExecutionResu
         )));
     }
     if command.trim().is_empty() {
-        return Err(CatermError::Validation(ValidationError::Generic(
-            "command cannot be empty".to_string(),
-        )));
+    	return Err(CatermError::Validation(ValidationError::Generic(
+    		"command cannot be empty".to_string(),
+    	)));
     }
 
-    // Runs on the host's pooled non-interactive session, never on a terminal pane's session:
+    if host_id == "local" || host_id == "__local__" {
+    	#[cfg(windows)]
+    	let mut cmd = std::process::Command::new("powershell.exe");
+    	#[cfg(windows)]
+    	{
+    		use std::os::windows::process::CommandExt;
+    		const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    		cmd.args(["-NoLogo", "-NonInteractive", "-Command", command]);
+    		cmd.creation_flags(CREATE_NO_WINDOW);
+    	}
+
+    	#[cfg(not(windows))]
+    	let mut cmd = std::process::Command::new("sh");
+    	#[cfg(not(windows))]
+    	cmd.args(["-c", command]);
+
+    	let output = cmd.output().map_err(|e| {
+    		CatermError::Ai(AiError::Generic(format!("Failed to execute local command: {e}")))
+    	})?;
+
+    	let exit_code = output.status.code().unwrap_or(0);
+    	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    	let success = output.status.success();
+    	let summary = if success { "SUCCESS" } else { "FAILED" };
+
+    	let _ = crate::audit::log_event(
+    		"AI_AUTOMATION",
+    		Some(host_id),
+    		&format!("[AI-EXEC-LOCAL] Command: {command} Exit: {exit_code} Result: {summary}"),
+    	);
+
+    	return Ok(AiExecutionResult {
+    		step: 1,
+    		command: command.to_string(),
+    		success,
+    		exit_code,
+    		stdout,
+    		stderr,
+    		step_number: Some(1),
+    		duration_ms: None,
+    	});
+    }
+
+    // Runs on the host's pooled non-interactive session, NOT the terminal pane's session:
     // an automation step must not be able to stall (or steal output from) an open terminal.
     let (exit_code, stdout_buf, stderr_buf) = crate::ssh::with_exec_session(host_id, |sess| {
         let mut channel = sess.channel_session().map_err(|e| {

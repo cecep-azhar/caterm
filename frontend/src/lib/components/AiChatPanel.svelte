@@ -11,6 +11,8 @@
     type AiPlanStep
   } from '$lib/api/ai';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
+  import { getTabs, localTerminalHost, LOCAL_HOST_ID } from '$lib/stores/sessionTabs.svelte';
+  import { getSessionView } from '$lib/stores/sessionView.svelte';
   import { getActiveSession, injectIntoActiveSession } from '$lib/stores/activeSession.svelte';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { errorText } from '$lib/errors';
@@ -32,7 +34,7 @@
   let errorMsg = $state('');
 
   let hosts = $state<HostRecord[]>([]);
-  let targetHostId = $state('');
+  let targetHostId = $state<string>(LOCAL_HOST_ID);
   let execMode = $state<ExecMode>('ssh');
 
   let proposedSteps = $state<AiPlanStep[]>([]);
@@ -42,16 +44,26 @@
 
   let scroller: HTMLDivElement | undefined = $state();
 
-  const targetHost = $derived(hosts.find((h) => h.id === targetHostId));
+  const allHosts = $derived([localTerminalHost(), ...hosts]);
+  const targetHost = $derived(allHosts.find((h) => h.id === targetHostId) || (targetHostId === LOCAL_HOST_ID ? localTerminalHost() : undefined));
   const activeSession = $derived(getActiveSession());
 
   onMount(async () => {
-    try {
-      hosts = await listHosts();
-      if (!targetHostId && hosts.length > 0) targetHostId = hosts[0].id;
-    } catch {
-      hosts = [];
-    }
+  	try {
+  		hosts = await listHosts();
+  		// Default to currently active session's host if one exists
+  		const activeTabs = getTabs();
+  		const view = getSessionView();
+  		const activeTab = activeTabs.find((t) => t.id === view.selectedTabId) || activeTabs[0];
+  		if (activeTab?.host?.id) {
+  			targetHostId = activeTab.host.id;
+  		} else if (hosts.length > 0) {
+  			targetHostId = LOCAL_HOST_ID;
+  		}
+  	} catch {
+  		hosts = [];
+  		targetHostId = LOCAL_HOST_ID;
+  	}
   });
 
   function scrollToBottom() {
@@ -210,16 +222,14 @@
     <div class="flex items-center gap-2">
       <label for="ai-chat-host" class="text-[11px] font-semibold text-neutral-500 shrink-0">{t('aiChat.host')}</label>
       <select
-        id="ai-chat-host"
-        bind:value={targetHostId}
-        class="flex-1 min-w-0 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500"
+      	id="ai-chat-host"
+      	bind:value={targetHostId}
+      	class="flex-1 min-w-0 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 cursor-pointer"
       >
-        {#if hosts.length === 0}
-          <option value="">{t('aiChat.noHosts')}</option>
-        {/if}
-        {#each hosts as host (host.id)}
-          <option value={host.id}>{host.label} ({host.username}@{host.address})</option>
-        {/each}
+      	<option value={LOCAL_HOST_ID}>🖥️ {t('session.localTerminal')} (localhost)</option>
+      	{#each hosts as host (host.id)}
+      		<option value={host.id}>{host.label} ({host.username}@{host.address})</option>
+      	{/each}
       </select>
     </div>
 

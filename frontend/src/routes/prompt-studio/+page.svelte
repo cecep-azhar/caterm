@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
-  import { getTabs } from '$lib/stores/sessionTabs.svelte';
+  import { getTabs, localTerminalHost, LOCAL_HOST_ID } from '$lib/stores/sessionTabs.svelte';
+  import { getSessionView } from '$lib/stores/sessionView.svelte';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import {
     getAiSettings,
@@ -68,21 +69,26 @@
   });
 
   async function loadHosts() {
-    isLoadingHosts = true;
-    try {
-      const data = await listHosts();
-      hosts = data;
-      const activeTabs = getTabs();
-      if (activeTabs.length > 0 && activeTabs[0]?.host?.id) {
-        selectedHostId = activeTabs[0].host.id;
-      } else if (data.length > 0 && data[0]?.id) {
-        selectedHostId = data[0].id;
-      }
-    } catch {
-      hosts = [];
-    } finally {
-      isLoadingHosts = false;
-    }
+  	isLoadingHosts = true;
+  	try {
+  		const data = await listHosts();
+  		hosts = [localTerminalHost(), ...data];
+  		const activeTabs = getTabs();
+  		const view = getSessionView();
+  		const activeTab = activeTabs.find((t) => t.id === view.selectedTabId) || activeTabs[0];
+  		if (activeTab?.host?.id) {
+  			selectedHostId = activeTab.host.id;
+  		} else if (data.length > 0 && data[0]?.id) {
+  			selectedHostId = data[0].id;
+  		} else {
+  			selectedHostId = LOCAL_HOST_ID;
+  		}
+  	} catch {
+  		hosts = [localTerminalHost()];
+  		selectedHostId = LOCAL_HOST_ID;
+  	} finally {
+  		isLoadingHosts = false;
+  	}
   }
 
   async function loadSettings() {
@@ -576,9 +582,9 @@
             class="bg-transparent text-xs md:text-sm font-semibold text-neutral-900 dark:text-white focus:outline-none cursor-pointer max-w-[200px] truncate"
           >
             {#each hosts as host}
-              <option value={host.id} class="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white">
-                {host.label} ({host.username}@{host.address}:{host.port})
-              </option>
+            	<option value={host.id} class="bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white">
+            		{host.id === LOCAL_HOST_ID ? '🖥️ ' : ''}{host.label} ({host.username}@{host.address}{host.port > 0 ? `:${host.port}` : ''})
+            	</option>
             {/each}
           </select>
         {/if}
