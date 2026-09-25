@@ -89,6 +89,18 @@
     "allow-ai-execute-step",
     "allow-get-performance-prefs",
     "allow-set-performance-prefs",
+    "allow-pro-status",
+    "allow-pro-server-available",
+    "allow-pro-register",
+    "allow-pro-resend-verification",
+    "allow-pro-forgot-password",
+    "allow-pro-login",
+    "allow-pro-commit-pending",
+    "allow-pro-sync",
+    "allow-pro-start-trial",
+    "allow-pro-account",
+    "allow-pro-revoke-device",
+    "allow-pro-logout",
     "allow-submit-feedback",
     "process:allow-restart"
   ]

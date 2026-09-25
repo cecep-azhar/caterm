@@ -616,6 +616,68 @@ pub async fn set_performance_prefs(prefs: prefs::PerformancePrefs) -> Result<(),
     run_blocking(move || prefs::save_performance_prefs(&prefs)).await
 }
 
+// ---- CATerm Pro (caterm_core::pro) --------------------------------------------------------
+
+#[tauri::command]
+pub async fn pro_status() -> Result<caterm_core::pro::ProStatus, CatermError> {
+    run_blocking(caterm_core::pro::status).await
+}
+
+#[tauri::command]
+pub async fn pro_server_available() -> Result<bool, CatermError> {
+    run_blocking(|| Ok(caterm_core::pro::server_available())).await
+}
+
+#[tauri::command]
+pub async fn pro_register(email: String, password: String, name: String, locale: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::pro::register(&email, &password, &name, &locale)).await
+}
+
+#[tauri::command]
+pub async fn pro_resend_verification(email: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::pro::resend_verification(&email)).await
+}
+
+#[tauri::command]
+pub async fn pro_forgot_password(email: String, locale: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::pro::forgot_password(&email, &locale)).await
+}
+
+#[tauri::command]
+pub async fn pro_login(email: String, password: String) -> Result<caterm_core::pro::ProAccount, CatermError> {
+    run_blocking(move || caterm_core::pro::login(&email, &password)).await
+}
+
+#[tauri::command]
+pub async fn pro_commit_pending() -> Result<bool, CatermError> {
+    run_blocking(caterm_core::pro::commit_pending).await
+}
+
+#[tauri::command]
+pub async fn pro_sync() -> Result<caterm_core::pro::SyncOutcome, CatermError> {
+    run_blocking(caterm_core::pro::sync).await
+}
+
+#[tauri::command]
+pub async fn pro_start_trial() -> Result<caterm_core::pro::SyncOutcome, CatermError> {
+    run_blocking(caterm_core::pro::start_trial).await
+}
+
+#[tauri::command]
+pub async fn pro_account() -> Result<caterm_core::pro::AccountDetails, CatermError> {
+    run_blocking(caterm_core::pro::account_details).await
+}
+
+#[tauri::command]
+pub async fn pro_revoke_device(device_id: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::pro::revoke_device(&device_id)).await
+}
+
+#[tauri::command]
+pub async fn pro_logout() -> Result<(), CatermError> {
+    run_blocking(caterm_core::pro::logout).await
+}
+
 #[tauri::command]
 pub async fn submit_feedback(rating: i32, content: String) -> Result<(), CatermError> {
     run_blocking(move || feedback::submit_feedback(rating, &content)).await

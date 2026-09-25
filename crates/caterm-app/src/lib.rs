@@ -202,6 +202,18 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::open_external_url,
             commands::get_performance_prefs,
             commands::set_performance_prefs,
+            commands::pro_status,
+            commands::pro_server_available,
+            commands::pro_register,
+            commands::pro_resend_verification,
+            commands::pro_forgot_password,
+            commands::pro_login,
+            commands::pro_commit_pending,
+            commands::pro_sync,
+            commands::pro_start_trial,
+            commands::pro_account,
+            commands::pro_revoke_device,
+            commands::pro_logout,
             commands::submit_feedback,
         ])
         .run(tauri::generate_context!())

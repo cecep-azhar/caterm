@@ -48,6 +48,7 @@ pub mod webdav;
 pub mod s3;
 pub mod feedback;
 pub mod prefs;
+pub mod pro;
 
 pub use error::CatermError;
 pub use vfs::RemoteFileSystem;

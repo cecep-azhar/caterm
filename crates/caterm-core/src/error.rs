@@ -38,6 +38,9 @@ domain_error!(SyncError, "SYNC");
 domain_error!(IoError, "IO");
 domain_error!(ValidationError, "VALIDATION");
 domain_error!(FtpError, "FTP");
+// CATerm Pro account/license. The message is the server's stable error code (e.g.
+// `INVALID_CREDENTIALS`) so the UI can translate it; see crates/caterm-core/src/pro.
+domain_error!(ProError, "PRO");
 
 #[derive(Debug, Error)]
 pub enum CatermError {
@@ -61,6 +64,8 @@ pub enum CatermError {
     Validation(#[from] ValidationError),
     #[error("ftp: {0}")]
     Ftp(#[from] FtpError),
+    #[error("pro: {0}")]
+    Pro(#[from] ProError),
     #[error("not implemented: {0}")]
     NotImplemented(String),
 }
@@ -79,6 +84,7 @@ impl CatermError {
             Self::Io(e) => e.code(),
             Self::Validation(e) => e.code(),
             Self::Ftp(e) => e.code(),
+            Self::Pro(e) => e.code(),
             Self::NotImplemented(_) => "CAT-CORE-501",
         }
     }
@@ -96,6 +102,7 @@ impl CatermError {
             Self::Io(_) => "IO",
             Self::Validation(_) => "VALIDATION",
             Self::Ftp(_) => "FTP",
+            Self::Pro(_) => "PRO",
             Self::NotImplemented(_) => "CORE",
         }
     }
@@ -124,6 +131,7 @@ impl CatermError {
             Self::Io(IoError::Generic(PLACEHOLDER.into())),
             Self::Validation(ValidationError::Generic(PLACEHOLDER.into())),
             Self::Ftp(FtpError::Generic(PLACEHOLDER.into())),
+            Self::Pro(ProError::Generic(PLACEHOLDER.into())),
             Self::NotImplemented(PLACEHOLDER.into()),
         ]
     }

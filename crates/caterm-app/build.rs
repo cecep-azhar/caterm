@@ -106,6 +106,19 @@ const COMMANDS: &[&str] = &[
     // System / Performance
     "get_performance_prefs",
     "set_performance_prefs",
+    // CATerm Pro
+    "pro_status",
+    "pro_server_available",
+    "pro_register",
+    "pro_resend_verification",
+    "pro_forgot_password",
+    "pro_login",
+    "pro_commit_pending",
+    "pro_sync",
+    "pro_start_trial",
+    "pro_account",
+    "pro_revoke_device",
+    "pro_logout",
     // Feedback
     "submit_feedback",
 ];
