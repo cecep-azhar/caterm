@@ -358,34 +358,34 @@
 
 <svelte:window onkeydown={handleListKeydown} onpointerdown={handleOutsidePointer} />
 
-<div class="max-w-6xl mx-auto">
-  <PageHeader
-    icon={['M4 17l6-5-6-5M12 19h8']}
-    accent="sky"
-    title={t('hosts.title')}
-    subtitle={t('hosts.subtitle', { count: hosts.length, groups: groupCount })}
-  >
-    {#snippet actions()}
-      <button
-        onclick={() => openSession('local')}
-        class="w-10 h-10 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
-        title={t('hosts.localTerminal')}
-        aria-label={t('hosts.localTerminal')}
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" stroke-width="1.8" /><path stroke-linecap="round" stroke-width="1.8" d="M8 20h8M12 16v4" /></svg>
-      </button>
-      <button
-        onclick={openAddModal}
-        class="h-10 px-4 flex items-center gap-2 rounded-lg text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5" /></svg>
-        {t('hosts.addHost')}
-      </button>
-    {/snippet}
-  </PageHeader>
+<div class="max-w-6xl mx-auto space-y-6">
+	<PageHeader
+		icon={['M4 17l6-5-6-5', 'M12 19h8']}
+		accent="sky"
+		title={t('hosts.title')}
+		subtitle={t('hosts.subtitle', { count: hosts.length, groups: groupCount })}
+	>
+		{#snippet actions()}
+			<button
+				onclick={() => openSession('local')}
+				class="w-10 h-10 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+				title={t('hosts.localTerminal')}
+				aria-label={t('hosts.localTerminal')}
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" stroke-width="1.8" /><path stroke-linecap="round" stroke-width="1.8" d="M8 20h8M12 16v4" /></svg>
+			</button>
+			<button
+				onclick={openAddModal}
+				class="h-10 px-4 flex items-center gap-2 rounded-lg text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors"
+			>
+				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5" /></svg>
+				{t('hosts.addHost')}
+			</button>
+		{/snippet}
+	</PageHeader>
 
-  <!-- Search + filter -->
-  <div class="mt-8 flex gap-2">
+	<!-- Search and filter -->
+	<div class="flex gap-2">
     <div class="relative flex-1">
       <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
       <input
