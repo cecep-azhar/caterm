@@ -514,10 +514,10 @@ const en = {
     showPassword: 'Show password',
     settingUp: 'Setting up...',
     unlocking: 'Unlocking...',
-    createVault: 'Create Vault',
-    unlockVault: 'Unlock Vault',
-    resetVault: 'Reset Vault',
-    vaultEncrypted: 'Local Vault: Encrypted',
+    createVault: 'Create',
+    unlockVault: 'Unlock',
+    resetVault: 'Reset Local',
+    vaultEncrypted: 'Local: Encrypted',
     errEmpty: 'Master password cannot be empty.',
     errMinLength: 'Master password must be at least 8 characters.',
     errInvalid: 'Invalid password (minimum 8 characters)',
@@ -1270,8 +1270,8 @@ const en = {
   },
   pro: {
     lock: {
-      vaultTab: 'Local vault',
-      proTab: 'Pro Login',
+    	vaultTab: 'Local',
+    	proTab: 'Cloud',
       signedInAs: 'Signed in to your CATerm account as {{email}}. Unlock your vault to finish.'
     },
     login: {

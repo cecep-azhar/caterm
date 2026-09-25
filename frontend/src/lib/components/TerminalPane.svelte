@@ -477,22 +477,23 @@
 </script>
 
 <div
-  bind:this={rootContainer}
-  class="relative flex flex-col h-full bg-white dark:bg-[#09090b] border border-neutral-200 dark:border-neutral-800 rounded-md overflow-hidden"
+	bind:this={rootContainer}
+	class="relative flex flex-col h-full bg-white dark:bg-[#09090b] border {status === 'offline' ? 'border-rose-500/60 ring-1 ring-rose-500/30' : 'border-neutral-200 dark:border-neutral-800'} rounded-md overflow-hidden transition-colors"
 >
-  <!-- Top Bar -->
-  <div class="h-7 sm:h-8 bg-neutral-100 dark:bg-neutral-900/90 border-b border-neutral-200 dark:border-neutral-800 px-2.5 flex items-center justify-between text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0">
-    <div class="flex items-center gap-2 min-w-0">
-      <span
-        class="w-2 h-2 rounded-full shrink-0 {status === 'connected'
-          ? 'bg-emerald-500'
-          : status === 'connecting'
-            ? 'bg-amber-500'
-            : 'bg-neutral-600'}"
-      ></span>
-      <span class="text-neutral-900 dark:text-white font-medium truncate">{paneLabel}</span>
-      <span class="text-neutral-500 dark:text-neutral-500 hidden sm:inline truncate">({host.address})</span>
-    </div>
+	<!-- Top Bar -->
+	<div class="h-7 sm:h-8 bg-neutral-100 dark:bg-neutral-900/90 border-b border-neutral-200 dark:border-neutral-800 px-2.5 flex items-center justify-between text-xs font-mono text-neutral-500 dark:text-neutral-400 shrink-0">
+		<div class="flex items-center gap-2 min-w-0">
+			<span
+				class="w-2.5 h-2.5 rounded-full shrink-0 transition-all duration-300 {status === 'connected'
+					? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]'
+					: status === 'connecting'
+						? 'bg-amber-400 animate-pulse shadow-[0_0_6px_rgba(251,191,36,0.6)]'
+						: 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.9)] animate-pulse ring-2 ring-rose-500/30'}"
+				title={status === 'connected' ? t('terminal.connected') : status === 'connecting' ? t('terminal.connecting') : t('terminal.sshFailed')}
+			></span>
+			<span class="text-neutral-900 dark:text-white font-medium truncate">{paneLabel}</span>
+			<span class="text-neutral-500 dark:text-neutral-500 hidden sm:inline truncate">({host.address})</span>
+		</div>
     <div class="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 shrink-0">
       <!-- Autocomplete toggle button -->
       <button

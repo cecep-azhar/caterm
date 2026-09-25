@@ -515,10 +515,10 @@ const id: Dictionary = {
     showPassword: 'Tampilkan kata sandi',
     settingUp: 'Menyiapkan...',
     unlocking: 'Membuka...',
-    createVault: 'Buat Vault',
-    unlockVault: 'Buka Vault',
-    resetVault: 'Reset Vault',
-    vaultEncrypted: 'Vault Lokal: Terenkripsi',
+    createVault: 'Buat Identitas',
+    unlockVault: 'Unlock',
+    resetVault: 'Reset Lokal',
+    vaultEncrypted: 'Lokal: Terenkripsi',
     errEmpty: 'Master password tidak boleh kosong.',
     errMinLength: 'Master password minimal 8 karakter.',
     errInvalid: 'Kata sandi salah (minimal 8 karakter)',
@@ -1271,8 +1271,8 @@ const id: Dictionary = {
   },
   pro: {
     lock: {
-      vaultTab: 'Vault lokal',
-      proTab: 'Pro Login',
+    	vaultTab: 'Local',
+    	proTab: 'Cloud',
       signedInAs: 'Masuk ke akun CATerm sebagai {{email}}. Buka vault Anda untuk menyelesaikan.'
     },
     login: {
