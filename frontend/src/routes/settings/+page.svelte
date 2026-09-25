@@ -422,11 +422,11 @@
   {#if activeTab === 'profile'}
     <div class="{CARD} space-y-6">
       <div class="flex items-center gap-4">
-        <ProfileAvatar avatar={profileAvatar} name={profileName} size={56} />
+        <ProfileAvatar avatar={profileAvatar} name={profileName} size={56} pro={profile.plan === 'pro'} />
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h2 class="text-lg font-semibold text-neutral-900 dark:text-white truncate">{profileName.trim() || profile.name}</h2>
-            <span class="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 uppercase">{t('profileMenu.planFree')}</span>
+            <span class="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 uppercase">{profile.plan === 'pro' ? t('profileMenu.planPro') : t('profileMenu.planFree')}</span>
           </div>
           <p class="{MUTED} text-sm">{t('settings.profile.localNote')}</p>
         </div>

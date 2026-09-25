@@ -396,7 +396,7 @@
           <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.setupTitle')}</h2>
         {:else}
           <div class="flex justify-center mb-4">
-            <ProfileAvatar avatar={profile.avatar} name={profile.name} size={64} />
+            <ProfileAvatar avatar={profile.avatar} name={profile.name} size={64} pro={profile.plan === 'pro'} />
           </div>
           <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.welcomeBack', { name: profile.name })}</h2>
         {/if}

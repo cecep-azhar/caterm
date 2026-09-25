@@ -21,17 +21,30 @@
     avatar,
     name = '',
     size = 32,
+    pro = false,
     class: className = ''
-  }: { avatar: string; name?: string; size?: number; class?: string } = $props();
+  }: { avatar: string; name?: string; size?: number; pro?: boolean; class?: string } = $props();
 
   const preset = $derived(AVATARS.find((a) => a.id === avatar));
 </script>
 
-<span
-  class="inline-flex items-center justify-center rounded-full shrink-0 overflow-hidden select-none {className}"
-  style="width: {size}px; height: {size}px; background: linear-gradient(135deg, {preset?.from ?? '#0ea5e9'}, {preset?.to ?? '#10b981'});"
-  aria-hidden="true"
->
+<span class="relative inline-flex shrink-0" style="width: {size}px; height: {size}px;">
+  {#if pro}
+    <span
+      class="meteor-orbit"
+      style="--meteor-stroke: {Math.max(2, Math.round(size * 0.05))}px;"
+      aria-hidden="true"
+    >
+      <span class="meteor-arc meteor-arc--1"></span>
+      <span class="meteor-arc meteor-arc--2"></span>
+      <span class="meteor-arc meteor-arc--3"></span>
+    </span>
+  {/if}
+  <span
+    class="relative inline-flex items-center justify-center rounded-full shrink-0 overflow-hidden select-none {className}"
+    style="width: {size}px; height: {size}px; background: linear-gradient(135deg, {preset?.from ?? '#0ea5e9'}, {preset?.to ?? '#10b981'});"
+    aria-hidden="true"
+  >
   {#if preset}
     <svg
       viewBox="0 0 24 24"
@@ -84,4 +97,80 @@
   {:else}
     <span class="font-semibold text-white" style="font-size: {Math.round(size * 0.4)}px;">{initialsOf(name)}</span>
   {/if}
+  </span>
 </span>
+
+<style>
+  .meteor-orbit {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  /* Each arc is a conic-gradient comet trail, clipped to a thin ring band so the
+     head + fading tail are drawn curving along the circle itself, not a straight line. */
+  .meteor-arc {
+    position: absolute;
+    inset: -10%;
+    border-radius: 9999px;
+    -webkit-mask: radial-gradient(
+      closest-side,
+      transparent calc(100% - var(--meteor-stroke, 3px) - 1px),
+      #000 calc(100% - var(--meteor-stroke, 3px)),
+      #000 100%,
+      transparent 100%
+    );
+    mask: radial-gradient(
+      closest-side,
+      transparent calc(100% - var(--meteor-stroke, 3px) - 1px),
+      #000 calc(100% - var(--meteor-stroke, 3px)),
+      #000 100%,
+      transparent 100%
+    );
+  }
+  .meteor-arc--1 {
+    background: conic-gradient(
+      from 0deg,
+      transparent 0deg,
+      transparent 322deg,
+      rgba(56, 189, 248, 0) 330deg,
+      rgba(125, 211, 252, 0.9) 350deg,
+      #f0f9ff 358deg,
+      transparent 360deg
+    );
+    animation: meteor-orbit-spin 2.4s linear infinite;
+  }
+  .meteor-arc--2 {
+    background: conic-gradient(
+      from 130deg,
+      transparent 0deg,
+      transparent 326deg,
+      rgba(56, 189, 248, 0) 333deg,
+      rgba(125, 211, 252, 0.85) 350deg,
+      #e0f2fe 358deg,
+      transparent 360deg
+    );
+    animation: meteor-orbit-spin 4.1s linear infinite;
+  }
+  .meteor-arc--3 {
+    background: conic-gradient(
+      from 250deg,
+      transparent 0deg,
+      transparent 330deg,
+      rgba(56, 189, 248, 0) 336deg,
+      rgba(125, 211, 252, 0.8) 350deg,
+      #dbeafe 358deg,
+      transparent 360deg
+    );
+    animation: meteor-orbit-spin 6.3s linear infinite;
+  }
+  @keyframes meteor-orbit-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .meteor-arc {
+      animation: none;
+    }
+  }
+</style>
