@@ -5,13 +5,12 @@
   import type TerminalPaneComponent from '$lib/components/TerminalPane.svelte';
   import SessionFileManager from '$lib/components/SessionFileManager.svelte';
   import { listHosts } from '$lib/api/hosts';
-  import { getTabs, openTab, closeTab, tabLabel, LOCAL_HOST_ID, localTerminalHost } from '$lib/stores/sessionTabs.svelte';
+  import { getTabs, openTab, closeSessionTab, tabLabel, LOCAL_HOST_ID, localTerminalHost } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
     setSelectedTabId,
     setShowFiles,
-    setLayout,
-    resetLayout
+    setLayout
   } from '$lib/stores/sessionView.svelte';
 
   const view = getSessionView();
@@ -107,11 +106,7 @@
   }
 
   function close(tabId: string) {
-    closeTab(tabId);
-    if (getTabs().length === 0) resetLayout();
-    if (view.selectedTabId === tabId) {
-      setSelectedTabId(getTabs()[0]?.id || '');
-    }
+    closeSessionTab(tabId);
   }
 </script>
 

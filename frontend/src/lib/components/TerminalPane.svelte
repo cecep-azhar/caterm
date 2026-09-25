@@ -22,6 +22,9 @@
   import { LINUX_COMMANDS, commandDescription, type AutocompleteItem } from '$lib/data/terminalCommands';
   import { t } from '$lib/i18n/index.svelte';
   import TerminalAutocomplete from '$lib/components/TerminalAutocomplete.svelte';
+  import { terminalKeyAction } from '$lib/shortcuts';
+  import { getTerminalPrefs, stepTerminalFontSize, setTerminalFontSize, DEFAULT_FONT_SIZE } from '$lib/stores/terminalPrefs.svelte';
+  import { copyText } from '$lib/utils/clipboard';
 
   let {
     host,
@@ -50,6 +53,7 @@
 
   const paneLabel = $derived(label ?? host.label);
   const theme = getTheme();
+  const terminalPrefs = getTerminalPrefs();
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
   let terminalContainer: HTMLDivElement;
   let rootContainer: HTMLDivElement | undefined = $state();
@@ -215,6 +219,15 @@
     if (term) term.options.theme = palette;
   });
 
+  // Font size is shared by all panes; a change re-fits the grid and tells the PTY.
+  $effect(() => {
+    const size = terminalPrefs.fontSize;
+    if (!term || term.options.fontSize === size) return;
+    term.options.fontSize = size;
+    fitAddon?.fit();
+    if (session) void sshResize(session.sessionId, term.cols, term.rows).catch(() => {});
+  });
+
   $effect(() => {
     if (!isActive || !session) return;
     markActive();
@@ -229,7 +242,7 @@
     const terminal = new Terminal({
       theme: terminalTheme(theme.name),
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      fontSize: 13,
+      fontSize: terminalPrefs.fontSize,
       cursorBlink: true,
       scrollback: 1000
     });
@@ -334,8 +347,30 @@
       }
     })();
 
-    // Intercept keystrokes for autocomplete & instant PTY write
+    // Intercept keystrokes for copy/paste, font size and autocomplete. App-wide shortcuts
+    // (tabs, palette, …) never get here: the layout catches them in the capture phase.
     terminal.attachCustomKeyEventHandler((event: KeyboardEvent) => {
+      const action = terminalKeyAction(event, terminal.hasSelection());
+      if (action) {
+        if (action === 'paste') {
+          // Not preventDefault: the browser's own paste event reaches xterm, which pastes
+          // (bracketed where the shell wants it) without needing clipboard-read permission.
+          return false;
+        }
+        event.preventDefault();
+        if (action === 'copy') {
+          const text = terminal.getSelection();
+          terminal.clearSelection();
+          void copyText(text).then(() => terminal.focus());
+        } else if (action === 'fontUp') {
+          stepTerminalFontSize(1);
+        } else if (action === 'fontDown') {
+          stepTerminalFontSize(-1);
+        } else {
+          setTerminalFontSize(DEFAULT_FONT_SIZE);
+        }
+        return false;
+      }
       if (suggestions.length > 0) {
         if (event.type === 'keydown') {
           if (event.key === 'Tab') {

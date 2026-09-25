@@ -12,7 +12,7 @@ import type { HostRecord } from '$lib/api/hosts';
 import { t } from '$lib/i18n/index.svelte';
 import { recordSessionClosed } from '$lib/stores/feedbackStore.svelte';
 import { markHostUsed } from '$lib/stores/hostPrefs.svelte';
-import { setShowFiles } from '$lib/stores/sessionView.svelte';
+import { setShowFiles, getSessionView, setSelectedTabId, resetLayout } from '$lib/stores/sessionView.svelte';
 
 export interface SessionTab {
   /** Unique per open session. Never the host id — a host may have several tabs. */
@@ -89,6 +89,19 @@ export function openTabOnce(host: HostRecord): string {
 export function closeTab(id: string) {
   tabs = tabs.filter((t) => t.id !== id);
   recordSessionClosed();
+}
+
+/**
+ * Closes a tab and keeps the workspace coherent: the neighbour to its left becomes current if
+ * it was current, and the split resets once nothing is open.
+ */
+export function closeSessionTab(id: string) {
+  const index = tabs.findIndex((t) => t.id === id);
+  if (index < 0) return;
+  closeTab(id);
+  if (tabs.length === 0) resetLayout();
+  const view = getSessionView();
+  if (view.selectedTabId === id) setSelectedTabId(tabs[Math.max(0, index - 1)]?.id ?? '');
 }
 
 /**
