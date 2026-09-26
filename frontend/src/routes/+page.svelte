@@ -358,7 +358,7 @@
 
 <svelte:window onkeydown={handleListKeydown} onpointerdown={handleOutsidePointer} />
 
-<div class="max-w-6xl mx-auto space-y-6">
+<div class="max-w-5xl mx-auto space-y-6">
 	<PageHeader
 		icon={['M4 17l6-5-6-5', 'M12 19h8']}
 		accent="sky"

@@ -25,6 +25,8 @@
   import { getToasts, showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
   import FeedbackModal from '$lib/components/FeedbackModal.svelte';
+  import CrashReportModal from '$lib/components/CrashReportModal.svelte';
+  import { getPendingCrashReport, type ScrubbedCrashReport } from '$lib/api/crash';
   import ProfileMenu from '$lib/components/ProfileMenu.svelte';
   import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
   import { checkForUpdates } from '$lib/stores/updater.svelte';
@@ -73,12 +75,25 @@
   const feedbackPrompt = getFeedbackPromptState();
   const isDarkTheme = $derived(theme.name === 'dark');
 
+  // Reviewed once per launch, after the previous run's panic hook (if any fired) had a chance
+  // to finish writing its dump. Null unless there is something pending — see
+  // caterm-crash-reporting-spec-v1.md §7. Never surfaced again this session once dismissed.
+  let pendingCrashReport = $state<ScrubbedCrashReport | null>(null);
+
   onMount(() => {
     startMonitoring();
     initTheme();
     // One quiet check per launch; failures (offline, no release yet) stay silent. Skipped under
     // `vite dev`, where there is no installed build to update.
     if (!import.meta.env.DEV) void checkForUpdates({ silent: true });
+
+    void getPendingCrashReport()
+      .then((report) => {
+        pendingCrashReport = report;
+      })
+      .catch(() => {
+        // No dump, disabled, or an unreadable data dir — silently nothing to show either way.
+      });
 
     // Phone in landscape (including rotating into it): height is the scarce axis, so switch
     // to the icon-only sidebar. Leaving landscape keeps whatever the user picked.
@@ -825,6 +840,13 @@
         <FeedbackModal
           onClose={() => feedbackPrompt.close()}
           onSubmitted={() => feedbackPrompt.markSubmitted()}
+        />
+      {/if}
+
+      {#if pendingCrashReport}
+        <CrashReportModal
+          report={pendingCrashReport}
+          onClose={() => (pendingCrashReport = null)}
         />
       {/if}
     </main>

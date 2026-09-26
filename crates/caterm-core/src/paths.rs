@@ -84,6 +84,14 @@ pub fn db_path(data_dir: &std::path::Path) -> PathBuf {
     data_dir.join("caterm.db")
 }
 
+/// Where local crash dumps live before they are reviewed and either sent or discarded
+/// (crash-reporting spec §6). Never inside the encrypted vault: a dump must be readable and
+/// scrubbable before the vault is unlocked, since a crash can happen on the lock screen.
+/// # Infallible: pure path join, no I/O, cannot fail.
+pub fn crash_dumps_dir(data_dir: &std::path::Path) -> PathBuf {
+    data_dir.join("crash-dumps")
+}
+
 /// Expands a leading `~` or `~/...` in an SSH key path to the user's home directory.
 /// Paths without a leading `~` are returned unchanged.
 /// # Infallible: falls back to the original string when the home directory can't be

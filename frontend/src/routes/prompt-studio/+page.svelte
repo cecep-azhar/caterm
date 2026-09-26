@@ -9,11 +9,14 @@
     getAiSettings,
     aiGeneratePlan,
     aiExecuteStep,
+    getProAiUsage,
     type AiPlanStep,
     type AiExecutionPlan,
     type AiExecutionResult,
-    type AiSettings
+    type AiSettings,
+    type ProAiUsage
   } from '$lib/api/ai';
+  import { proErrorMessage } from '$lib/pro/errors';
   import { t } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
@@ -38,6 +41,47 @@
   };
 
   let settings = $state<AiSettings>({ ...DEFAULT_SETTINGS });
+
+  // Hosted AI (CATerm Pro pooled quota via OmniRoute) vs. Bring-your-own key. Persisted per
+  // device only — it's a local preference, not something the account carries around.
+  const AI_MODE_KEY = 'caterm_ai_mode';
+  let aiMode = $state<'byo' | 'hosted'>('byo');
+  let hostedUsage = $state<ProAiUsage | null>(null);
+  let isLoadingHostedUsage = $state(false);
+
+  try {
+    const savedMode = localStorage.getItem(AI_MODE_KEY);
+    if (savedMode === 'hosted' || savedMode === 'byo') aiMode = savedMode;
+  } catch {
+    // Private browsing / storage blocked: default to BYO.
+  }
+
+  async function loadHostedUsage() {
+    isLoadingHostedUsage = true;
+    try {
+      hostedUsage = await getProAiUsage();
+    } catch {
+      hostedUsage = null;
+    } finally {
+      isLoadingHostedUsage = false;
+    }
+  }
+
+  function setAiMode(mode: 'byo' | 'hosted') {
+    aiMode = mode;
+    try {
+      localStorage.setItem(AI_MODE_KEY, mode);
+    } catch {
+      // ignore
+    }
+    if (mode === 'hosted' && !hostedUsage) {
+      void loadHostedUsage();
+    }
+  }
+
+  let hostedQuotaExceeded = $derived(
+    hostedUsage !== null && hostedUsage.entitled && hostedUsage.remaining <= 0
+  );
 
   // Prompt & Plan state
   let goal = $state('');
@@ -65,7 +109,9 @@
   );
 
   onMount(async () => {
-    await Promise.all([loadHosts(), loadSettings()]);
+    const tasks = [loadHosts(), loadSettings()];
+    if (aiMode === 'hosted') tasks.push(loadHostedUsage());
+    await Promise.all(tasks);
   });
 
   async function loadHosts() {
@@ -413,11 +459,22 @@
     isGenerating = true;
     try {
       let resultPlan: AiExecutionPlan;
+      const hosted = aiMode === 'hosted';
       try {
-        resultPlan = await aiGeneratePlan(goal, selectedHostId || undefined);
-      } catch {
-        // Backend unreachable entirely — fall back to the in-page template planner. Marked as
-        // `builtin` so the badge on the plan says so instead of implying the model wrote it.
+        resultPlan = await aiGeneratePlan(goal, selectedHostId || undefined, hosted);
+        if (hosted) void loadHostedUsage(); // refresh the quota bar after a counted request
+      } catch (err) {
+        if (hosted) {
+          // Unlike BYO, a hosted failure (quota exhausted, not entitled, gateway down) is
+          // surfaced rather than papered over with a fake template plan — the request was
+          // meant to spend real pooled quota, so silence here would just be confusing.
+          showToast(proErrorMessage(err), 'error');
+          void loadHostedUsage();
+          return;
+        }
+        // BYO backend unreachable entirely — fall back to the in-page template planner.
+        // Marked as `builtin` so the badge on the plan says so instead of implying the model
+        // wrote it.
         resultPlan = { ...generateLocalPlan(goal), source: 'builtin' };
       }
 
@@ -559,7 +616,7 @@
   let approvedCount = $derived(steps.filter((s) => s.enabled).length);
 </script>
 
-<div class="max-w-6xl mx-auto space-y-6 text-neutral-800 dark:text-neutral-200">
+<div class="max-w-5xl mx-auto space-y-6 text-neutral-800 dark:text-neutral-200">
   <PageHeader
     icon={['M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z']}
     accent="violet"
@@ -620,6 +677,69 @@
       ></textarea>
     </div>
 
+    <!-- AI Mode: hosted pooled quota (CATerm Pro) vs. bring-your-own key -->
+    <div class="flex flex-wrap items-center gap-3 p-3 rounded-lg bg-neutral-50 dark:bg-neutral-950/60 border border-neutral-200 dark:border-neutral-800">
+      <div class="inline-flex rounded-lg border border-neutral-200 dark:border-neutral-800 overflow-hidden shrink-0" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aiMode === 'byo'}
+          onclick={() => setAiMode('byo')}
+          class="px-3 py-1.5 text-xs font-semibold transition-colors {aiMode === 'byo'
+            ? 'bg-violet-600 text-white'
+            : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
+        >
+          {t('promptStudio.byoAi')}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={aiMode === 'hosted'}
+          onclick={() => setAiMode('hosted')}
+          class="px-3 py-1.5 text-xs font-semibold transition-colors {aiMode === 'hosted'
+            ? 'bg-violet-600 text-white'
+            : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800'}"
+        >
+          {t('promptStudio.hostedAi')}
+        </button>
+      </div>
+
+      {#if aiMode === 'byo'}
+        <span class="text-xs text-neutral-500 dark:text-neutral-400">{t('promptStudio.byoAiHint')}</span>
+      {:else if isLoadingHostedUsage}
+        <span class="text-xs text-neutral-400 animate-pulse">{t('common.loading')}</span>
+      {:else if hostedUsage && !hostedUsage.enabled}
+        <span class="text-xs text-amber-600 dark:text-amber-500">{t('promptStudio.hostedUnavailable')}</span>
+      {:else if hostedUsage && !hostedUsage.entitled}
+        <span class="text-xs text-amber-600 dark:text-amber-500">{t('promptStudio.hostedNotEntitled')}</span>
+      {:else if hostedUsage}
+        <div class="flex-1 min-w-[180px] flex items-center gap-2">
+          <div class="flex-1 h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-800 overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all {hostedQuotaExceeded ? 'bg-rose-500' : 'bg-violet-500'}"
+              style="width: {Math.min(100, (hostedUsage.used / Math.max(hostedUsage.limit, 1)) * 100)}%"
+            ></div>
+          </div>
+          <span class="text-xs whitespace-nowrap {hostedQuotaExceeded ? 'text-rose-600 dark:text-rose-400 font-semibold' : 'text-neutral-500 dark:text-neutral-400'}">
+            {t(hostedUsage.pooled ? 'promptStudio.hostedQuotaPooled' : 'promptStudio.hostedQuota', {
+              used: hostedUsage.used,
+              limit: hostedUsage.limit
+            })}
+          </span>
+        </div>
+      {:else}
+        <span class="text-xs text-neutral-500 dark:text-neutral-400">{t('promptStudio.hostedAiHint')}</span>
+      {/if}
+    </div>
+
+    {#if aiMode === 'hosted' && hostedQuotaExceeded}
+      <p class="text-xs text-rose-600 dark:text-rose-400">
+        {t('promptStudio.hostedQuotaExceeded', {
+          date: hostedUsage ? new Date(hostedUsage.resetsAt * 1000).toLocaleDateString() : ''
+        })}
+      </p>
+    {/if}
+
     <!-- Quick Prompt Suggestion Chips -->
     <div class="space-y-1.5">
       <span class="text-xs font-medium text-neutral-500 dark:text-neutral-400">{t('promptStudio.quickSuggestions')}</span>
@@ -640,13 +760,17 @@
     <div class="flex items-center justify-between pt-2">
       <div class="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1.5">
         <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-        {t('promptStudio.activeModel')} <span class="font-mono text-neutral-700 dark:text-neutral-300 font-semibold">{settings.model}</span>
+        {#if aiMode === 'hosted'}
+          {t('promptStudio.hostedAi')}
+        {:else}
+          {t('promptStudio.activeModel')} <span class="font-mono text-neutral-700 dark:text-neutral-300 font-semibold">{settings.model}</span>
+        {/if}
       </div>
 
       <button
         type="button"
         onclick={handleGeneratePlan}
-        disabled={isGenerating || !goal.trim()}
+        disabled={isGenerating || !goal.trim() || (aiMode === 'hosted' && hostedQuotaExceeded)}
         class="px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium text-sm flex items-center gap-2 shadow-md shadow-violet-600/20 transition-all cursor-pointer"
       >
         {#if isGenerating}

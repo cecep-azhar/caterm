@@ -533,16 +533,42 @@ pub async fn save_ai_settings(
 pub async fn ai_generate_plan(
     goal: String,
     host_id: Option<String>,
+    hosted: Option<bool>,
 ) -> Result<ai::AiExecutionPlan, CatermError> {
-    run_blocking(move || ai::generate_plan(&goal, host_id.as_deref())).await
+    run_blocking(move || ai::generate_plan(&goal, host_id.as_deref(), hosted.unwrap_or(false))).await
 }
 
 #[tauri::command]
 pub async fn ai_chat(
     messages: Vec<ai::AiChatMessage>,
     host_label: Option<String>,
+    hosted: Option<bool>,
 ) -> Result<ai::AiChatReply, CatermError> {
-    run_blocking(move || ai::chat(messages, host_label.as_deref())).await
+    run_blocking(move || ai::chat(messages, host_label.as_deref(), hosted.unwrap_or(false))).await
+}
+
+// ---- Hosted AI (CATerm Pro pooled quota via OmniRoute) -------------------------------------
+
+#[tauri::command]
+pub async fn pro_ai_usage() -> Result<caterm_core::pro::ProAiUsage, CatermError> {
+    run_blocking(caterm_core::pro::ai_usage).await
+}
+
+// ---- Crash reporting (opt-in, local-first — caterm-crash-reporting-spec-v1.md) -------------
+
+#[tauri::command]
+pub async fn get_pending_crash_report() -> Result<Option<caterm_core::crash::ScrubbedCrashReport>, CatermError> {
+    run_blocking(caterm_core::crash::pending_crash_report).await
+}
+
+#[tauri::command]
+pub async fn submit_crash_report(report_id: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::crash::submit_crash_report(&report_id)).await
+}
+
+#[tauri::command]
+pub async fn dismiss_crash_report(report_id: String, never_again: Option<bool>) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::crash::dismiss_crash_report(&report_id, never_again.unwrap_or(false))).await
 }
 
 fn do_open_url(url: &str) -> Result<(), CatermError> {

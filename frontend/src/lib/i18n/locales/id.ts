@@ -747,6 +747,21 @@ const id: Dictionary = {
     errRating: 'Pilih penilaian antara 1 dan 5 bintang.',
     thanks: 'Terima kasih! Masukan berhasil dikirim.'
   },
+  crash: {
+    closeDialog: 'Tutup dialog laporan crash',
+    title: 'CATerm tertutup secara tidak terduga',
+    subtitle: 'Semua yang di bawah ini sudah dibersihkan dari path, IP, kunci, dan nama pengguna Anda sebelum tampil di layar ini.',
+    whatHappened: 'Apa yang terekam',
+    viewDetails: 'Lihat detail teknis',
+    hideDetails: 'Sembunyikan detail teknis',
+    neverAskAgain: 'Jangan tanya lagi (menonaktifkan laporan crash)',
+    deleteAndClose: 'Hapus laporan',
+    send: 'Kirim laporan',
+    sending: 'Mengirim...',
+    sentThanks: 'Terkirim. Terima kasih sudah membantu kami memperbaikinya.',
+    sendFailed: 'Laporan gagal dikirim.',
+    location: 'Lokasi: {{location}}'
+  },
   aiSettings: {
     provider: 'Penyedia',
     providerCustom: 'Kustom / Kompatibel OpenAI (Self-hosted, vLLM, Ollama)',
@@ -996,6 +1011,15 @@ const id: Dictionary = {
     noHosts: 'Tidak ada host',
     aiSettingsTitle: 'Pengaturan AI (halaman Pengaturan)',
     aiSettings: 'Pengaturan AI',
+    hostedAi: 'AI Hosted (CATerm Pro)',
+    byoAi: 'Pakai kunci sendiri',
+    hostedAiHint: 'Pakai kuota bulanan bersama dari paket Pro kamu — tanpa perlu API key.',
+    byoAiHint: 'Pakai endpoint dan kunci yang diatur di Settings > AI Assistant.',
+    hostedQuota: '{{used}} / {{limit}} permintaan terpakai bulan ini',
+    hostedQuotaPooled: 'Kuota tim bersama: {{used}} / {{limit}} permintaan terpakai bulan ini',
+    hostedQuotaExceeded: 'Kuota AI hosted bulan ini sudah habis. Reset {{date}}, atau pindah ke Pakai kunci sendiri.',
+    hostedNotEntitled: 'AI Hosted butuh paket Pro atau trial yang aktif.',
+    hostedUnavailable: 'AI Hosted belum dikonfigurasi di server.',
     goalLabel: 'Tujuan / Instruksi Ops',
     goalPlaceholder: 'mis. Siapkan laptop Ubuntu saya untuk pengembangan Laravel dan Docker',
     quickSuggestions: 'Saran Cepat:',
@@ -1407,7 +1431,13 @@ const id: Dictionary = {
       ALREADY_MEMBER: 'Orang itu sudah ada di tim Anda.',
       ALREADY_IN_TEAM: 'Anda sudah tergabung di sebuah tim. Keluar dulu untuk bergabung ke tim lain.',
       CANNOT_INVITE_SELF: 'Anda tidak bisa mengundang diri sendiri.',
-      CANNOT_JOIN_OWN_TEAM: 'Anda tidak bisa bergabung ke tim sendiri.'
+      CANNOT_JOIN_OWN_TEAM: 'Anda tidak bisa bergabung ke tim sendiri.',
+      AI_NOT_CONFIGURED: 'AI Hosted belum dikonfigurasi di server.',
+      AI_QUOTA_EXCEEDED: 'Kuota AI hosted bulan ini sudah habis.',
+      AI_UPSTREAM_UNAVAILABLE: 'Tidak bisa menghubungi provider AI hosted. Coba lagi sebentar.',
+      AI_UPSTREAM_ERROR: 'Provider AI hosted mengembalikan error.',
+      AI_UPSTREAM_BUSY: 'Provider AI hosted sedang sibuk. Coba lagi sebentar.',
+      REQUEST_TOO_LARGE: 'Pesan tersebut terlalu panjang untuk AI hosted.'
     },
     team: {
       title: 'Tim',

@@ -45,12 +45,17 @@ export async function saveAiSettings(settings: AiSettings): Promise<void> {
   return invoke<void>('save_ai_settings', { settings, input: settings });
 }
 
-export async function aiGeneratePlan(goal: string, hostId?: string): Promise<AiExecutionPlan> {
+export async function aiGeneratePlan(
+  goal: string,
+  hostId?: string,
+  hosted?: boolean
+): Promise<AiExecutionPlan> {
   return invoke<AiExecutionPlan>('ai_generate_plan', {
     goal,
     hostId,
     prompt: goal,
-    host_id: hostId
+    host_id: hostId,
+    hosted
   });
 }
 
@@ -89,7 +94,24 @@ export interface AiChatReply {
  */
 export async function aiChat(
   messages: AiChatMessage[],
-  hostLabel?: string
+  hostLabel?: string,
+  hosted?: boolean
 ): Promise<AiChatReply> {
-  return invoke<AiChatReply>('ai_chat', { messages, hostLabel });
+  return invoke<AiChatReply>('ai_chat', { messages, hostLabel, hosted });
+}
+
+/** The signed-in CATerm Pro account's hosted-AI pool for the current period (pricing notes §5). */
+export interface ProAiUsage {
+  enabled: boolean;
+  entitled: boolean;
+  pooled: boolean;
+  period: string;
+  used: number;
+  limit: number;
+  remaining: number;
+  resetsAt: number;
+}
+
+export async function getProAiUsage(): Promise<ProAiUsage> {
+  return invoke<ProAiUsage>('pro_ai_usage');
 }

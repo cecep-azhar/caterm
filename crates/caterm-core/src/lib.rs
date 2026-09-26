@@ -24,6 +24,7 @@
 pub mod ai;
 pub mod audit;
 pub mod backup;
+pub mod crash;
 pub mod db;
 pub mod error;
 pub mod ftp;

@@ -81,6 +81,12 @@ pub fn run() {
 }
 
 pub fn run_with_start(start: std::time::Instant) {
+    // As early as possible, before any other thread can panic: opt-in, local-first crash
+    // reporting (caterm-crash-reporting-spec-v1.md). Zero telemetry by default — this only
+    // ever writes a scrubbed dump to disk; nothing is sent until the user reviews and approves
+    // it on the next launch (see commands::get_pending_crash_report).
+    caterm_core::crash::install_panic_hook();
+
     // Unrecoverable: if the Tauri runtime itself fails to start, the process has no
     // useful state to continue in. This is the one sanctioned exception to the
     // zero-panic policy (REQ-04) outside #[cfg(test)] — see ledger-v2.md KA-05.
@@ -221,6 +227,10 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::pro_team_accept,
             commands::pro_team_decline,
             commands::pro_team_leave,
+            commands::pro_ai_usage,
+            commands::get_pending_crash_report,
+            commands::submit_crash_report,
+            commands::dismiss_crash_report,
             commands::submit_feedback,
         ])
         .run(tauri::generate_context!())

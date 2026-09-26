@@ -746,6 +746,21 @@ const en = {
     errRating: 'Please select a rating between 1 and 5 stars.',
     thanks: 'Thank you! Feedback submitted successfully.'
   },
+  crash: {
+    closeDialog: 'Close crash report dialog',
+    title: 'CATerm closed unexpectedly',
+    subtitle: 'Everything below has already been stripped of paths, IPs, keys and your username before it reached this screen.',
+    whatHappened: 'What was captured',
+    viewDetails: 'View technical details',
+    hideDetails: 'Hide technical details',
+    neverAskAgain: "Don't ask again (turns off crash reporting)",
+    deleteAndClose: 'Delete report',
+    send: 'Send report',
+    sending: 'Sending...',
+    sentThanks: 'Sent. Thanks for helping us fix this.',
+    sendFailed: 'Could not send the report.',
+    location: 'Location: {{location}}'
+  },
   aiSettings: {
     provider: 'Provider',
     providerCustom: 'Custom / OpenAI Compatible (Self-hosted, vLLM, Ollama)',
@@ -995,6 +1010,15 @@ const en = {
     noHosts: 'No hosts available',
     aiSettingsTitle: 'AI Settings (Settings page)',
     aiSettings: 'AI Settings',
+    hostedAi: 'Hosted AI (CATerm Pro)',
+    byoAi: 'Bring your own key',
+    hostedAiHint: 'Uses your Pro plan\'s shared monthly pool — no API key needed.',
+    byoAiHint: 'Uses the endpoint and key configured in Settings > AI Assistant.',
+    hostedQuota: '{{used}} / {{limit}} requests used this month',
+    hostedQuotaPooled: 'Shared team pool: {{used}} / {{limit}} requests used this month',
+    hostedQuotaExceeded: 'Monthly hosted AI quota used up. Resets {{date}}, or switch to Bring your own key.',
+    hostedNotEntitled: 'Hosted AI needs an active Pro plan or trial.',
+    hostedUnavailable: 'Hosted AI is not configured on the server yet.',
     goalLabel: 'Ops Goal / Instruction',
     goalPlaceholder: 'e.g. Set up my Ubuntu laptop for Laravel and Docker development',
     quickSuggestions: 'Quick Suggestions:',
@@ -1406,7 +1430,13 @@ const en = {
       ALREADY_MEMBER: 'That person is already in your team.',
       ALREADY_IN_TEAM: 'You\'re already in a team. Leave it first to join another.',
       CANNOT_INVITE_SELF: 'You can\'t invite yourself.',
-      CANNOT_JOIN_OWN_TEAM: 'You can\'t join your own team.'
+      CANNOT_JOIN_OWN_TEAM: 'You can\'t join your own team.',
+      AI_NOT_CONFIGURED: 'Hosted AI is not configured on the server yet.',
+      AI_QUOTA_EXCEEDED: 'Monthly hosted AI quota used up.',
+      AI_UPSTREAM_UNAVAILABLE: 'Could not reach the hosted AI provider. Try again shortly.',
+      AI_UPSTREAM_ERROR: 'The hosted AI provider returned an error.',
+      AI_UPSTREAM_BUSY: 'The hosted AI provider is busy. Try again shortly.',
+      REQUEST_TOO_LARGE: 'That message is too long for hosted AI.'
     },
     team: {
       title: 'Team',

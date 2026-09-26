@@ -755,6 +755,47 @@ pub fn revoke_device(device_id: &str) -> Result<(), CatermError> {
     }
 }
 
+// ---- Hosted AI (OmniRoute, via GCC's pooled proxy) --------------------------------------------
+
+/// The signed-in account's hosted-AI pool for the current period. `entitled` mirrors the
+/// `ai_hosted` feature; `pooled` is true when the quota belongs to a team owner rather than
+/// this account's own license.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+pub struct ProAiUsage {
+    pub enabled: bool,
+    pub entitled: bool,
+    pub pooled: bool,
+    pub period: String,
+    pub used: i64,
+    pub limit: i64,
+    pub remaining: i64,
+    pub resets_at: i64,
+}
+
+pub fn ai_usage() -> Result<ProAiUsage, CatermError> {
+    let conn = open_db()?;
+    let (status, body) = authed(&conn, "GET", "/ai/usage", None)?;
+    if status != 200 {
+        return Err(api_error(status, &body));
+    }
+    serde_json::from_value(body).map_err(|_| pro_err("BAD_RESPONSE"))
+}
+
+/// Sends an OpenAI-compatible chat payload through GCC's `/ai/chat/completions`, which counts
+/// the request against the pooled quota and forwards it to OmniRoute with the server's own
+/// key — this device never sees the upstream URL or key. `payload` should carry `messages` and
+/// may omit `model`; the server assigns the pooled model. Returns the raw OpenAI-shaped
+/// response body (not the extracted text), so callers can reuse existing parsers.
+pub(crate) fn ai_chat_completion(payload: &Value) -> Result<Value, CatermError> {
+    let conn = open_db()?;
+    let (status, body) = authed(&conn, "POST", "/ai/chat/completions", Some(payload))?;
+    if status != 200 {
+        return Err(api_error(status, &body));
+    }
+    Ok(body)
+}
+
 // ---- Team ------------------------------------------------------------------------------------
 
 fn team_call(method: &str, path: &str, body: Option<&Value>) -> Result<ProTeamView, CatermError> {

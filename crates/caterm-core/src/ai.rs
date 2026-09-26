@@ -293,13 +293,7 @@ fn strip_code_fence(content: &str) -> &str {
     }
 }
 
-fn call_llm_if_available(
-    settings: &AiSettings,
-    goal: &str,
-    target_host: Option<&str>,
-    host_label: Option<String>,
-) -> Option<AiExecutionPlan> {
-    let system_prompt = "You are a Linux DevOps and Sysadmin AI assistant. Generate a structured execution plan for the requested goal. Respond ONLY with valid JSON matching this schema:
+const PLAN_SYSTEM_PROMPT: &str = "You are a Linux DevOps and Sysadmin AI assistant. Generate a structured execution plan for the requested goal. Respond ONLY with valid JSON matching this schema:
 {
   \"summary\": \"Brief summary of the plan\",
   \"requirements\": [\"Requirement 1\", \"Requirement 2\"],
@@ -314,21 +308,62 @@ fn call_llm_if_available(
   ]
 }";
 
-    let payload = serde_json::json!({
-        "model": &settings.model,
+/// Builds the one-shot plan-generation payload. `model` is omitted for the hosted backend,
+/// which assigns the pooled model itself.
+fn plan_payload(model: Option<&str>, goal: &str) -> serde_json::Value {
+    let mut payload = serde_json::json!({
         "messages": [
-            { "role": "system", "content": system_prompt },
+            { "role": "system", "content": PLAN_SYSTEM_PROMPT },
             { "role": "user", "content": goal }
         ],
         "temperature": 0.2,
         "stream": false
     });
+    if let Some(model) = model
+        && let Some(obj) = payload.as_object_mut()
+    {
+        obj.insert("model".to_string(), serde_json::Value::String(model.to_string()));
+    }
+    payload
+}
+
+fn call_llm_if_available(
+    settings: &AiSettings,
+    goal: &str,
+    target_host: Option<&str>,
+    host_label: Option<String>,
+) -> Option<AiExecutionPlan> {
+    let payload = plan_payload(Some(&settings.model), goal);
 
     // Falls back to the built-in heuristic planner when the endpoint is unreachable, so this
     // deliberately swallows the error rather than surfacing it.
     let content =
         post_chat_completion(settings, payload, std::time::Duration::from_secs(60)).ok()?;
     parse_ai_plan_content(&content, goal, target_host, host_label)
+}
+
+/// Same plan generation through GCC's pooled hosted-AI proxy (OmniRoute) instead of a
+/// self-configured endpoint. Unlike the BYO path this does not silently fall back to the
+/// template planner on failure: the caller opted into hosted AI and spent quota on it, so a
+/// quota or network error should reach them, not be hidden behind a generic template.
+fn call_llm_hosted(
+    goal: &str,
+    target_host: Option<&str>,
+    host_label: Option<String>,
+) -> Result<AiExecutionPlan, CatermError> {
+    let payload = plan_payload(None, goal);
+    let body = crate::pro::ai_chat_completion(&payload)?;
+    let content = extract_message_content(&body.to_string()).ok_or_else(|| {
+        CatermError::Ai(AiError::Generic(format!(
+            "AI response does not match OpenAI chat/completions format: {}",
+            body.to_string().chars().take(300).collect::<String>()
+        )))
+    })?;
+    parse_ai_plan_content(&content, goal, target_host, host_label).ok_or_else(|| {
+        CatermError::Ai(AiError::Generic(
+            "Model tidak mengembalikan rencana yang bisa dipakai.".to_string(),
+        ))
+    })
 }
 
 /// Reads a `steps: [...]` array into `AiPlanStep`s, skipping entries with no command. Shared by
@@ -824,6 +859,7 @@ fn build_template_plan(
 pub fn generate_plan(
     goal: &str,
     target_host: Option<&str>,
+    hosted: bool,
 ) -> Result<AiExecutionPlan, CatermError> {
     if goal.trim().is_empty() {
         return Err(CatermError::Ai(AiError::Generic(
@@ -832,6 +868,10 @@ pub fn generate_plan(
     }
 
     let host_label = resolve_host_label(target_host);
+
+    if hosted {
+        return call_llm_hosted(goal, target_host, host_label);
+    }
 
     if let Ok(settings) = get_ai_settings()
         && let Some(plan) = call_llm_if_available(&settings, goal, target_host, host_label.clone())
@@ -880,14 +920,13 @@ Reply with ONLY a JSON object, no prose outside it, no markdown fence:
 pub fn chat(
     messages: Vec<AiChatMessage>,
     host_label: Option<&str>,
+    hosted: bool,
 ) -> Result<AiChatReply, CatermError> {
     if messages.is_empty() {
         return Err(CatermError::Validation(ValidationError::Generic(
             "Percakapan kosong".to_string(),
         )));
     }
-
-    let settings = get_ai_settings()?;
 
     let mut system = CHAT_SYSTEM_PROMPT.to_string();
     if let Some(label) = host_label.filter(|l| !l.trim().is_empty()) {
@@ -911,16 +950,32 @@ The commands will run on the host the user calls \"{label}\"."
             .push(serde_json::json!({ "role": role, "content": message.content.clone() }));
     }
 
-    let payload = serde_json::json!({
-        "model": &settings.model,
-        "messages": payload_messages,
-        "temperature": 0.3,
-        // Some OpenAI-compatible gateways (9Router among them) stream by default and answer
-        // with `text/event-stream` unless told otherwise, which no plain JSON parse can read.
-        "stream": false
-    });
+    let content = if hosted {
+        let payload = serde_json::json!({
+            "messages": payload_messages,
+            "temperature": 0.3,
+            "stream": false
+        });
+        let body = crate::pro::ai_chat_completion(&payload)?;
+        extract_message_content(&body.to_string()).ok_or_else(|| {
+            CatermError::Ai(AiError::Generic(format!(
+                "AI response does not match OpenAI chat/completions format: {}",
+                body.to_string().chars().take(300).collect::<String>()
+            )))
+        })?
+    } else {
+        let settings = get_ai_settings()?;
+        let payload = serde_json::json!({
+            "model": &settings.model,
+            "messages": payload_messages,
+            "temperature": 0.3,
+            // Some OpenAI-compatible gateways (9Router among them) stream by default and answer
+            // with `text/event-stream` unless told otherwise, which no plain JSON parse can read.
+            "stream": false
+        });
+        post_chat_completion(&settings, payload, std::time::Duration::from_secs(120))?
+    };
 
-    let content = post_chat_completion(&settings, payload, std::time::Duration::from_secs(120))?;
     Ok(parse_chat_reply(&content))
 }
 
@@ -1151,6 +1206,16 @@ mod tests {
     }
 
     #[test]
+    fn plan_payload_omits_model_for_hosted_and_sets_it_for_byo() {
+        let hosted = plan_payload(None, "install docker");
+        assert!(hosted.get("model").is_none());
+        assert_eq!(hosted["messages"][1]["content"], "install docker");
+
+        let byo = plan_payload(Some("gpt-4o"), "install docker");
+        assert_eq!(byo["model"], "gpt-4o");
+    }
+
+    #[test]
     fn settings_default_and_roundtrip() {
         let db = TempDb::new("settings_roundtrip");
         let initial = get_ai_settings_in(&db.0).expect("failed to get default settings");
@@ -1175,7 +1240,7 @@ mod tests {
 
     #[test]
     fn generate_laravel_plan_has_seven_sequential_steps() {
-        let plan = generate_plan("Setup Laravel 11 on Ubuntu with PHP and Composer", None)
+        let plan = generate_plan("Setup Laravel 11 on Ubuntu with PHP and Composer", None, false)
             .expect("generate_plan failed");
 
         assert_eq!(
@@ -1203,7 +1268,7 @@ mod tests {
     #[test]
     fn generate_docker_plan_has_docker_steps() {
         let plan =
-            generate_plan("Install Docker and docker compose", None).expect("generate_plan failed");
+            generate_plan("Install Docker and docker compose", None, false).expect("generate_plan failed");
 
         assert!(plan.steps.len() >= 5);
         assert!(plan.steps.iter().any(|s| s.command.contains("docker-ce")));
@@ -1212,7 +1277,7 @@ mod tests {
 
     #[test]
     fn generate_node_plan_has_node_and_pm2() {
-        let plan = generate_plan("Deploy Node fullstack app with Express", None)
+        let plan = generate_plan("Deploy Node fullstack app with Express", None, false)
             .expect("generate_plan failed");
 
         assert!(plan.steps.iter().any(|s| s.command.contains("setup_20.x")));
@@ -1223,7 +1288,7 @@ mod tests {
     #[test]
     fn generate_python_plan_has_python_and_venv() {
         let plan =
-            generate_plan("Setup Python Django backend", None).expect("generate_plan failed");
+            generate_plan("Setup Python Django backend", None, false).expect("generate_plan failed");
 
         assert!(plan.steps.iter().any(|s| s.command.contains("python3")));
         assert!(plan.requirements.iter().any(|r| r.contains("Python 3")));
@@ -1231,7 +1296,7 @@ mod tests {
 
     #[test]
     fn generate_ufw_plan_has_dangerous_step() {
-        let plan = generate_plan("Linux hardening and configure UFW firewall", None)
+        let plan = generate_plan("Linux hardening and configure UFW firewall", None, false)
             .expect("generate_plan failed");
 
         let enable_step = plan
@@ -1247,7 +1312,7 @@ mod tests {
 
     #[test]
     fn generate_plan_rejects_empty_goal() {
-        let err = generate_plan("   ", None);
+        let err = generate_plan("   ", None, false);
         assert!(err.is_err());
     }
 
