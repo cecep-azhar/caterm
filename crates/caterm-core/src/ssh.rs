@@ -297,7 +297,22 @@ fn verify_host_key(sess: &ssh2::Session, host: &HostRecord, port: u16) -> Result
         .map_err(|e| invalid(format!("Failed to initialize known_hosts: {e}")))?;
 
     if kh_file.exists() {
-        let _ = known_hosts.read_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH);
+        // A missing file is the normal first-connection-ever case and is handled below via
+        // `CheckResult::NotFound`. An *existing* file that fails to read (corrupted, permission
+        // denied, unexpectedly a directory) is different: silently treating that the same as "no
+        // known hosts recorded" would make every previously-pinned host look brand new, TOFU-add
+        // whatever key the server happens to present, and paper over both storage corruption and
+        // a real MITM that happens to coincide with it. Fail closed instead.
+        known_hosts
+            .read_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH)
+            .map_err(|e| {
+                invalid(format!(
+                    "Could not read the known_hosts file at {}: {e}. Host-key verification \
+                     cannot proceed safely until this is fixed — check the file's permissions \
+                     and that it isn't corrupted.",
+                    kh_file.display()
+                ))
+            })?;
     }
 
     let Some((key, key_type)) = sess.host_key() else {
@@ -318,7 +333,25 @@ fn verify_host_key(sess: &ssh2::Session, host: &HostRecord, port: u16) -> Result
                     key_type.into(),
                 )
                 .map_err(|e| invalid(format!("Failed to record TOFU host key: {e}")))?;
-            let _ = known_hosts.write_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH);
+            // If this write fails, the trust decision we just made lives only in this
+            // in-process `known_hosts` handle: it vanishes the moment the session ends, and
+            // every future connection silently re-runs TOFU from scratch with no memory of this
+            // one — the exact "always trust whatever key shows up" behavior TOFU exists to avoid
+            // after the first connection. Previously this was `let _ = ...`, discarded. Failing
+            // the connection here is louder than real OpenSSH (which warns and continues), but
+            // matches how the rest of this function already treats verification failures, and a
+            // write failure here means the security property this function exists to provide
+            // (remembering hosts across connections) silently isn't holding.
+            known_hosts
+                .write_file(&kh_file, ssh2::KnownHostFileKind::OpenSSH)
+                .map_err(|e| {
+                    invalid(format!(
+                        "Verified this host's key but could not save it to {}: {e}. Future \
+                         connections would silently trust whatever key is presented instead of \
+                         checking against this one — check the file's permissions.",
+                        kh_file.display()
+                    ))
+                })?;
             Ok(())
         }
         ssh2::CheckResult::Mismatch => Err(invalid(format!(
@@ -1476,6 +1509,57 @@ mod tests {
             err.kind(),
             std::io::ErrorKind::InvalidInput,
             "hostname should resolve, not fail to parse: {err}"
+        );
+    }
+
+    fn dummy_host(address: &str, port: u16) -> HostRecord {
+        HostRecord {
+            id: "host-under-test".into(),
+            label: "Test".into(),
+            address: address.into(),
+            port,
+            username: "root".into(),
+            auth_method: AuthMethod::Password,
+            tags: vec![],
+            os: None,
+            protocol: crate::store::ConnectionProtocol::default(),
+            created_at: 0,
+            updated_at: 0,
+            has_secret: false,
+        }
+    }
+
+    #[test]
+    fn verify_host_key_fails_closed_when_known_hosts_is_unreadable() {
+        // C-21: a `known_hosts` file that exists but can't be parsed (disk corruption, a stray
+        // binary write, half a file left by a crash) used to be silently swallowed
+        // (`let _ = known_hosts.read_file(...)`) and treated exactly like "no known_hosts
+        // recorded yet". That doesn't just risk re-TOFUing a host that was already pinned; it
+        // masks the read failure itself, which is often a sign of a real problem the user needs
+        // to know about. Verifying still needs `sess.host_key()` to return something, which
+        // needs a completed handshake — but the read happens *before* that check, so a session
+        // that never handshook is enough to reach and exercise this branch without a live server.
+        let data = crate::test_support::isolated_data_dir("verify_host_key_unreadable");
+        let kh_path = data.path.join("known_hosts");
+        // Not valid OpenSSH known_hosts syntax in any encoding: libssh2 opens this fine and then
+        // fails to parse it, which is exactly the "exists but corrupted" case this guards.
+        std::fs::write(
+            &kh_path,
+            [
+                0xff, 0xfe, 0x00, 0x01, b'g', b'a', b'r', b'b', b'a', b'g', b'e',
+            ],
+        )
+        .expect("write corrupted known_hosts");
+
+        let sess = ssh2::Session::new().expect("create ssh2 session");
+        let host = dummy_host("198.51.100.10", 22);
+        let err =
+            verify_host_key(&sess, &host, 22).expect_err("unreadable known_hosts must not pass");
+        let msg = err.to_string();
+
+        assert!(
+            msg.contains("known_hosts"),
+            "error should name the known_hosts file as the problem: {msg}"
         );
     }
 
