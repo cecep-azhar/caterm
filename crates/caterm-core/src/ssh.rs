@@ -307,23 +307,19 @@ fn authenticate(
             })
         }
         AuthMethod::KeyId { id } => {
+            // C-10: this used to write the decrypted private key to a temp file (0644, the
+            // std::fs::write default) so libssh2 could read it, then best-effort-shred and
+            // delete it. Any other local user could read the key while it existed, and a crash
+            // mid-auth left it on disk. userauth_pubkey_memory() hands libssh2 the PEM directly
+            // — the key never touches disk at all.
             let priv_pem = crate::keys::get_private_key(id)?;
-            let temp_path = std::env::temp_dir().join(uuid::Uuid::new_v4().to_string());
-            std::fs::write(&temp_path, priv_pem.as_bytes()).map_err(|e| {
-                invalid(format!(
-                    "Failed to prepare temporary key for authentication: {e}"
-                ))
-            })?;
-            let auth_res = sess.userauth_pubkey_file(&host.username, None, &temp_path, None);
-            // Best-effort shred: the key must not outlive the auth attempt on disk.
-            let _ = std::fs::write(&temp_path, vec![0u8; priv_pem.len()]);
-            std::fs::remove_file(&temp_path).ok();
-            auth_res.map_err(|e| {
-                invalid(format!(
-                    "Vault Key ID authentication failed for {}: {e}",
-                    host.username
-                ))
-            })
+            sess.userauth_pubkey_memory(&host.username, None, &priv_pem, None)
+                .map_err(|e| {
+                    invalid(format!(
+                        "Vault Key ID authentication failed for {}: {e}",
+                        host.username
+                    ))
+                })
         }
     }
 }
@@ -1224,6 +1220,65 @@ mod tests {
         for tail in ["$ ", "user@host:~$ ", "Permission denied", ""] {
             assert!(!looks_like_password_prompt(tail), "should not match: {tail:?}");
         }
+    }
+
+    #[test]
+    fn key_id_auth_never_writes_the_private_key_to_disk() {
+        // Guard for C-10. authenticate() with AuthMethod::KeyId used to write the decrypted
+        // private key to std::env::temp_dir() (mode 0644, the std::fs::write default), then
+        // best-effort-shred and delete it once auth finished -- readable by any other local
+        // user for as long as it existed, and left behind entirely if the process crashed in
+        // between. userauth_pubkey_memory() (the fix) hands libssh2 the PEM directly and never
+        // touches disk, so there is no window and nothing to clean up either way.
+        //
+        // Note on what this test can and can't prove: because the old code's own cleanup ran
+        // on every non-crash path, a before/after directory snapshot can't distinguish old vs.
+        // fixed code here -- both leave temp_dir unchanged when nothing crashes. What this test
+        // does verify, and keep verifying: no file is left behind, including if a future change
+        // reintroduces a file-based approach with a cleanup bug (an early return before the
+        // remove_file call, for instance).
+        let _data = crate::test_support::isolated_data_dir("key_id_auth_no_tmp_file");
+        crate::vault::unlock_vault("12345678").expect("unlock vault");
+
+        let key = crate::keys::generate_key(crate::keys::KeyInput {
+            name: "test-key".into(),
+            algorithm: "Ed25519".into(),
+        })
+        .expect("generate_key");
+
+        let before: std::collections::HashSet<_> = std::fs::read_dir(std::env::temp_dir())
+            .expect("read temp_dir")
+            .filter_map(|e| e.ok().map(|e| e.file_name()))
+            .collect();
+
+        let host = HostRecord {
+            id: "host-under-test".into(),
+            label: "Test".into(),
+            address: "127.0.0.1".into(),
+            port: 22,
+            username: "root".into(),
+            auth_method: AuthMethod::KeyId { id: key.id.clone() },
+            tags: vec![],
+            os: None,
+            protocol: crate::store::ConnectionProtocol::default(),
+            created_at: 0,
+            updated_at: 0,
+            has_secret: false,
+        };
+        // No real transport, so this is expected to fail -- what matters is that it never
+        // touches disk on the way there.
+        let sess = ssh2::Session::new().expect("create ssh2 session");
+        let _ = authenticate(&sess, &host, None);
+
+        let after: std::collections::HashSet<_> = std::fs::read_dir(std::env::temp_dir())
+            .expect("read temp_dir")
+            .filter_map(|e| e.ok().map(|e| e.file_name()))
+            .collect();
+        let new_files: Vec<_> = after.difference(&before).collect();
+        assert!(
+            new_files.is_empty(),
+            "authenticate() left new file(s) in temp_dir: {new_files:?}"
+        );
     }
 
     #[test]
