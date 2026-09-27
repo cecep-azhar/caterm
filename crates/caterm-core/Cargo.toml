@@ -46,8 +46,8 @@ ed25519-dalek = "2"
 machine-uid = "0.5"
 
 [target.'cfg(windows)'.dependencies]
-rusqlite = { version = "0.32", features = ["bundled-sqlcipher"] }
-ssh2 = "0.9.6"
+rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
+ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 
 [target.'cfg(not(windows))'.dependencies]
 rusqlite = { version = "0.32", features = ["bundled-sqlcipher-vendored-openssl"] }
