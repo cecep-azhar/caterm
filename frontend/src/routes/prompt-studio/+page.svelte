@@ -543,19 +543,6 @@
       });
     } catch (err: any) {
       const errMsg = err?.message || String(err);
-      // Fallback simulation if backend command is not registered yet
-      if (errMsg.includes('not found') || errMsg.includes('plugin') || !(window as any).__TAURI__) {
-        await new Promise((r) => setTimeout(r, 1200));
-        const duration = Date.now() - startTime;
-        return {
-          step_number: step.step_number,
-          success: true,
-          stdout: `[caterm@host]$ ${step.command}\nExecuting: ${step.title}...\nHit:1 http://archive.ubuntu.com/ubuntu noble InRelease\nGet:2 http://security.ubuntu.com/ubuntu noble-security InRelease\nFetched 312 kB in 1s (312 kB/s)\n[OK] Step ${step.step_number} completed successfully.\nDone.`,
-          stderr: '',
-          exit_code: 0,
-          duration_ms: duration
-        };
-      }
       return {
         step_number: step.step_number,
         success: false,
