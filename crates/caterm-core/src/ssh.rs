@@ -150,6 +150,12 @@ fn looks_like_password_prompt(tail: &str) -> bool {
 pub(crate) static SESSIONS: Lazy<Arc<Mutex<HashMap<String, SessionHandle>>>> =
     Lazy::new(|| Arc::new(Mutex::new(HashMap::new())));
 
+/// Disambiguates local-terminal session ids that would otherwise collide: the id is seeded from
+/// a millisecond timestamp, which two `connect("local")` calls in the same millisecond (two tabs
+/// restored from a saved layout at startup, or two tests running in parallel) can share. Mixing
+/// two shells under one session id means one pane's keystrokes and output leak into the other's.
+static LOCAL_SESSION_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 /// Pooled blocking sessions for non-interactive work, one per host id.
 static EXEC_SESSIONS: Lazy<Mutex<HashMap<String, Arc<Mutex<ssh2::Session>>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -502,8 +508,9 @@ fn flush_pty_output(session_id: &str, pending: &mut String, tail: &Arc<Mutex<Str
 /// because the shell has no real notion of the pane's width. A real PTY fixes all of that at
 /// once, the same way the remote-SSH path already gets it from `ssh2`'s `request_pty`.
 fn connect_local() -> Result<SshSession, CatermError> {
+    let seq = LOCAL_SESSION_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let session_id = format!(
-        "local-{}",
+        "local-{}-{seq}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
@@ -588,20 +595,29 @@ fn connect_local() -> Result<SshSession, CatermError> {
     thread::spawn(move || {
         let mut buf = [0u8; 4096];
         let push = has_event_sink();
+        // Carries a UTF-8 sequence truncated at the 4 KiB read boundary over to the next read,
+        // instead of decoding each chunk in isolation — otherwise a multi-byte character (an
+        // emoji in `git log`, a non-ASCII filename in `ls`) split across two reads would surface
+        // as a pair of replacement characters. Mirrors the remote-SSH reader path below.
+        let mut carry = Vec::<u8>::new();
         loop {
             match pty_reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
-                    let chunk = buf.get(..n).map(|b| b.to_vec()).unwrap_or_default();
-                    if push {
-                        let text = String::from_utf8_lossy(&chunk).to_string();
-                        record_output_tail(&tail_read, &text);
-                        emit(SshEvent::Output {
-                            session_id: reader_session_id.clone(),
-                            data: text,
-                        });
-                    } else if let Ok(mut ob) = buffer_read.lock() {
-                        ob.extend_from_slice(&chunk);
+                    if let Some(chunk) = buf.get(..n) {
+                        if push {
+                            carry.extend_from_slice(chunk);
+                            let text = drain_utf8(&mut carry);
+                            if !text.is_empty() {
+                                record_output_tail(&tail_read, &text);
+                                emit(SshEvent::Output {
+                                    session_id: reader_session_id.clone(),
+                                    data: text,
+                                });
+                            }
+                        } else if let Ok(mut ob) = buffer_read.lock() {
+                            ob.extend_from_slice(chunk);
+                        }
                     }
                 }
                 // The shell exiting can surface as a read error rather than a clean Ok(0)
@@ -1532,6 +1548,44 @@ PRETTY_NAME="Ubuntu 24.04 LTS"
         assert!(
             !out.contains("cannot set terminal process group") && !out.contains("no job control"),
             "a real PTY should give the shell job control, not the old pipe-based errors: {out:?}"
+        );
+
+        disconnect(&session.session_id).expect("failed to disconnect local terminal");
+    }
+
+    #[test]
+    #[cfg(not(windows))]
+    fn local_terminal_does_not_mangle_utf8_split_across_a_read_boundary() {
+        // Regression test for the other half of C-25: the local-PTY reader thread used to decode
+        // each 4 KiB `read()` chunk independently with `String::from_utf8_lossy`, so a multi-byte
+        // character landing right on that boundary came out as one or two U+FFFD replacement
+        // characters instead of itself. A short command (well under the terminal's own
+        // line-length limit) that emits a 3-byte UTF-8 character thousands of times in a tight
+        // loop produces a bulk write the kernel hands back to us in ~4 KiB reads; since 3 does
+        // not divide 4096, most of those reads land mid-character, reliably exercising the split.
+        let session = connect("local").expect("failed to connect local terminal");
+
+        let cmd =
+            "for i in $(seq 1 4000); do printf '\\xE2\\x9C\\x93'; done; printf DONE_MARKER\r\n";
+        let _ = write(&session.session_id, cmd);
+        std::thread::sleep(Duration::from_millis(800));
+        let out = read(&session.session_id).expect("read local terminal output");
+
+        assert!(
+            !out.contains('\u{FFFD}'),
+            "a multi-byte char split across a PTY read boundary should be reassembled, not \
+             replaced with U+FFFD: {} bytes, contains FFFD",
+            out.len()
+        );
+        assert!(
+            out.contains("DONE_MARKER"),
+            "loop should have finished and printed the marker: {} bytes captured",
+            out.len()
+        );
+        assert!(
+            out.matches('\u{2713}').count() > 1000,
+            "most of the 4000 checkmarks should survive intact in the output, got {}",
+            out.matches('\u{2713}').count()
         );
 
         disconnect(&session.session_id).expect("failed to disconnect local terminal");
