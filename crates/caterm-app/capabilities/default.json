@@ -109,6 +109,10 @@
     "allow-pro-team-decline",
     "allow-pro-team-leave",
     "allow-submit-feedback",
+    "allow-pro-ai-usage",
+    "allow-get-pending-crash-report",
+    "allow-submit-crash-report",
+    "allow-dismiss-crash-report",
     "process:allow-restart"
   ]
 }

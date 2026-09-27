@@ -128,6 +128,11 @@ const COMMANDS: &[&str] = &[
     "pro_team_leave",
     // Feedback
     "submit_feedback",
+    // Pro AI usage + crash reporting
+    "pro_ai_usage",
+    "get_pending_crash_report",
+    "submit_crash_report",
+    "dismiss_crash_report",
 ];
 
 fn main() {
