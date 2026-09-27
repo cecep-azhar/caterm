@@ -101,8 +101,15 @@
     cursorY = Math.round(screenRect.top - rootRect.top + (buffer.cursorY + 1) * cellHeight);
   }
 
+  // Autocomplete only makes sense against the normal shell line buffer. An alternate-screen
+  // program (vim, less, top, htop, ...) owns the screen and its own line editing, so Tab/↑/↓/Esc
+  // must reach it untouched and we must not keep suggesting against stale command-line text.
+  function isAlternateScreen(): boolean {
+    return term?.buffer.active.type === 'alternate';
+  }
+
   function updateSuggestions(input: string) {
-    if (!autocompleteEnabled || !input.trim()) {
+    if (!autocompleteEnabled || !input.trim() || isAlternateScreen()) {
       suggestions = [];
       selectedSuggestionIndex = 0;
       return;
@@ -369,7 +376,7 @@
         }
         return false;
       }
-      if (suggestions.length > 0) {
+      if (suggestions.length > 0 && !isAlternateScreen()) {
         if (event.type === 'keydown') {
           if (event.key === 'Tab') {
             event.preventDefault();
@@ -402,6 +409,13 @@
       // Send keystroke to the real Rust SSH PTY backend
       if (session) {
         void sshWrite(session.sessionId, data).catch((err) => reportFailure(t('terminal.sendFailed'), err));
+      }
+
+      if (isAlternateScreen()) {
+        // Don't track command-line state or keep suggestions alive while a full-screen program
+        // (vim, less, top, ...) owns the terminal — see attachCustomKeyEventHandler above.
+        if (suggestions.length > 0) suggestions = [];
+        return;
       }
 
       // Track active line buffer for smart autocomplete
