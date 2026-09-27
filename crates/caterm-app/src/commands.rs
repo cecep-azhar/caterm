@@ -456,8 +456,13 @@ pub async fn ssh_connect(host_id: String) -> Result<ssh::SshSession, CatermError
 }
 
 #[tauri::command]
-pub fn ssh_write(session_id: String, data: String) -> Result<String, CatermError> {
-    ssh::write(&session_id, &data)
+pub async fn ssh_write(session_id: String, data: String) -> Result<String, CatermError> {
+    // Regression for C-08: this used to be a synchronous command, which Tauri v2 runs on the
+    // main thread. ssh::write() calls audit::log_event() on Enter, which opens a database
+    // connection — before the C-08 raw-key fix that alone cost ~156ms, stalling the whole UI
+    // on every keystroke that submitted a line. Routing it through spawn_blocking (like every
+    // other SSH/DB command here) keeps it off the main thread regardless.
+    run_blocking(move || ssh::write(&session_id, &data)).await
 }
 
 #[tauri::command]
