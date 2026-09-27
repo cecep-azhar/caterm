@@ -125,6 +125,25 @@ fn known_hosts_name(address: &str, port: u16) -> String {
     }
 }
 
+/// Resolves `addr` (host:port, with the host DNS-resolvable or a bracketed IPv6 literal) and
+/// tries each returned address in turn, returning the first successful TCP connection. Unlike
+/// `SocketAddr::parse`, this accepts hostnames (`vps.example.com:22`, `localhost:22`) as well as
+/// IP literals, and — when a name resolves to several addresses — falls back to the next one
+/// instead of failing on the first that refuses the connection.
+fn connect_resolved(addr: &str, timeout: Duration) -> std::io::Result<std::net::TcpStream> {
+    use std::net::ToSocketAddrs;
+    let mut last_err: Option<std::io::Error> = None;
+    for candidate in addr.to_socket_addrs()? {
+        match std::net::TcpStream::connect_timeout(&candidate, timeout) {
+            Ok(stream) => return Ok(stream),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "address resolved to no candidates")
+    }))
+}
+
 /// TCP connect + handshake + TOFU host key verification + user authentication for a saved
 /// host. Returns a **blocking** authenticated session; interactive callers switch it to
 /// non-blocking themselves once their channel is up.
@@ -141,12 +160,14 @@ pub(crate) fn open_authenticated_session(
 
     let port = if host.port == 0 { 22 } else { host.port };
     let addr = format!("{}:{port}", host.address);
+    // Bracket a bare IPv6 literal (e.g. "::1") so it parses as one host, not host:port:port.
+    let lookup_addr = if host.address.contains(':') && !host.address.starts_with('[') {
+        format!("[{}]:{port}", host.address)
+    } else {
+        addr.clone()
+    };
 
-    let socket_addr = addr
-        .parse()
-        .map_err(|e| invalid(format!("Invalid address {addr}: {e}")))?;
-
-    let tcp = std::net::TcpStream::connect_timeout(&socket_addr, Duration::from_secs(10))
+    let tcp = connect_resolved(&lookup_addr, Duration::from_secs(10))
         .map_err(|e| invalid(format!("Connection failed to {addr}: {e}")))?;
 
     tcp.set_nonblocking(false)
@@ -1147,6 +1168,30 @@ mod tests {
     fn with_exec_session_rejects_empty_host_id() {
         let result = with_exec_session("", |_| Ok(()));
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn connect_resolved_accepts_hostnames_not_just_ip_literals() {
+        // Regression for the C-02 bug: `"localhost:0".parse::<SocketAddr>()` fails outright
+        // (it is not an IP literal), while `to_socket_addrs()` resolves it via the system
+        // resolver. Port 0 is deliberate: nothing listens there, so this proves resolution
+        // succeeded and only the connection itself was refused, not that parsing failed.
+        let err = connect_resolved("localhost:0", Duration::from_millis(200))
+            .expect_err("nothing listens on port 0");
+        assert_ne!(
+            err.kind(),
+            std::io::ErrorKind::InvalidInput,
+            "hostname should resolve, not fail to parse: {err}"
+        );
+    }
+
+    #[test]
+    fn connect_resolved_accepts_bracketed_ipv6_literal() {
+        // "::1:0" (unbracketed) is ambiguous; the caller in open_authenticated_session brackets
+        // bare IPv6 addresses before calling this, so verify the bracketed form resolves.
+        let err = connect_resolved("[::1]:0", Duration::from_millis(200))
+            .expect_err("nothing listens on port 0");
+        assert_ne!(err.kind(), std::io::ErrorKind::InvalidInput);
     }
 
     #[test]
