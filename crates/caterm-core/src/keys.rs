@@ -303,6 +303,19 @@ pub fn get_private_key(id: &str) -> Result<String, CatermError> {
     Ok(decrypted)
 }
 
+/// Builds the idempotent "append this key if it isn't already there" remote command.
+/// `pub_key_line` includes the key's free-form comment field, which an OpenSSH public key's own
+/// format never disallows a `'` in — this is the one place that text reaches a shell command
+/// string, so it goes through `shell_quote` (the POSIX single-quote escaping already used for
+/// SFTP's compress/extract commands) rather than being interpolated raw.
+fn build_deploy_key_cmd(pub_key_line: &str) -> String {
+    let q_key = crate::sftp::shell_quote(pub_key_line);
+    format!(
+        "mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && \
+         grep -qF {q_key} ~/.ssh/authorized_keys || echo {q_key} >> ~/.ssh/authorized_keys"
+    )
+}
+
 /// Deploy a public key from the local vault to a remote host's `~/.ssh/authorized_keys`.
 pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError> {
     require_non_empty("host_id", host_id)?;
@@ -327,11 +340,7 @@ pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError>
         )))
     })?;
 
-    let pub_key_line = target_key.public_key.trim();
-    let cmd = format!(
-        "mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys && \
-         grep -qF '{pub_key_line}' ~/.ssh/authorized_keys || echo '{pub_key_line}' >> ~/.ssh/authorized_keys"
-    );
+    let cmd = build_deploy_key_cmd(target_key.public_key.trim());
 
     channel.exec(&cmd).map_err(|e| {
         CatermError::Validation(ValidationError::Generic(format!(
@@ -339,7 +348,25 @@ pub fn deploy_public_key(host_id: &str, key_id: &str) -> Result<(), CatermError>
         )))
     })?;
 
+    // Previously unchecked: `wait_close().ok()` discarded any failure, and the function returned
+    // `Ok(())` (and logged "Deployed key...") even if the remote commands above failed outright —
+    // no write permission on ~/.ssh, a full disk, a read-only home directory. Capture stderr and
+    // the exit status so a failed deploy is reported as one instead of silently claimed to have
+    // succeeded.
+    let mut stderr = String::new();
+    {
+        use std::io::Read;
+        let _ = channel.stderr().read_to_string(&mut stderr);
+    }
     channel.wait_close().ok();
+    let exit = channel.exit_status().unwrap_or(1);
+    if exit != 0 {
+        return Err(CatermError::Validation(ValidationError::Generic(format!(
+            "Deploying key to {} failed (exit {exit}): {}",
+            host.label,
+            stderr.trim()
+        ))));
+    }
 
     let _ = crate::audit::log_event(
         "KEY_DEPLOY",
@@ -374,5 +401,50 @@ mod tests {
         assert!(priv_key.contains("BEGIN OPENSSH PRIVATE KEY"));
 
         delete_key(&key.id).expect("Delete key failed");
+    }
+
+    #[test]
+    fn build_deploy_key_cmd_does_not_let_a_malicious_comment_inject_commands() {
+        // C-19: a public key's comment field is free-form text an OpenSSH key's own format
+        // never disallows a `'` in. Deploy used to interpolate it into a single-quoted remote
+        // shell string unescaped, so a comment like `x'; touch pwned; echo 'x` would close the
+        // quote early and run `touch pwned` on the remote host. This runs the actual built
+        // command through a real shell (locally — no SSH needed, since the vulnerability is in
+        // the string, not the transport) and proves the "payload" never executes.
+        let tmp = std::env::temp_dir().join(format!("caterm_c19_test_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).expect("create scratch dir");
+        let marker = tmp.join("pwned");
+
+        let malicious_comment = format!(
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIA comment'; touch {} ; echo '",
+            marker.display()
+        );
+        let cmd = build_deploy_key_cmd(&malicious_comment);
+
+        // The command targets `~/.ssh/authorized_keys` — override HOME rather than `cd`, so
+        // `~` expands into the scratch dir instead of the real one.
+        let status = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .env("HOME", &tmp)
+            .status()
+            .expect("run built command through a real shell");
+
+        assert!(
+            !marker.exists(),
+            "the injected `touch` must never run: {cmd}"
+        );
+        // The grep-or-append idiom itself should still work end to end: exit 0 (append
+        // succeeded, since the file was just created empty) and the line landed in the file
+        // exactly once, comment and all.
+        assert!(
+            status.success(),
+            "the deploy command itself should still succeed: {cmd}"
+        );
+        let authorized_keys =
+            std::fs::read_to_string(tmp.join(".ssh/authorized_keys")).expect("read result");
+        assert_eq!(authorized_keys.trim(), malicious_comment.trim());
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 }

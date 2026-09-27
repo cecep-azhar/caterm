@@ -305,6 +305,26 @@ pub fn copy_remote_file(host_id: &str, src_path: &str, dst_path: &str) -> Result
     write_remote_file(host_id, dst_path, &data)
 }
 
+/// Builds the remote `cd ... && tar -czf ...` command for [`compress_remote`]. Pulled out as a
+/// pure function so the `--` fix (see comment below) has a regression test that doesn't need a
+/// live SSH session.
+fn build_compress_cmd(parent_dir: &str, items: &[String], archive_name: &str) -> String {
+    // ponytail: zip support, use archive_name suffix to pick tool; add when needed
+    let items_shell: Vec<String> = items.iter().map(|s| shell_quote(s)).collect();
+    let items_str = items_shell.join(" ");
+    let q_dir = shell_quote(parent_dir);
+    let q_archive = shell_quote(archive_name);
+    // `--` marks the end of tar's own option parsing: without it, an item whose name starts
+    // with `-` (a file literally named `--checkpoint=1000` or `--checkpoint-action=exec=sh
+    // evil.sh`, which a remote directory listing can legitimately contain) is parsed by tar as
+    // an *option*, not a filename — shell-quoting each item (via `shell_quote` above) only
+    // controls how the shell tokenizes the command line, not how tar itself interprets an
+    // argument that happens to start with a dash once it receives it. This is the standard
+    // GNU-tar-and-friends mitigation for that class of argument injection.
+    // Works on all POSIX targets; Windows SSH servers typically ship tar.exe (Win10+).
+    format!("cd {q_dir} && tar -czf {q_archive} -- {items_str}")
+}
+
 /// Compress remote items via `tar -czf` (unix) or `tar.exe -czf` (windows).
 /// `archive_name` must be a simple filename (e.g. `archive.tar.gz`); it is
 /// created in `parent_dir`. Items are relative names inside `parent_dir`.
@@ -317,15 +337,7 @@ pub fn compress_remote(
     if items.is_empty() {
         return Err(sftp_err("No items specified for compression".into()));
     }
-    let dir = parent_dir.to_string();
-    let archive = archive_name.to_string();
-    // ponytail: zip support, use archive_name suffix to pick tool; add when needed
-    let items_shell: Vec<String> = items.iter().map(|s| shell_quote(s)).collect();
-    let items_str = items_shell.join(" ");
-    let q_dir = shell_quote(&dir);
-    let q_archive = shell_quote(&archive);
-    // Works on all POSIX targets; Windows SSH servers typically ship tar.exe (Win10+).
-    let cmd = format!("cd {q_dir} && tar -czf {q_archive} {items_str}");
+    let cmd = build_compress_cmd(parent_dir, &items, archive_name);
 
     crate::ssh::with_exec_session(host_id, move |sess| {
         let mut channel = sess
@@ -393,7 +405,7 @@ pub fn extract_remote(
 }
 
 /// POSIX single-quote escaping: wrap in `'`, replace every `'` inside with `'\''`.
-fn shell_quote(s: &str) -> String {
+pub(crate) fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
 
@@ -988,6 +1000,45 @@ mod tests {
         assert_eq!(shell_quote("hello"), "'hello'");
         assert_eq!(shell_quote("hello world"), "'hello world'");
         assert_eq!(shell_quote("foo'bar"), r"'foo'\''bar'");
+    }
+
+    #[test]
+    fn build_compress_cmd_does_not_let_an_item_name_run_as_a_tar_option() {
+        // C-19: this is the classic GNU-tar argument-injection PoC. `--checkpoint=1` and
+        // `--checkpoint-action=exec=<cmd>` are each individually valid *filenames* (a remote
+        // directory can legitimately contain files with these names), so a caller could pass
+        // them as two entries in `items`. Each is shell-quoted correctly (shell_quote handles
+        // that), but without a `--` separator tar itself still parses each dash-prefixed
+        // argument as an option once it receives them — quoting only affects shell tokenizing,
+        // not tar's own argv parsing — so tar would run the "exec" action as a checkpoint
+        // callback. This runs the actual built command through a real shell and `tar` binary
+        // and proves the exec payload never runs.
+        let tmp =
+            std::env::temp_dir().join(format!("caterm_c19_tar_test_{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&tmp).expect("create scratch dir");
+        let marker = tmp.join("pwned");
+        // tar's checkpoint only fires once it has actually processed a file, so the PoC needs a
+        // real file to archive alongside the two option-shaped "filenames" below.
+        std::fs::write(tmp.join("real_file.txt"), b"hello").expect("create a real file to archive");
+
+        let items = vec![
+            "real_file.txt".to_string(),
+            "--checkpoint=1".to_string(),
+            format!("--checkpoint-action=exec=touch {}", marker.display()),
+        ];
+        let cmd = build_compress_cmd(&tmp.to_string_lossy(), &items, "out.tar.gz");
+
+        let _ = std::process::Command::new("sh")
+            .arg("-c")
+            .arg(&cmd)
+            .status();
+
+        assert!(
+            !marker.exists(),
+            "tar must never treat an item name as a --checkpoint-action exec payload: {cmd}"
+        );
+
+        let _ = std::fs::remove_dir_all(&tmp);
     }
 
     #[test]
