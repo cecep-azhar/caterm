@@ -320,12 +320,13 @@ const id: Dictionary = {
   },
   contribution: {
     title: 'Kontribusi & Dukung CATerm',
-    subtitle: 'Dukung pengembangan independen CATerm — 100% Gratis, Local-First, Zero-Knowledge.',
+    subtitle: 'Dukung pengembangan independen CATerm — berlisensi MIT, local-first, zero-knowledge.',
     directDonation: 'Donasi Langsung',
-    heading: 'Bantu CATerm Tetap Independen, Cepat, dan Bebas Iklan & Paywall',
-    body: 'CATerm dibangun dengan Rust native dan Svelte modern tanpa analitik tersembunyi, server pelacak, atau paywall langganan untuk alur kerja terminal & SFTP inti. Setiap donasi langsung mendukung pemeliharaan open-source, build multi-platform, dan inovasi mendatang seperti agen AI lokal.',
-    donateVia: 'Donasi via PayPal (paypal.me/cecepazhar)',
-    copyUrl: 'Salin URL PayPal',
+    heading: 'Bantu CATerm Tetap Independen, Cepat, dan Gratis untuk Semua Developer',
+    body: 'CATerm ditulis dengan Rust dan Svelte, berlisensi MIT, tanpa telemetri. Fitur inti — SSH, SFTP, vault lokal, dan AI dengan API key sendiri — gratis selamanya; Pro hanya untuk fitur yang berjalan di server kami (Cloud Sync dan AI hosted). Dukungan Anda membiayai server, build lintas platform, dan waktu untuk terus merilis pembaruan.',
+    donateVia: 'Dukung di Ko-fi',
+    donatePaypal: 'Atau donasi sekali via PayPal',
+    copyUrl: 'Salin URL Ko-fi',
     copiedLink: '✓ Tautan Tersalin',
     otherWays: 'Cara Lain Berkontribusi',
     starTitle: 'Beri Star di GitHub',
@@ -339,7 +340,7 @@ const id: Dictionary = {
   },
   sponsorWall: {
     title: 'Sponsor',
-    subtitle: 'Semua pendukung CATerm di GitHub Sponsors, diurutkan berdasarkan tingkat.',
+    subtitle: 'Pendukung bulanan di Ko-fi atau GitHub Sponsors mendapat nama atau logo di README, website, dan halaman ini.',
     tierPlatinum: 'Platinum',
     tierGold: 'Gold',
     tierSilver: 'Silver',
@@ -347,7 +348,8 @@ const id: Dictionary = {
     minAmount: '${{amount}}+/bln',
     anyAmount: 'Berapa saja',
     emptyTier: 'Belum ada sponsor di tingkat ini — jadilah yang pertama!',
-    cta: 'Jadi Sponsor di GitHub'
+    cta: 'Jadi Sponsor di Ko-fi',
+    ctaGithub: 'atau lewat GitHub Sponsors'
   },
   vpsRecommendation: {
     tagline: 'Tempat maintainer CATerm menguji server',
@@ -895,7 +897,7 @@ const id: Dictionary = {
       subscribe: 'Berlangganan',
       trialNote: 'Trial tanpa kartu kredit. Kuota AI dipakai bersama oleh semua anggota akun.',
       supportTitle: 'Dukung Pengembangan Terbuka Independen',
-      supportBody: 'CATerm gratis dan lokal. Donasi membantu pengembangan tetap aktif.'
+      supportBody: 'Inti CATerm gratis dan open source. Dukungan di Ko-fi menjaga pengembangan tetap aktif.'
     },
     security: {
       title: 'Konfigurasi Vault Zero-Knowledge',

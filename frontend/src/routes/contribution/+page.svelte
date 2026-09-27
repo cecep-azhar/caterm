@@ -4,12 +4,13 @@
   import SponsorWall from '$lib/components/SponsorWall.svelte';
   import VpsRecommendation from '$lib/components/VpsRecommendation.svelte';
   import { getProfile } from '$lib/stores/profile.svelte';
+  import { KOFI_URL, PAYPAL_URL } from '$lib/appInfo';
 
   const profile = getProfile();
   let copied = $state(false);
 
-  function copyPaypal() {
-    navigator.clipboard.writeText('https://paypal.me/cecepazhar');
+  function copyKofi() {
+    navigator.clipboard.writeText(KOFI_URL);
     copied = true;
     setTimeout(() => { copied = false; }, 2000);
   }
@@ -33,26 +34,33 @@
       </p>
     </div>
 
-    <!-- PayPal Action -->
+    <!-- Ko-fi (primary) + PayPal (secondary) -->
     <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-2">
       <a
-        href="https://paypal.me/cecepazhar"
+        href={KOFI_URL}
         target="_blank"
         rel="noopener"
-        class="inline-flex items-center gap-2.5 px-6 py-3 bg-[#0070ba] hover:bg-[#005ea6] text-white font-semibold rounded-xl text-sm shadow-lg shadow-sky-900/30 transition-all hover:scale-[1.02]"
+        class="inline-flex items-center gap-2.5 px-6 py-3 bg-[#ff5e5b] hover:bg-[#e54d4a] text-white font-semibold rounded-xl text-sm shadow-lg shadow-rose-900/30 transition-all hover:scale-[1.02]"
       >
-        <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
-          <path d="M20.067 8.478c.492.88.556 2.014.3 3.327-.777 3.99-3.42 6.07-7.857 6.07H9.288a.936.936 0 0 1-.925-.797L6.82 7.02a.936.936 0 0 1 .925-1.077h5.08c2.81 0 4.88.428 5.894 1.488.583.61.94 1.34 1.348 2.047zm-5.074 1.09c-.588-.616-1.78-.865-3.393-.865H8.847l-1.09 6.883h2.368c2.87 0 4.542-1.348 5.04-3.905.215-1.106.143-1.63-.172-2.113z"/>
-        </svg>
+        <span aria-hidden="true">☕</span>
         <span>{t('contribution.donateVia')}</span>
       </a>
 
       <button
-        onclick={copyPaypal}
+        onclick={copyKofi}
         class="px-4 py-3 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-xl text-sm font-medium border border-neutral-300 dark:border-neutral-700 transition-colors"
       >
         {copied ? t('contribution.copiedLink') : t('contribution.copyUrl')}
       </button>
+
+      <a
+        href={PAYPAL_URL}
+        target="_blank"
+        rel="noopener"
+        class="text-sm text-sky-700 dark:text-sky-400 hover:underline"
+      >
+        {t('contribution.donatePaypal')} ↗
+      </a>
     </div>
   </div>
 

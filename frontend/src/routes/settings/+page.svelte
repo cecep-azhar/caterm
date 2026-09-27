@@ -11,7 +11,7 @@
   import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
   import { getAppearance, setReduceMotion } from '$lib/stores/appearance.svelte';
   import { getUpdater, checkForUpdates, installUpdate } from '$lib/stores/updater.svelte';
-  import { APP_VERSION, releaseNotesUrl, pricingUrl } from '$lib/appInfo';
+  import { APP_VERSION, releaseNotesUrl, pricingUrl, KOFI_URL } from '$lib/appInfo';
   import { PRO_PRICING, formatUsd, type BillingInterval } from '$lib/pro/pricing';
   import { openExternalUrl } from '$lib/utils/url';
   import { errorText } from '$lib/errors';
@@ -698,10 +698,10 @@
           <p class="text-[11px] text-neutral-500">{t('settings.subscription.supportBody')}</p>
         </div>
         <a
-          href="https://paypal.me/cecepazhar"
+          href={KOFI_URL}
           target="_blank"
           rel="noopener"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-[#0070ba] hover:bg-[#005ea6] text-white text-xs font-semibold rounded-lg transition-colors shrink-0"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-[#ff5e5b] hover:bg-[#e54d4a] text-white text-xs font-semibold rounded-lg transition-colors shrink-0"
         >
           <span>{t('contribution.donateVia')}</span>
         </a>

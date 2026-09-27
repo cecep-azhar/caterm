@@ -7,6 +7,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-brightgreen.svg)](#supported-platforms)
 [![Rust](https://img.shields.io/badge/Core-Rust%202024-orange.svg)](https://www.rust-lang.org/)
 [![GitHub Issues](https://img.shields.io/badge/Issues-GitHub-blue)](https://github.com/cecep-azhar/caterm/issues)
+[![Support on Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/cecepazhar)
 
 ---
 
@@ -147,10 +148,36 @@ npx --prefix ../../frontend tauri build --bundles nsis
 
 - **Repository**: [https://github.com/cecep-azhar/caterm](https://github.com/cecep-azhar/caterm)
 - **Issue Tracker & Feature Requests**: [https://github.com/cecep-azhar/caterm/issues](https://github.com/cecep-azhar/caterm/issues)
-- **Support & Sponsorship**: [https://paypal.me/cecepazhar](https://paypal.me/cecepazhar)
+- **Support & Sponsorship**: [ko-fi.com/cecepazhar](https://ko-fi.com/cecepazhar) (primary) · [GitHub Sponsors](https://github.com/sponsors/cecep-azhar) · [PayPal](https://paypal.me/cecepazhar)
+
+---
+
+## 💖 Sponsors
+
+CATerm's core stays free and MIT-licensed forever. Sponsorship pays for servers, cross-platform builds, and the time to keep shipping updates.
+
+| Tier | Monthly | You get |
+| :--- | :--- | :--- |
+| 💎 **Platinum** | $100+ | Large logo at the top of this section, on [caterm.fathforce.com](https://caterm.fathforce.com) and in the docs · one CATerm Pro license · quarterly roadmap call |
+| 🥇 **Gold** | $25+ | Logo in this section and on the website · thank-you in release notes · priority issue triage |
+| 🥈 **Silver** | $5+ | Your name in the supporters list below and on the website |
+
+[![Become a sponsor on Ko-fi](https://img.shields.io/badge/Become%20a%20sponsor-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/cecepazhar)
+
+### 💎 Platinum
+
+_Your logo here — [become the first Platinum sponsor](https://ko-fi.com/cecepazhar)._
+
+### 🥇 Gold
+
+_Your logo here — [become a Gold sponsor](https://ko-fi.com/cecepazhar)._
+
+### 🥈 Silver
+
+_Your name here — [become a Silver supporter](https://ko-fi.com/cecepazhar)._
 
 ---
 
 ## 📄 License
 
-Licensed under the [MIT License](LICENSE). 100% Free and Open Source.
+Licensed under the [MIT License](LICENSE). Free and open source; CATerm Pro only covers server-backed features (Cloud Sync, hosted AI).

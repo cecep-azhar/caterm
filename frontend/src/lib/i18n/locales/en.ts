@@ -319,12 +319,13 @@ const en = {
   },
   contribution: {
     title: 'Contribution & Support CATerm',
-    subtitle: 'Support the independent development of CATerm — 100% Free, Local-First, Zero-Knowledge.',
+    subtitle: 'Support the independent development of CATerm — MIT-licensed, local-first, zero-knowledge.',
     directDonation: 'Direct Donation',
-    heading: 'Help Keep CATerm Independent, Fast, and Free of Ads & Paywalls',
-    body: 'CATerm is engineered with native Rust and modern Svelte without hidden analytics, tracking servers, or subscription paywalls for essential terminal & SFTP workflows. Every donation directly supports open-source maintenance, multi-platform builds, and upcoming innovations like local AI agents.',
-    donateVia: 'Donate via PayPal (paypal.me/cecepazhar)',
-    copyUrl: 'Copy PayPal URL',
+    heading: 'Help Keep CATerm Independent, Fast, and Free for Every Developer',
+    body: 'CATerm is written in Rust and Svelte, MIT-licensed, with no telemetry. The core — SSH, SFTP, local vault, and AI with your own key — stays free forever; Pro only covers features that run on our servers (Cloud Sync and hosted AI). Your support pays for servers, cross-platform builds, and the hours to keep shipping updates.',
+    donateVia: 'Support on Ko-fi',
+    donatePaypal: 'Or donate once via PayPal',
+    copyUrl: 'Copy Ko-fi URL',
     copiedLink: '✓ Copied Link',
     otherWays: 'Other Ways to Contribute',
     starTitle: 'Star on GitHub',
@@ -338,7 +339,7 @@ const en = {
   },
   sponsorWall: {
     title: 'Sponsors',
-    subtitle: 'Everyone who backs CATerm on GitHub Sponsors, recognized by tier.',
+    subtitle: 'Monthly supporters on Ko-fi or GitHub Sponsors get their name or logo on CATerm’s README, website, and this page.',
     tierPlatinum: 'Platinum',
     tierGold: 'Gold',
     tierSilver: 'Silver',
@@ -346,7 +347,8 @@ const en = {
     minAmount: '${{amount}}+/mo',
     anyAmount: 'Any amount',
     emptyTier: 'No sponsors in this tier yet — be the first!',
-    cta: 'Become a Sponsor on GitHub'
+    cta: 'Become a Sponsor on Ko-fi',
+    ctaGithub: 'or via GitHub Sponsors'
   },
   vpsRecommendation: {
     tagline: 'Where CATerm’s maintainer hosts test servers',
@@ -894,7 +896,7 @@ const en = {
       subscribe: 'Subscribe',
       trialNote: 'No credit card needed for the trial. The AI quota is shared by everyone on the account.',
       supportTitle: 'Support Independent Open Development',
-      supportBody: 'CATerm is free and local-first. Donations help maintain active development.'
+      supportBody: 'CATerm’s core is free and open source. Support on Ko-fi keeps development active.'
     },
     security: {
       title: 'Zero-Knowledge Vault Configuration',
