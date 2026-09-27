@@ -113,6 +113,10 @@
     "allow-get-pending-crash-report",
     "allow-submit-crash-report",
     "allow-dismiss-crash-report",
-    "process:allow-restart"
+    "process:allow-restart",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "fs:allow-write-text-file",
+    "fs:allow-read-text-file"
   ]
 }

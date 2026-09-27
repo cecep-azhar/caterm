@@ -22,10 +22,10 @@ serde_json.workspace = true
 async-trait = "0.1.92"
 parking_lot = "0.12.5"
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync", "time", "process", "io-util"] }
-tauri-plugin-shell = "2.3.6"
 tauri-plugin-dialog = "2.7.3"
 mimalloc = { version = "0.1", default-features = false }
 tauri-plugin-process = "2"
+tauri-plugin-fs = "2"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 tauri-plugin-updater = "2"

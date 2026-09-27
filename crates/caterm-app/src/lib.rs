@@ -96,6 +96,14 @@ pub fn run_with_start(start: std::time::Instant) {
     #[allow(clippy::expect_used, clippy::disallowed_methods)]
     tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
+        // The frontend imports @tauri-apps/plugin-dialog (native save/open dialogs on the
+        // Command Logs CSV export and the Snippets import/export) and @tauri-apps/plugin-fs
+        // (writeTextFile/readTextFile against the path the user picked in that dialog). Neither
+        // plugin was registered here (C-17) even though caterm-app already depended on
+        // tauri-plugin-dialog, and tauri-plugin-fs wasn't even a dependency — both features
+        // silently failed with a "plugin not found" error at the call site.
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(move |app| {
             window::create_main_window(app)?;
             install_ssh_event_bridge(app.handle());
