@@ -80,9 +80,44 @@ pub(crate) struct SessionHandle {
     pub(crate) tx: std::sync::mpsc::Sender<Vec<u8>>,
     pub(crate) output_buffer: Arc<Mutex<Vec<u8>>>,
     pub(crate) input_buffer: Arc<Mutex<String>>,
+    /// The last ~200 bytes of remote/local output actually emitted to the frontend, kept so
+    /// `write()` can tell whether the terminal is mid password prompt before audit-logging a
+    /// submitted line (C-09). Not a substitute for real echo-state tracking (ssh2 exposes none),
+    /// just a heuristic against common prompt text.
+    pub(crate) last_output_tail: Arc<Mutex<String>>,
     pub(crate) channel: Option<Arc<Mutex<ssh2::Channel>>>,
     pub(crate) child: Option<Arc<Mutex<std::process::Child>>>,
     pub(crate) host_id: String,
+}
+
+/// How much trailing output text `last_output_tail` keeps. Only needs to cover the tail end of
+/// one prompt line ("[sudo] password for alice: "), not a whole screen.
+const OUTPUT_TAIL_CAPACITY: usize = 200;
+
+/// Appends `text` to `tail`, keeping only the last [`OUTPUT_TAIL_CAPACITY`] bytes (cut at a
+/// char boundary, since this holds UTF-8 text).
+fn record_output_tail(tail: &Arc<Mutex<String>>, text: &str) {
+    let Ok(mut t) = tail.lock() else { return };
+    t.push_str(text);
+    if t.len() > OUTPUT_TAIL_CAPACITY {
+        let mut cut = t.len() - OUTPUT_TAIL_CAPACITY;
+        while cut < t.len() && !t.is_char_boundary(cut) {
+            cut += 1;
+        }
+        t.drain(..cut);
+    }
+}
+
+/// Best-effort check for whether `tail` (recent terminal output) looks like it ends in a
+/// password/passphrase prompt with nothing typed back yet — `sudo`, `su`, `ssh-add`, `passwd`,
+/// login prompts, and similar all print one of these forms and then stop echoing input.
+fn looks_like_password_prompt(tail: &str) -> bool {
+    let lower = tail.to_ascii_lowercase();
+    let trimmed = lower.trim_end().trim_end_matches(':').trim_end();
+    trimmed.ends_with("password")
+        || trimmed.ends_with("passphrase")
+        || trimmed.contains("password for")
+        || trimmed.contains("passphrase for")
 }
 
 pub(crate) static SESSIONS: Lazy<Arc<Mutex<HashMap<String, SessionHandle>>>> =
@@ -422,10 +457,11 @@ fn absorb_pty_bytes(
 }
 
 /// No-op when there is nothing pending, which is also the case whenever no sink is installed.
-fn flush_pty_output(session_id: &str, pending: &mut String) {
+fn flush_pty_output(session_id: &str, pending: &mut String, tail: &Arc<Mutex<String>>) {
     if pending.is_empty() {
         return;
     }
+    record_output_tail(tail, pending);
     emit(SshEvent::Output {
         session_id: session_id.to_string(),
         data: std::mem::take(pending),
@@ -497,6 +533,7 @@ fn connect_local() -> Result<SshSession, CatermError> {
 
     let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
+    let last_output_tail = Arc::new(Mutex::new(String::new()));
 
     // Writer thread: pipe user keystrokes into child stdin
     thread::spawn(move || {
@@ -511,6 +548,7 @@ fn connect_local() -> Result<SshSession, CatermError> {
 
     // Reader thread: stdout -> xterm events
     let buffer_read = Arc::clone(&output_buffer);
+    let tail_read = Arc::clone(&last_output_tail);
     let reader_session_id = session_id.clone();
     thread::spawn(move || {
         use std::io::Read;
@@ -523,6 +561,7 @@ fn connect_local() -> Result<SshSession, CatermError> {
                     let chunk = buf.get(..n).map(|b| b.to_vec()).unwrap_or_default();
                     if push {
                         let text = String::from_utf8_lossy(&chunk).to_string();
+                        record_output_tail(&tail_read, &text);
                         emit(SshEvent::Output {
                             session_id: reader_session_id.clone(),
                             data: text,
@@ -542,6 +581,7 @@ fn connect_local() -> Result<SshSession, CatermError> {
     // Reader thread: stderr -> xterm events
     let err_session_id = session_id.clone();
     let err_buffer = Arc::clone(&output_buffer);
+    let err_tail = Arc::clone(&last_output_tail);
     thread::spawn(move || {
         use std::io::Read;
         let mut buf = [0u8; 4096];
@@ -552,9 +592,11 @@ fn connect_local() -> Result<SshSession, CatermError> {
                 Ok(n) => {
                     let chunk = buf.get(..n).map(|b| b.to_vec()).unwrap_or_default();
                     if push {
+                        let text = String::from_utf8_lossy(&chunk).to_string();
+                        record_output_tail(&err_tail, &text);
                         emit(SshEvent::Output {
                             session_id: err_session_id.clone(),
-                            data: String::from_utf8_lossy(&chunk).to_string(),
+                            data: text,
                         });
                     } else if let Ok(mut ob) = err_buffer.lock() {
                         ob.extend_from_slice(&chunk);
@@ -570,6 +612,7 @@ fn connect_local() -> Result<SshSession, CatermError> {
         tx,
         output_buffer,
         input_buffer: Arc::new(Mutex::new(String::new())),
+        last_output_tail,
         channel: None,
         child: Some(child_arc),
         host_id: "local".to_string(),
@@ -611,6 +654,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
 
     let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
+    let last_output_tail = Arc::new(Mutex::new(String::new()));
 
     // Set session to non-blocking so our reader loop doesn't hold the lock forever. The
     // session is moved into the reader thread afterwards and is never shared with SFTP,
@@ -622,6 +666,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     // Spawn reader background thread
     let channel_read = Arc::clone(&channel_arc);
     let buffer_read = Arc::clone(&output_buffer);
+    let tail_read = Arc::clone(&last_output_tail);
     let reader_session_id = session_id.clone();
     thread::spawn(move || {
         // Owns the session for the lifetime of the PTY: dropping it here is what tears the
@@ -655,7 +700,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                 Ok(0) => {
                     // Stream went quiet: hand over whatever we have before idling, so a single
                     // keystroke echo is never held back waiting for more bytes.
-                    flush_pty_output(&reader_session_id, &mut pending);
+                    flush_pty_output(&reader_session_id, &mut pending, &tail_read);
                     if is_eof {
                         break;
                     }
@@ -666,13 +711,13 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                         absorb_pty_bytes(chunk, push, &mut carry, &mut pending, &buffer_read);
                     }
                     // Instant flush on any read for zero-delay typing feedback
-                    flush_pty_output(&reader_session_id, &mut pending);
+                    flush_pty_output(&reader_session_id, &mut pending, &tail_read);
                 }
                 Err(e) => {
                     if e.kind() == std::io::ErrorKind::WouldBlock
                         || e.kind() == std::io::ErrorKind::Interrupted
                     {
-                        flush_pty_output(&reader_session_id, &mut pending);
+                        flush_pty_output(&reader_session_id, &mut pending, &tail_read);
                         thread::sleep(Duration::from_millis(1));
                     } else {
                         break;
@@ -681,7 +726,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
             }
         }
 
-        flush_pty_output(&reader_session_id, &mut pending);
+        flush_pty_output(&reader_session_id, &mut pending, &tail_read);
         if push {
             emit(SshEvent::Closed {
                 session_id: reader_session_id.clone(),
@@ -737,6 +782,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         tx,
         output_buffer,
         input_buffer: Arc::new(Mutex::new(String::new())),
+        last_output_tail,
         channel: Some(channel_arc),
         child: None,
         host_id: host.id.clone(),
@@ -762,7 +808,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
 pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
     require_non_empty("session_id", session_id)?;
 
-    let (tx, input_buffer, host_id) = {
+    let (tx, input_buffer, last_output_tail, host_id) = {
         let sessions = SESSIONS
             .lock()
             .map_err(|_| invalid("Lock failure".to_string()))?;
@@ -772,6 +818,7 @@ pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
         (
             handle.tx.clone(),
             Arc::clone(&handle.input_buffer),
+            Arc::clone(&handle.last_output_tail),
             handle.host_id.clone(),
         )
     };
@@ -780,7 +827,21 @@ pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
         if let Ok(mut buf) = input_buffer.lock() {
             if data == "\r" || data == "\n" {
                 if !buf.is_empty() {
-                    let _ = crate::audit::log_event("PTY_COMMAND", Some(&host_id), &buf);
+                    // C-09: don't audit-log what was typed at a silent prompt (sudo, su, ssh-add,
+                    // passwd, ...) — the terminal never echoes it back, but this buffer captures
+                    // every keystroke regardless, so without this check the password itself was
+                    // stored (encrypted at rest, but plainly readable in Command Logs and its
+                    // CSV export, and offered back as an autocomplete suggestion).
+                    let tail = last_output_tail.lock().map(|t| t.clone()).unwrap_or_default();
+                    if looks_like_password_prompt(&tail) {
+                        let _ = crate::audit::log_event(
+                            "PTY_COMMAND",
+                            Some(&host_id),
+                            "***redacted: typed at a password/passphrase prompt, not logged***",
+                        );
+                    } else {
+                        let _ = crate::audit::log_event("PTY_COMMAND", Some(&host_id), &buf);
+                    }
                     buf.clear();
                 }
             } else if data == "\x7F" || data == "\x08" {
@@ -1147,6 +1208,64 @@ mod tests {
     #[test]
     fn write_rejects_empty_session_id() {
         assert!(write("", "ls").is_err());
+    }
+
+    #[test]
+    fn looks_like_password_prompt_matches_common_forms_only() {
+        for tail in [
+            "Password: ",
+            "password:",
+            "[sudo] password for alice: ",
+            "Enter passphrase for key '/home/alice/.ssh/id_ed25519': ",
+            "some earlier output\nPassword: ",
+        ] {
+            assert!(looks_like_password_prompt(tail), "should match: {tail:?}");
+        }
+        for tail in ["$ ", "user@host:~$ ", "Permission denied", ""] {
+            assert!(!looks_like_password_prompt(tail), "should not match: {tail:?}");
+        }
+    }
+
+    #[test]
+    fn write_redacts_a_line_typed_at_a_password_prompt_instead_of_logging_it() {
+        // Regression for C-09. Reproduces the audit's finding: text typed at a silent prompt
+        // (sudo's included) used to be stored verbatim in Command Logs because audit::log_event
+        // only masks lines matching "key=value"-style secrets, not a bare password with no
+        // label. Simulates a session whose last output was a sudo password prompt, then checks
+        // what write() actually persisted.
+        let _data = crate::test_support::isolated_data_dir("ssh_password_prompt_redaction");
+        crate::vault::unlock_vault("12345678").expect("unlock vault");
+
+        let (tx, _rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        let session_id = "test-session-password-prompt".to_string();
+        let handle = SessionHandle {
+            tx,
+            output_buffer: Arc::new(Mutex::new(Vec::new())),
+            input_buffer: Arc::new(Mutex::new(String::new())),
+            last_output_tail: Arc::new(Mutex::new("[sudo] password for alice: ".to_string())),
+            channel: None,
+            child: None,
+            host_id: "host-under-test".to_string(),
+        };
+        SESSIONS
+            .lock()
+            .expect("lock sessions")
+            .insert(session_id.clone(), handle);
+
+        write(&session_id, "hunter2").expect("type password");
+        write(&session_id, "\r").expect("submit password");
+
+        let logs = crate::audit::get_logs(Some("host-under-test"), None, None)
+            .expect("get_logs should succeed");
+        assert_eq!(logs.len(), 1);
+        assert!(
+            !logs[0].details.contains("hunter2"),
+            "the typed password must never reach Command Logs: {:?}",
+            logs[0].details
+        );
+        assert!(logs[0].details.contains("not logged"));
+
+        SESSIONS.lock().expect("lock sessions").remove(&session_id);
     }
 
     #[test]
