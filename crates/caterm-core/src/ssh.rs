@@ -28,7 +28,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -93,6 +93,24 @@ pub(crate) struct SessionHandle {
 /// How much trailing output text `last_output_tail` keeps. Only needs to cover the tail end of
 /// one prompt line ("[sudo] password for alice: "), not a whole screen.
 const OUTPUT_TAIL_CAPACITY: usize = 200;
+
+/// Caps how long a burst of PTY output is allowed to accumulate before being flushed as one
+/// `SshEvent::Output`, when the remote keeps handing over more bytes read after read (`cat` on a
+/// big file, `find /`, a noisy build). Below this, a single keystroke's echo still flushes
+/// immediately via the "stream went quiet" branch, so typed latency is unaffected — this only
+/// coalesces sustained floods that would otherwise emit (and cross the Tauri IPC boundary) once
+/// per `read()` syscall, which measured over 17,000 events/sec on a `yes` -style flood.
+const OUTPUT_BATCH_MAX_DELAY: Duration = Duration::from_millis(8);
+/// Also flush early if a single burst already built up this much text, so one pathologically long
+/// quiet-free stream doesn't grow `pending` unboundedly between time-based flushes.
+const OUTPUT_BATCH_MAX_BYTES: usize = 64 * 1024;
+
+/// Whether a currently-accumulating output batch should be flushed now. Pulled out as a pure
+/// function (the read loop itself needs a live `ssh2::Channel` and can't run in a unit test) so
+/// the coalescing thresholds above have a regression test.
+fn should_flush_batch(pending_len: usize, batch_age: Duration) -> bool {
+    pending_len >= OUTPUT_BATCH_MAX_BYTES || batch_age >= OUTPUT_BATCH_MAX_DELAY
+}
 
 /// Appends `text` to `tail`, keeping only the last [`OUTPUT_TAIL_CAPACITY`] bytes (cut at a
 /// char boundary, since this holds UTF-8 text).
@@ -674,6 +692,9 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         let mut err_buf = [0u8; 4096];
         let mut carry = Vec::<u8>::new();
         let mut pending = String::new();
+        // Set the moment the current (still-unflushed) batch started accumulating; `None` means
+        // `pending` is empty. Used to cap how long a continuous flood can be held before flushing.
+        let mut batch_started: Option<Instant> = None;
 
         loop {
             let (read_res, is_eof) = {
@@ -697,6 +718,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                     // Stream went quiet: hand over whatever we have before idling, so a single
                     // keystroke echo is never held back waiting for more bytes.
                     flush_pty_output(&reader_session_id, &mut pending, &tail_read);
+                    batch_started = None;
                     if is_eof {
                         break;
                     }
@@ -706,14 +728,24 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                     if let Some(chunk) = buf.get(..n) {
                         absorb_pty_bytes(chunk, push, &mut carry, &mut pending, &buffer_read);
                     }
-                    // Instant flush on any read for zero-delay typing feedback
-                    flush_pty_output(&reader_session_id, &mut pending, &tail_read);
+                    // Coalesce a sustained flood (the remote keeps handing over more bytes with
+                    // no gap) into batches instead of one IPC event per read(): only flush once
+                    // this batch has been building for OUTPUT_BATCH_MAX_DELAY, or has grown past
+                    // OUTPUT_BATCH_MAX_BYTES. A single keystroke's echo is unaffected — it still
+                    // goes out immediately via the "stream went quiet" branch above, since the
+                    // very next read is a WouldBlock/EOF, not another `Ok(n)`.
+                    let started = batch_started.get_or_insert_with(Instant::now);
+                    if should_flush_batch(pending.len(), started.elapsed()) {
+                        flush_pty_output(&reader_session_id, &mut pending, &tail_read);
+                        batch_started = None;
+                    }
                 }
                 Err(e) => {
                     if e.kind() == std::io::ErrorKind::WouldBlock
                         || e.kind() == std::io::ErrorKind::Interrupted
                     {
                         flush_pty_output(&reader_session_id, &mut pending, &tail_read);
+                        batch_started = None;
                         thread::sleep(Duration::from_millis(1));
                     } else {
                         break;
@@ -1204,6 +1236,21 @@ mod tests {
     #[test]
     fn write_rejects_empty_session_id() {
         assert!(write("", "ls").is_err());
+    }
+
+    #[test]
+    fn should_flush_batch_waits_for_size_or_age_threshold() {
+        // Small batch, no age yet: hold it — this is the case that used to flush on every single
+        // `read()` and produced 17,518 IPC events/sec on a sustained flood (C-12).
+        assert!(!should_flush_batch(10, Duration::from_millis(0)));
+        assert!(!should_flush_batch(
+            OUTPUT_BATCH_MAX_BYTES - 1,
+            OUTPUT_BATCH_MAX_DELAY - Duration::from_millis(1)
+        ));
+
+        // Either threshold on its own is enough to force a flush.
+        assert!(should_flush_batch(OUTPUT_BATCH_MAX_BYTES, Duration::from_millis(0)));
+        assert!(should_flush_batch(1, OUTPUT_BATCH_MAX_DELAY));
     }
 
     #[test]
