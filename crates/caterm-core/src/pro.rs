@@ -65,7 +65,9 @@ fn api_base() -> String {
 /// Debug builds also accept `CATERM_PRO_LICENSE_PUBKEY` at runtime, for a local GCC.
 fn public_key(version: u32) -> Option<VerifyingKey> {
     let compiled = match version {
-        1 => option_env!("CATERM_PRO_LICENSE_PUBKEY_V1").or(Some("8a1c49d8d6e8e6b2e25f821451c8d85b997331d2efa2d6d335e87535aa67f6a2")),
+        1 => option_env!("CATERM_PRO_LICENSE_PUBKEY_V1").or(Some(
+            "8a1c49d8d6e8e6b2e25f821451c8d85b997331d2efa2d6d335e87535aa67f6a2",
+        )),
         2 => option_env!("CATERM_PRO_LICENSE_PUBKEY_V2"),
         _ => None,
     };
