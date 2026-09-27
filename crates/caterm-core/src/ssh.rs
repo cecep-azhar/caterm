@@ -121,6 +121,26 @@ fn should_flush_batch(pending_len: usize, batch_age: Duration) -> bool {
     pending_len >= OUTPUT_BATCH_MAX_BYTES || batch_age >= OUTPUT_BATCH_MAX_DELAY
 }
 
+/// Floor and ceiling for [`next_poll_delay`]. The reader loop below is non-blocking (`ch.read()`
+/// returns `WouldBlock`/`Ok(0)` immediately rather than parking the thread), so without a sleep
+/// between empty reads it would spin the CPU at 100% per open session. A fixed 1ms sleep fixed
+/// that but replaced it with a *steady* per-session wakeup 1000 times a second for the entire
+/// life of an idle pane — measurable with several panes left open overnight. Backing off toward
+/// `POLL_MAX_DELAY` while the session stays quiet, and resetting to `POLL_MIN_DELAY` the instant
+/// data shows up again, keeps interactive latency (a keystroke's echo) unaffected while cutting
+/// the idle wakeup rate by more than an order of magnitude.
+const POLL_MIN_DELAY: Duration = Duration::from_millis(1);
+const POLL_MAX_DELAY: Duration = Duration::from_millis(40);
+
+/// How long to sleep before the next poll, given how many consecutive empty reads have happened
+/// since data last arrived. Pulled out as a pure function for the same reason as
+/// [`should_flush_batch`] — the read loop needs a live channel and can't run in a unit test.
+fn next_poll_delay(consecutive_idle_reads: u32) -> Duration {
+    let shift = consecutive_idle_reads.min(6); // 1,2,4,8,16,32,64ms, clamped to POLL_MAX_DELAY
+    let ms = (POLL_MIN_DELAY.as_millis() as u64).saturating_mul(1u64 << shift);
+    Duration::from_millis(ms).min(POLL_MAX_DELAY)
+}
+
 /// Appends `text` to `tail`, keeping only the last [`OUTPUT_TAIL_CAPACITY`] bytes (cut at a
 /// char boundary, since this holds UTF-8 text).
 fn record_output_tail(tail: &Arc<Mutex<String>>, text: &str) {
@@ -704,6 +724,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         // Set the moment the current (still-unflushed) batch started accumulating; `None` means
         // `pending` is empty. Used to cap how long a continuous flood can be held before flushing.
         let mut batch_started: Option<Instant> = None;
+        let mut idle_streak: u32 = 0;
 
         loop {
             let (read_res, is_eof) = {
@@ -731,9 +752,11 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                     if is_eof {
                         break;
                     }
-                    thread::sleep(Duration::from_millis(1));
+                    thread::sleep(next_poll_delay(idle_streak));
+                    idle_streak = idle_streak.saturating_add(1);
                 }
                 Ok(n) => {
+                    idle_streak = 0;
                     if let Some(chunk) = buf.get(..n) {
                         absorb_pty_bytes(chunk, push, &mut carry, &mut pending, &buffer_read);
                     }
@@ -755,7 +778,8 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
                     {
                         flush_pty_output(&reader_session_id, &mut pending, &tail_read);
                         batch_started = None;
-                        thread::sleep(Duration::from_millis(1));
+                        thread::sleep(next_poll_delay(idle_streak));
+                        idle_streak = idle_streak.saturating_add(1);
                     } else {
                         break;
                     }
@@ -1281,6 +1305,21 @@ mod tests {
             Duration::from_millis(0)
         ));
         assert!(should_flush_batch(1, OUTPUT_BATCH_MAX_DELAY));
+    }
+
+    #[test]
+    fn next_poll_delay_backs_off_then_caps_and_resets_are_the_callers_job() {
+        // C-16: the idle-read loop used to sleep a flat 1ms forever, waking an open-but-silent
+        // session's reader thread 1000 times a second for as long as the pane stayed open. The
+        // first idle read still polls almost immediately (interactive latency unaffected)...
+        assert_eq!(next_poll_delay(0), POLL_MIN_DELAY);
+        // ...but consecutive idle reads back off geometrically...
+        assert_eq!(next_poll_delay(1), Duration::from_millis(2));
+        assert_eq!(next_poll_delay(2), Duration::from_millis(4));
+        assert_eq!(next_poll_delay(3), Duration::from_millis(8));
+        // ...capping at POLL_MAX_DELAY rather than growing unboundedly.
+        assert_eq!(next_poll_delay(6), POLL_MAX_DELAY);
+        assert_eq!(next_poll_delay(1000), POLL_MAX_DELAY);
     }
 
     #[test]
