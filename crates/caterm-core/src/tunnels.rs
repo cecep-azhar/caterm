@@ -84,9 +84,7 @@ pub fn init_table(conn: &rusqlite::Connection) -> Result<(), CatermError> {
 
 /// List all configured tunnels along with active live state.
 pub fn list_tunnels() -> Result<Vec<TunnelRecord>, CatermError> {
-    let data_info = crate::paths::resolve_data_dir()?;
-    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     let mut stmt = conn
@@ -139,9 +137,7 @@ pub fn save_tunnel(input: TunnelInput) -> Result<TunnelRecord, CatermError> {
 
     let id = generate_id();
 
-    let data_info = crate::paths::resolve_data_dir()?;
-    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     conn.execute(
@@ -175,9 +171,7 @@ pub fn save_tunnel(input: TunnelInput) -> Result<TunnelRecord, CatermError> {
 pub fn delete_tunnel(id: &str) -> Result<(), CatermError> {
     let _ = stop_tunnel(id);
 
-    let data_info = crate::paths::resolve_data_dir()?;
-    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
-    let conn = crate::db::open_encrypted(&data_info.path, &key)?;
+    let conn = crate::db::open()?;
     init_table(&conn)?;
 
     let affected = conn
@@ -572,4 +566,38 @@ pub fn stop_all_tunnels() -> Result<(), CatermError> {
         tunnel.shutdown_signal.store(true, Ordering::Relaxed);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Regression for C-03: save_tunnel/list_tunnels/delete_tunnel used to open the database
+    // with `vault::load_or_create_local_key` (a plaintext key file used nowhere else) instead
+    // of the vault DEK every other module uses via `db::open()`. Against a database created by
+    // any other module the mismatch failed with "file is not a database". Unlocking the vault
+    // first, as the real app does before any of these calls, reproduces that setup.
+    #[test]
+    fn save_list_and_delete_tunnel_use_the_same_key_as_the_rest_of_the_app() {
+        let _data = crate::test_support::isolated_data_dir("tunnels_roundtrip");
+        crate::vault::unlock_vault("12345678").expect("unlock vault");
+
+        let saved = save_tunnel(TunnelInput {
+            host_id: "host-1".into(),
+            forward_type: ForwardType::Local,
+            bind_addr: None,
+            bind_port: 2222,
+            target_addr: "127.0.0.1".into(),
+            target_port: 22,
+        })
+        .expect("save_tunnel should use the vault DEK, not a separate local key");
+
+        let all = list_tunnels().expect("list_tunnels should open the same database");
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].id, saved.id);
+        assert_eq!(all[0].bind_port, 2222);
+
+        delete_tunnel(&saved.id).expect("delete_tunnel should open the same database");
+        assert!(list_tunnels().expect("list_tunnels after delete").is_empty());
+    }
 }
