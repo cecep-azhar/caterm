@@ -174,8 +174,7 @@ impl RemoteFileSystem for WebDavFileSystem {
 
             // Skip the current directory itself
             if href_clean == target_clean
-                || (href_clean.ends_with(remote_path.trim_matches('/'))
-                    && (href_raw.ends_with('/') || href_clean == target_clean))
+                || (href_clean.ends_with(remote_path.trim_matches('/')) && href_raw.ends_with('/'))
             {
                 let last_segment = href_clean.rsplit('/').next().unwrap_or("");
                 let req_segment = remote_path
