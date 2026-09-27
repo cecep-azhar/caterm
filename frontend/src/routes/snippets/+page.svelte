@@ -72,7 +72,9 @@
         a.href = url;
         a.download = 'caterm-snippets-export.json';
         a.click();
-        URL.revokeObjectURL(url);
+        // See the identical fix in command-logs/+page.svelte's exportLogs(): revoking right after
+        // click() races the download actually starting, since click() only schedules it.
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         showToast(t('snippets.exportSuccess'), 'success');
       }
     } catch (err) {

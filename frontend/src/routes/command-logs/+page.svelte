@@ -167,14 +167,36 @@
   let aiAutomationCount = $derived(logs.filter((l) => l.event_type === 'AI_AUTOMATION').length);
   let aiPlanCount = $derived(logs.filter((l) => l.event_type === 'AI_PLAN').length);
 
+  // Quotes a CSV field and neutralizes formula injection: Excel/Sheets/LibreOffice treat a
+  // cell whose *first* character is one of =+-@ (or a tab/CR, which some parsers also honor as
+  // a formula prefix) as a formula to evaluate on open, not as text. A command log's `details`
+  // is largely attacker- or user-influenced text (an SSH command, an AI-exec note) — without
+  // this, a row like `=cmd|'/c calc'!A1` opens as a live formula in whatever spreadsheet app
+  // the exported file is opened in. Prefixing with a bare `'` is the standard mitigation: every
+  // major spreadsheet app treats a leading apostrophe as "this cell is text", and it's invisible
+  // once opened. Every field is escaped and quoted here, not just `details` — `id`/`eventType`/
+  // `hostId` were previously written unquoted-content-unescaped (`host_id` especially, since
+  // it's a free-form value on some connection types), so any of them containing a `"` would have
+  // broken the CSV's column alignment for that row and everything after it.
+  function csvField(value: string): string {
+    const text = value ?? '';
+    const guarded = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+    return `"${guarded.replace(/"/g, '""')}"`;
+  }
+
   async function exportLogs() {
     try {
       const csvContent =
         'ID,EventType,Timestamp,HostID,Details\n' +
         filteredLogs
-          .map(
-            (l) =>
-              `"${l.id}","${l.event_type}","${new Date(l.timestamp).toISOString()}","${l.host_id || ''}","${l.details.replace(/"/g, '""')}"`
+          .map((l) =>
+            [
+              csvField(l.id),
+              csvField(l.event_type),
+              csvField(new Date(l.timestamp).toISOString()),
+              csvField(l.host_id || ''),
+              csvField(l.details)
+            ].join(',')
           )
           .join('\n');
 
@@ -204,7 +226,11 @@
         a.href = url;
         a.download = `caterm-audit-logs-${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
-        URL.revokeObjectURL(url);
+        // Revoking immediately after click() is a race: click() only *schedules* the download,
+        // it doesn't start it synchronously, and some webview engines cancel an in-flight
+        // download when its blob URL disappears out from under it. Deferring the revoke gives
+        // the download a moment to actually begin reading the blob first.
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         showToast(t('commandLogs.exportedDownload'), 'success');
       }
     } catch (e) {
