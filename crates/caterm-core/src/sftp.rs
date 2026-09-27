@@ -102,7 +102,8 @@ pub fn list_remote_dir(
             let mode = stat.perm.unwrap_or(0);
             let is_symlink = (mode & 0o120000) == 0o120000;
 
-            let entry_p = join_remote(&path, &file_name).unwrap_or_else(|_| format!("{path}/{file_name}"));
+            let entry_p =
+                join_remote(&path, &file_name).unwrap_or_else(|_| format!("{path}/{file_name}"));
             entries.push(SftpFileEntry {
                 path: entry_p,
                 name: file_name,
@@ -228,8 +229,12 @@ fn remove_remote_dir_recursive(sftp: &ssh2::Sftp, path: &Path) -> Result<(), Cat
         }
     }
 
-    sftp.rmdir(path)
-        .map_err(|e| sftp_err(format!("Failed to remove remote dir {}: {e}", path.display())))?;
+    sftp.rmdir(path).map_err(|e| {
+        sftp_err(format!(
+            "Failed to remove remote dir {}: {e}",
+            path.display()
+        ))
+    })?;
     Ok(())
 }
 
@@ -270,7 +275,11 @@ pub fn rename_remote_file(
     crate::ssh::with_exec_session(host_id, move |sess| {
         let sftp = open_sftp(sess)?;
         sftp.rename(Path::new(&old_p), Path::new(&new_p), None)
-            .map_err(|e| sftp_err(format!("Failed to rename remote file {old_p} -> {new_p}: {e}")))
+            .map_err(|e| {
+                sftp_err(format!(
+                    "Failed to rename remote file {old_p} -> {new_p}: {e}"
+                ))
+            })
     })
 }
 
@@ -283,16 +292,15 @@ pub fn chmod_remote_file(host_id: &str, remote_path: &str, mode: u32) -> Result<
             .stat(Path::new(&path))
             .map_err(|e| sftp_err(format!("Failed to stat remote file {path}: {e}")))?;
         stat.perm = Some(mode);
-        sftp.setstat(Path::new(&path), stat)
-            .map_err(|e| sftp_err(format!("Failed to chmod remote file {path} to {mode:o}: {e}")))
+        sftp.setstat(Path::new(&path), stat).map_err(|e| {
+            sftp_err(format!(
+                "Failed to chmod remote file {path} to {mode:o}: {e}"
+            ))
+        })
     })
 }
 
-pub fn copy_remote_file(
-    host_id: &str,
-    src_path: &str,
-    dst_path: &str,
-) -> Result<(), CatermError> {
+pub fn copy_remote_file(host_id: &str, src_path: &str, dst_path: &str) -> Result<(), CatermError> {
     let data = read_remote_file(host_id, src_path)?;
     write_remote_file(host_id, dst_path, &data)
 }
@@ -334,9 +342,7 @@ pub fn compress_remote(
         channel.wait_close().unwrap_or_default();
         let exit = channel.exit_status().unwrap_or(1);
         if exit != 0 {
-            return Err(sftp_err(format!(
-                "tar exited with status {exit}: {stderr}"
-            )));
+            return Err(sftp_err(format!("tar exited with status {exit}: {stderr}")));
         }
         Ok(())
     })
@@ -405,10 +411,7 @@ where
     clear_cancel_token(transfer_id);
     let local_file = File::open(local_path)
         .map_err(|e| sftp_err(format!("Failed to open local file {local_path}: {e}")))?;
-    let total_bytes = local_file
-        .metadata()
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let total_bytes = local_file.metadata().map(|m| m.len()).unwrap_or(0);
 
     let local_file_arc = Arc::new(Mutex::new(local_file));
     let t_id = transfer_id.to_string();
@@ -611,7 +614,11 @@ pub fn search_remote_files(
     if host_id.is_empty() {
         return Err(sftp_err("host_id must not be empty".to_string()));
     }
-    let base = if base_path.trim().is_empty() { "/" } else { base_path };
+    let base = if base_path.trim().is_empty() {
+        "/"
+    } else {
+        base_path
+    };
 
     // Detect OS; default to Unix if detection fails.
     let is_unix = crate::ssh::detect_host_os(host_id)
@@ -619,8 +626,9 @@ pub fn search_remote_files(
         .unwrap_or(true);
 
     if is_unix {
-        search_via_find(host_id, base, pattern, max_results, min_size, max_size)
-            .or_else(|_| search_via_sftp_walk(host_id, base, pattern, max_results, min_size, max_size))
+        search_via_find(host_id, base, pattern, max_results, min_size, max_size).or_else(|_| {
+            search_via_sftp_walk(host_id, base, pattern, max_results, min_size, max_size)
+        })
     } else {
         search_via_sftp_walk(host_id, base, pattern, max_results, min_size, max_size)
     }
@@ -709,7 +717,15 @@ fn search_via_sftp_walk(
     crate::ssh::with_exec_session(host_id, move |sess| {
         let sftp = open_sftp(sess)?;
         let mut results = Vec::new();
-        sftp_walk(&sftp, &base, &pattern, max_results, min_size, max_size, &mut results)?;
+        sftp_walk(
+            &sftp,
+            &base,
+            &pattern,
+            max_results,
+            min_size,
+            max_size,
+            &mut results,
+        )?;
         Ok(results)
     })
 }
@@ -755,18 +771,42 @@ fn sftp_walk(
         if glob_match(pattern, &name) {
             if !is_dir {
                 let mut pass = true;
-                if min_size.is_some_and(|min| size < min) { pass = false; }
-                if max_size.is_some_and(|max| size > max) { pass = false; }
+                if min_size.is_some_and(|min| size < min) {
+                    pass = false;
+                }
+                if max_size.is_some_and(|max| size > max) {
+                    pass = false;
+                }
                 if pass {
-                    acc.push(RemoteSearchItem { path: full_path.clone(), name, size, mtime, is_dir });
+                    acc.push(RemoteSearchItem {
+                        path: full_path.clone(),
+                        name,
+                        size,
+                        mtime,
+                        is_dir,
+                    });
                 }
             } else {
-                acc.push(RemoteSearchItem { path: full_path.clone(), name, size, mtime, is_dir });
+                acc.push(RemoteSearchItem {
+                    path: full_path.clone(),
+                    name,
+                    size,
+                    mtime,
+                    is_dir,
+                });
             }
         }
 
         if is_dir {
-            sftp_walk(sftp, &full_path, pattern, max_results, min_size, max_size, acc)?;
+            sftp_walk(
+                sftp,
+                &full_path,
+                pattern,
+                max_results,
+                min_size,
+                max_size,
+                acc,
+            )?;
         }
     }
     Ok(())
@@ -797,7 +837,6 @@ fn glob_match_inner(p: &[char], s: &[char]) -> bool {
     }
 }
 
-
 /// Compute SHA-256 or MD5 checksum of a remote file.
 ///
 /// Tries `sha256sum`/`md5sum` command first (fast, no data transfer).
@@ -807,49 +846,52 @@ pub fn calculate_remote_checksum(
     path: &str,
     algorithm: &str,
 ) -> Result<String, CatermError> {
-    use sha2::{Digest, Sha256};
     use md5::Md5;
+    use sha2::{Digest, Sha256};
 
     if host_id.is_empty() {
         return Err(sftp_err("host_id must not be empty".to_string()));
     }
     let algo = algorithm.to_lowercase();
     if algo != "sha256" && algo != "md5" {
-        return Err(sftp_err(format!("unsupported algorithm '{algorithm}'; use sha256 or md5")));
+        return Err(sftp_err(format!(
+            "unsupported algorithm '{algorithm}'; use sha256 or md5"
+        )));
     }
 
     let remote_path = path.to_string();
     let algo_clone = algo.clone();
 
     // Try remote command first (zero-copy, fast).
-    let cmd_result: Result<String, CatermError> = crate::ssh::with_exec_session(host_id, move |sess| {
-        let escaped = remote_path.replace('\'', "'\\''");
-        let cmd = if algo_clone == "sha256" {
-            format!("sha256sum '{escaped}'")
-        } else {
-            format!("md5sum '{escaped}'")
-        };
+    let cmd_result: Result<String, CatermError> =
+        crate::ssh::with_exec_session(host_id, move |sess| {
+            let escaped = remote_path.replace('\'', "'\\''");
+            let cmd = if algo_clone == "sha256" {
+                format!("sha256sum '{escaped}'")
+            } else {
+                format!("md5sum '{escaped}'")
+            };
 
-        let mut channel = sess
-            .channel_session()
-            .map_err(|e| sftp_err(format!("Failed to open channel for checksum: {e}")))?;
-        channel
-            .exec(&cmd)
-            .map_err(|e| sftp_err(format!("Failed to exec checksum command: {e}")))?;
-        let mut out = String::new();
-        channel.read_to_string(&mut out).unwrap_or_default();
-        channel.wait_close().unwrap_or_default();
-        let exit_status = channel.exit_status().unwrap_or(1);
-        if exit_status != 0 || out.trim().is_empty() {
-            return Err(sftp_err("remote checksum command failed".to_string()));
-        }
-        // Output format: "<hash>  <filename>"
-        let hash = out.split_whitespace().next().unwrap_or("").to_string();
-        if hash.is_empty() {
-            return Err(sftp_err("empty checksum output from remote".to_string()));
-        }
-        Ok(hash)
-    });
+            let mut channel = sess
+                .channel_session()
+                .map_err(|e| sftp_err(format!("Failed to open channel for checksum: {e}")))?;
+            channel
+                .exec(&cmd)
+                .map_err(|e| sftp_err(format!("Failed to exec checksum command: {e}")))?;
+            let mut out = String::new();
+            channel.read_to_string(&mut out).unwrap_or_default();
+            channel.wait_close().unwrap_or_default();
+            let exit_status = channel.exit_status().unwrap_or(1);
+            if exit_status != 0 || out.trim().is_empty() {
+                return Err(sftp_err("remote checksum command failed".to_string()));
+            }
+            // Output format: "<hash>  <filename>"
+            let hash = out.split_whitespace().next().unwrap_or("").to_string();
+            if hash.is_empty() {
+                return Err(sftp_err("empty checksum output from remote".to_string()));
+            }
+            Ok(hash)
+        });
 
     if let Ok(hash) = cmd_result {
         return Ok(hash);
@@ -870,7 +912,9 @@ pub fn calculate_remote_checksum(
                 let n = remote_file
                     .read(&mut buf)
                     .map_err(|e| sftp_err(format!("Failed to read remote chunk: {e}")))?;
-                if n == 0 { break; }
+                if n == 0 {
+                    break;
+                }
                 if let Some(chunk) = buf.get(..n) {
                     hasher.update(chunk);
                 }
@@ -882,7 +926,9 @@ pub fn calculate_remote_checksum(
                 let n = remote_file
                     .read(&mut buf)
                     .map_err(|e| sftp_err(format!("Failed to read remote chunk: {e}")))?;
-                if n == 0 { break; }
+                if n == 0 {
+                    break;
+                }
                 if let Some(chunk) = buf.get(..n) {
                     hasher.update(chunk);
                 }
@@ -916,7 +962,6 @@ pub fn compare_file_checksums(
     })
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -949,8 +994,14 @@ mod tests {
     fn join_remote_keeps_exactly_one_separator() {
         assert_eq!(join_remote("/", "etc").unwrap(), "/etc");
         assert_eq!(join_remote(".", "etc").unwrap(), "/etc");
-        assert_eq!(join_remote("/var/log", "syslog").unwrap(), "/var/log/syslog");
-        assert_eq!(join_remote("/var/log/", "syslog").unwrap(), "/var/log/syslog");
+        assert_eq!(
+            join_remote("/var/log", "syslog").unwrap(),
+            "/var/log/syslog"
+        );
+        assert_eq!(
+            join_remote("/var/log/", "syslog").unwrap(),
+            "/var/log/syslog"
+        );
     }
 
     #[test]

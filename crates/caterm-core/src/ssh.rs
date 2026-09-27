@@ -193,7 +193,10 @@ fn connect_resolved(addr: &str, timeout: Duration) -> std::io::Result<std::net::
         }
     }
     Err(last_err.unwrap_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::NotFound, "address resolved to no candidates")
+        std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "address resolved to no candidates",
+        )
     }))
 }
 
@@ -860,7 +863,10 @@ pub fn write(session_id: &str, data: &str) -> Result<String, CatermError> {
                     // every keystroke regardless, so without this check the password itself was
                     // stored (encrypted at rest, but plainly readable in Command Logs and its
                     // CSV export, and offered back as an autocomplete suggestion).
-                    let tail = last_output_tail.lock().map(|t| t.clone()).unwrap_or_default();
+                    let tail = last_output_tail
+                        .lock()
+                        .map(|t| t.clone())
+                        .unwrap_or_default();
                     if looks_like_password_prompt(&tail) {
                         let _ = crate::audit::log_event(
                             "PTY_COMMAND",
@@ -1249,7 +1255,10 @@ mod tests {
         ));
 
         // Either threshold on its own is enough to force a flush.
-        assert!(should_flush_batch(OUTPUT_BATCH_MAX_BYTES, Duration::from_millis(0)));
+        assert!(should_flush_batch(
+            OUTPUT_BATCH_MAX_BYTES,
+            Duration::from_millis(0)
+        ));
         assert!(should_flush_batch(1, OUTPUT_BATCH_MAX_DELAY));
     }
 
@@ -1265,7 +1274,10 @@ mod tests {
             assert!(looks_like_password_prompt(tail), "should match: {tail:?}");
         }
         for tail in ["$ ", "user@host:~$ ", "Permission denied", ""] {
-            assert!(!looks_like_password_prompt(tail), "should not match: {tail:?}");
+            assert!(
+                !looks_like_password_prompt(tail),
+                "should not match: {tail:?}"
+            );
         }
     }
 

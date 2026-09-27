@@ -334,7 +334,11 @@ fn list_dumps(dumps_dir: &Path) -> Vec<(String, PathBuf)> {
         .filter_map(|e| e.ok())
         .filter_map(|e| {
             let path = e.path();
-            let id = path.file_name()?.to_str()?.strip_suffix(".raw.json")?.to_string();
+            let id = path
+                .file_name()?
+                .to_str()?
+                .strip_suffix(".raw.json")?
+                .to_string();
             valid_id(&id).then_some((id, path))
         })
         .collect();
@@ -414,7 +418,11 @@ pub fn submit_crash_report(id: &str) -> Result<(), CatermError> {
         .post(PROXY_URL)
         .header("Content-Type", "application/json")
         .send_json(&payload)
-        .map_err(|e| CatermError::Io(IoError::Generic(format!("Gagal mengirim laporan crash: {e}"))))?;
+        .map_err(|e| {
+            CatermError::Io(IoError::Generic(format!(
+                "Gagal mengirim laporan crash: {e}"
+            )))
+        })?;
 
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
@@ -467,14 +475,32 @@ mod tests {
                    loopback ping to 127.0.0.1 ok";
         let scrubbed = scrubber.scrub_text(raw);
 
-        assert!(!scrubbed.contains("cecepazhar"), "username leaked: {scrubbed}");
-        assert!(!scrubbed.contains("/home/cecepazhar"), "home dir leaked: {scrubbed}");
+        assert!(
+            !scrubbed.contains("cecepazhar"),
+            "username leaked: {scrubbed}"
+        );
+        assert!(
+            !scrubbed.contains("/home/cecepazhar"),
+            "home dir leaked: {scrubbed}"
+        );
         assert!(!scrubbed.contains("192.168.1.120"), "IP leaked: {scrubbed}");
-        assert!(!scrubbed.contains("sk-abcdefghijklmnopqrstuvwx"), "API key leaked: {scrubbed}");
+        assert!(
+            !scrubbed.contains("sk-abcdefghijklmnopqrstuvwx"),
+            "API key leaked: {scrubbed}"
+        );
         assert!(!scrubbed.contains("hunter2"), "password leaked: {scrubbed}");
-        assert!(!scrubbed.contains("sk-abcdefghijklmnopqrstuvwx"), "API key leaked: {scrubbed}");
-        assert!(!scrubbed.contains("BEGIN OPENSSH PRIVATE KEY-----\nabc123"), "private key leaked: {scrubbed}");
-        assert!(scrubbed.contains("127.0.0.1"), "loopback should be kept: {scrubbed}");
+        assert!(
+            !scrubbed.contains("sk-abcdefghijklmnopqrstuvwx"),
+            "API key leaked: {scrubbed}"
+        );
+        assert!(
+            !scrubbed.contains("BEGIN OPENSSH PRIVATE KEY-----\nabc123"),
+            "private key leaked: {scrubbed}"
+        );
+        assert!(
+            scrubbed.contains("127.0.0.1"),
+            "loopback should be kept: {scrubbed}"
+        );
         assert!(scrubbed.contains("[REDACTED_PRIVATE_KEY]"));
         // The api_key value also sits behind a "api_key: ..." label, so the broader
         // key-value rule may redact it a second time on top of the narrower rule's own
@@ -495,7 +521,10 @@ mod tests {
 
     #[test]
     fn scrubber_redacts_a_bare_username_outside_any_path() {
-        let scrubber = PiiScrubber { home_dir: "/home/cecepazhar".to_string(), username: "cecepazhar".to_string() };
+        let scrubber = PiiScrubber {
+            home_dir: "/home/cecepazhar".to_string(),
+            username: "cecepazhar".to_string(),
+        };
         let scrubbed = scrubber.scrub_text("connected as user cecepazhar from another session");
         assert!(!scrubbed.contains("cecepazhar"));
         assert!(scrubbed.contains("[USER]"));
@@ -503,14 +532,19 @@ mod tests {
 
     #[test]
     fn scrubber_is_idempotent_with_no_secrets() {
-        let scrubber = PiiScrubber { home_dir: String::new(), username: String::new() };
+        let scrubber = PiiScrubber {
+            home_dir: String::new(),
+            username: String::new(),
+        };
         let text = "assertion failed: key_len == 32";
         assert_eq!(scrubber.scrub_text(text), text);
     }
 
     #[test]
     fn valid_id_rejects_path_traversal_and_junk() {
-        assert!(valid_id("1790300000000-a1b2c3d4-e5f6-4a1b-9c3d-8e7f6a5b4c3d"));
+        assert!(valid_id(
+            "1790300000000-a1b2c3d4-e5f6-4a1b-9c3d-8e7f6a5b4c3d"
+        ));
         assert!(!valid_id(""));
         assert!(!valid_id("../../etc/passwd"));
         assert!(!valid_id("has spaces"));
@@ -520,7 +554,11 @@ mod tests {
     #[test]
     fn no_pending_report_when_directory_is_empty() {
         let guard = crate::test_support::isolated_data_dir("crash_empty");
-        assert!(pending_crash_report().expect("pending_crash_report failed").is_none());
+        assert!(
+            pending_crash_report()
+                .expect("pending_crash_report failed")
+                .is_none()
+        );
         drop(guard);
     }
 
@@ -548,7 +586,10 @@ mod tests {
             backtrace: String::new(),
         };
         let newer = RawCrashEvent {
-            message: format!("assertion failed: key_len == 32 at /home/{}/.ssh/id_ed25519", "tester"),
+            message: format!(
+                "assertion failed: key_len == 32 at /home/{}/.ssh/id_ed25519",
+                "tester"
+            ),
             ..older.clone()
         };
         write_restricted(
@@ -574,7 +615,10 @@ mod tests {
         dismiss_crash_report(&pending.id, false).expect("dismiss failed");
         assert!(!dumps_dir.join(format!("{}.raw.json", pending.id)).exists());
         let remaining = pending_crash_report().expect("pending_crash_report failed");
-        assert!(remaining.is_some(), "the older dump should still be pending");
+        assert!(
+            remaining.is_some(),
+            "the older dump should still be pending"
+        );
 
         drop(guard);
     }
@@ -599,13 +643,22 @@ mod tests {
         )
         .expect("write");
 
-        dismiss_crash_report("3000-cccccccc-cccc-cccc-cccc-cccccccccccc", true).expect("dismiss failed");
+        dismiss_crash_report("3000-cccccccc-cccc-cccc-cccc-cccccccccccc", true)
+            .expect("dismiss failed");
         assert!(is_disabled());
-        assert!(pending_crash_report().expect("pending_crash_report failed").is_none());
+        assert!(
+            pending_crash_report()
+                .expect("pending_crash_report failed")
+                .is_none()
+        );
 
         // A dump written after opting out is never even created.
         try_record_panic_test_hook(&guard.path);
-        assert!(pending_crash_report().expect("pending_crash_report failed").is_none());
+        assert!(
+            pending_crash_report()
+                .expect("pending_crash_report failed")
+                .is_none()
+        );
 
         drop(guard);
     }

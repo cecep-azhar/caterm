@@ -76,8 +76,12 @@ impl RemoteFileSystem for ScpFileSystem {
                 }
                 let is_dir = parts.first().map(|p| p.starts_with('d')).unwrap_or(false);
                 let is_symlink = parts.first().map(|p| p.starts_with('l')).unwrap_or(false);
-                let size = parts.get(4).and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
-                let full_path = crate::sftp::join_remote(&path, &name).unwrap_or_else(|_| format!("{path}/{name}"));
+                let size = parts
+                    .get(4)
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
+                let full_path = crate::sftp::join_remote(&path, &name)
+                    .unwrap_or_else(|_| format!("{path}/{name}"));
 
                 entries.push(SftpFileEntry {
                     name,
@@ -289,10 +293,7 @@ impl RemoteFileSystem for ScpFileSystem {
         crate::sftp::clear_cancel_token(transfer_id);
         let local_file = File::open(local_path)
             .map_err(|e| scp_err(format!("Failed to open local file {local_path}: {e}")))?;
-        let total_bytes = local_file
-            .metadata()
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let total_bytes = local_file.metadata().map(|m| m.len()).unwrap_or(0);
 
         let local_file_arc = Arc::new(Mutex::new(local_file));
         let t_id = transfer_id.to_string();
@@ -405,9 +406,9 @@ impl RemoteFileSystem for ScpFileSystem {
                 {
                     let mut guard = local_file_arc.lock();
                     if let Some(chunk) = buffer.get(..n) {
-                        guard
-                            .write_all(chunk)
-                            .map_err(|e| scp_err(format!("Failed to write local file chunk: {e}")))?;
+                        guard.write_all(chunk).map_err(|e| {
+                            scp_err(format!("Failed to write local file chunk: {e}"))
+                        })?;
                     }
                 }
 

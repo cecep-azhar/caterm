@@ -18,7 +18,9 @@ pub(crate) fn mask_secrets(text: &str) -> String {
     let re = match SECRET_REGEX.get() {
         Some(r) => r,
         None => {
-            if let Ok(compiled) = Regex::new(r#"(?i)(password|pass|secret|token|key)\s*(=|:|\s)\s*['"]?([^'"\s]+)['"]?"#) {
+            if let Ok(compiled) = Regex::new(
+                r#"(?i)(password|pass|secret|token|key)\s*(=|:|\s)\s*['"]?([^'"\s]+)['"]?"#,
+            ) {
                 let _ = SECRET_REGEX.set(compiled);
             }
             if let Some(r) = SECRET_REGEX.get() {

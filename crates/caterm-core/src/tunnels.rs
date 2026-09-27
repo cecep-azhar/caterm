@@ -251,11 +251,7 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                             thread::spawn(move || {
                                 let mut channel = {
                                     let guard = sess_inner.lock();
-                                    match guard.channel_direct_tcpip(
-                                        &t_addr,
-                                        target_port,
-                                        None,
-                                    ) {
+                                    match guard.channel_direct_tcpip(&t_addr, target_port, None) {
                                         Ok(c) => c,
                                         Err(_) => return,
                                     }
@@ -404,12 +400,18 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                             thread::spawn(move || {
                                 local_stream.set_nonblocking(false).ok();
                                 let mut buf = [0u8; 512];
-                                let Some(head) = buf.get_mut(0..2) else { return; };
-                                if local_stream.read_exact(head).is_err() || head.first() != Some(&5) {
+                                let Some(head) = buf.get_mut(0..2) else {
+                                    return;
+                                };
+                                if local_stream.read_exact(head).is_err()
+                                    || head.first() != Some(&5)
+                                {
                                     return;
                                 }
                                 let nmethods = head.get(1).copied().unwrap_or(0) as usize;
-                                let Some(methods_buf) = buf.get_mut(0..nmethods) else { return; };
+                                let Some(methods_buf) = buf.get_mut(0..nmethods) else {
+                                    return;
+                                };
                                 if local_stream.read_exact(methods_buf).is_err() {
                                     return;
                                 }
@@ -417,7 +419,9 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                     return;
                                 }
 
-                                let Some(req_head) = buf.get_mut(0..4) else { return; };
+                                let Some(req_head) = buf.get_mut(0..4) else {
+                                    return;
+                                };
                                 if local_stream.read_exact(req_head).is_err()
                                     || req_head.first() != Some(&5)
                                     || req_head.get(1) != Some(&1)
@@ -426,7 +430,9 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                 }
                                 let atyp = req_head.get(3).copied().unwrap_or(0);
                                 let target_host = if atyp == 1 {
-                                    let Some(ip_buf) = buf.get_mut(0..4) else { return; };
+                                    let Some(ip_buf) = buf.get_mut(0..4) else {
+                                        return;
+                                    };
                                     if local_stream.read_exact(ip_buf).is_err() {
                                         return;
                                     }
@@ -438,12 +444,16 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                         ip_buf.get(3).copied().unwrap_or(0)
                                     )
                                 } else if atyp == 3 {
-                                    let Some(len_buf) = buf.get_mut(0..1) else { return; };
+                                    let Some(len_buf) = buf.get_mut(0..1) else {
+                                        return;
+                                    };
                                     if local_stream.read_exact(len_buf).is_err() {
                                         return;
                                     }
                                     let len = len_buf.first().copied().unwrap_or(0) as usize;
-                                    let Some(domain_buf) = buf.get_mut(0..len) else { return; };
+                                    let Some(domain_buf) = buf.get_mut(0..len) else {
+                                        return;
+                                    };
                                     if local_stream.read_exact(domain_buf).is_err() {
                                         return;
                                     }
@@ -452,7 +462,9 @@ pub fn start_tunnel(id: &str) -> Result<(), CatermError> {
                                     return;
                                 };
 
-                                let Some(port_buf) = buf.get_mut(0..2) else { return; };
+                                let Some(port_buf) = buf.get_mut(0..2) else {
+                                    return;
+                                };
                                 if local_stream.read_exact(port_buf).is_err() {
                                     return;
                                 }
@@ -598,6 +610,10 @@ mod tests {
         assert_eq!(all[0].bind_port, 2222);
 
         delete_tunnel(&saved.id).expect("delete_tunnel should open the same database");
-        assert!(list_tunnels().expect("list_tunnels after delete").is_empty());
+        assert!(
+            list_tunnels()
+                .expect("list_tunnels after delete")
+                .is_empty()
+        );
     }
 }

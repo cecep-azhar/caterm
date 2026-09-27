@@ -211,14 +211,13 @@ fn post_chat_completion(
         request = request.header("Authorization", &format!("Bearer {api_key}"));
     }
 
-    let mut response = request
-        .send_json(&payload)
-        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Failed to connect to {url}: {e}"))))?;
+    let mut response = request.send_json(&payload).map_err(|e| {
+        CatermError::Ai(AiError::Generic(format!("Failed to connect to {url}: {e}")))
+    })?;
 
-    let body = response
-        .body_mut()
-        .read_to_string()
-        .map_err(|e| CatermError::Ai(AiError::Generic(format!("Failed to read AI response: {e}"))))?;
+    let body = response.body_mut().read_to_string().map_err(|e| {
+        CatermError::Ai(AiError::Generic(format!("Failed to read AI response: {e}")))
+    })?;
 
     extract_message_content(&body).ok_or_else(|| {
         CatermError::Ai(AiError::Generic(format!(
@@ -322,7 +321,10 @@ fn plan_payload(model: Option<&str>, goal: &str) -> serde_json::Value {
     if let Some(model) = model
         && let Some(obj) = payload.as_object_mut()
     {
-        obj.insert("model".to_string(), serde_json::Value::String(model.to_string()));
+        obj.insert(
+            "model".to_string(),
+            serde_json::Value::String(model.to_string()),
+        );
     }
     payload
 }
@@ -615,7 +617,7 @@ fn build_template_plan(
             requirements,
             steps,
             source: default_plan_source(),
-        created_at: now,
+            created_at: now,
             estimated_time: Some("~6 mins".to_string()),
         }
     } else if goal_lower.contains("node")
@@ -688,7 +690,7 @@ fn build_template_plan(
             requirements,
             steps,
             source: default_plan_source(),
-        created_at: now,
+            created_at: now,
             estimated_time: Some("~8 mins".to_string()),
         }
     } else if goal_lower.contains("python")
@@ -744,7 +746,7 @@ fn build_template_plan(
             requirements,
             steps,
             source: default_plan_source(),
-        created_at: now,
+            created_at: now,
             estimated_time: Some("~6 mins".to_string()),
         }
     } else if goal_lower.contains("hardening")
@@ -848,7 +850,7 @@ fn build_template_plan(
             requirements,
             steps,
             source: default_plan_source(),
-        created_at: now,
+            created_at: now,
             estimated_time: Some("~3 mins".to_string()),
         }
     }
@@ -1022,60 +1024,64 @@ pub fn execute_plan_step(host_id: &str, command: &str) -> Result<AiExecutionResu
         )));
     }
     if command.trim().is_empty() {
-    	return Err(CatermError::Validation(ValidationError::Generic(
-    		"command cannot be empty".to_string(),
-    	)));
+        return Err(CatermError::Validation(ValidationError::Generic(
+            "command cannot be empty".to_string(),
+        )));
     }
 
     if host_id == "local" || host_id == "__local__" {
-    	#[cfg(windows)]
-    	let mut cmd = std::process::Command::new("powershell.exe");
-    	#[cfg(windows)]
-    	{
-    		use std::os::windows::process::CommandExt;
-    		const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    		cmd.args(["-NoLogo", "-NonInteractive", "-Command", command]);
-    		cmd.creation_flags(CREATE_NO_WINDOW);
-    	}
+        #[cfg(windows)]
+        let mut cmd = std::process::Command::new("powershell.exe");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            cmd.args(["-NoLogo", "-NonInteractive", "-Command", command]);
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
 
-    	#[cfg(not(windows))]
-    	let mut cmd = std::process::Command::new("sh");
-    	#[cfg(not(windows))]
-    	cmd.args(["-c", command]);
+        #[cfg(not(windows))]
+        let mut cmd = std::process::Command::new("sh");
+        #[cfg(not(windows))]
+        cmd.args(["-c", command]);
 
-    	let output = cmd.output().map_err(|e| {
-    		CatermError::Ai(AiError::Generic(format!("Failed to execute local command: {e}")))
-    	})?;
+        let output = cmd.output().map_err(|e| {
+            CatermError::Ai(AiError::Generic(format!(
+                "Failed to execute local command: {e}"
+            )))
+        })?;
 
-    	let exit_code = output.status.code().unwrap_or(0);
-    	let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    	let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    	let success = output.status.success();
-    	let summary = if success { "SUCCESS" } else { "FAILED" };
+        let exit_code = output.status.code().unwrap_or(0);
+        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let success = output.status.success();
+        let summary = if success { "SUCCESS" } else { "FAILED" };
 
-    	let _ = crate::audit::log_event(
-    		"AI_AUTOMATION",
-    		Some(host_id),
-    		&format!("[AI-EXEC-LOCAL] Command: {command} Exit: {exit_code} Result: {summary}"),
-    	);
+        let _ = crate::audit::log_event(
+            "AI_AUTOMATION",
+            Some(host_id),
+            &format!("[AI-EXEC-LOCAL] Command: {command} Exit: {exit_code} Result: {summary}"),
+        );
 
-    	return Ok(AiExecutionResult {
-    		step: 1,
-    		command: command.to_string(),
-    		success,
-    		exit_code,
-    		stdout,
-    		stderr,
-    		step_number: Some(1),
-    		duration_ms: None,
-    	});
+        return Ok(AiExecutionResult {
+            step: 1,
+            command: command.to_string(),
+            success,
+            exit_code,
+            stdout,
+            stderr,
+            step_number: Some(1),
+            duration_ms: None,
+        });
     }
 
     // Runs on the host's pooled non-interactive session, NOT the terminal pane's session:
     // an automation step must not be able to stall (or steal output from) an open terminal.
     let (exit_code, stdout_buf, stderr_buf) = crate::ssh::with_exec_session(host_id, |sess| {
         let mut channel = sess.channel_session().map_err(|e| {
-            CatermError::Ssh(SshError::Generic(format!("Failed to open SSH channel: {e}")))
+            CatermError::Ssh(SshError::Generic(format!(
+                "Failed to open SSH channel: {e}"
+            )))
         })?;
 
         channel.exec(command).map_err(|e| {
@@ -1175,9 +1181,14 @@ mod tests {
 
     #[test]
     fn extract_message_content_rejects_a_body_with_no_text() {
-        assert!(extract_message_content("data: [DONE]
+        assert!(
+            extract_message_content(
+                "data: [DONE]
 
-").is_none());
+"
+            )
+            .is_none()
+        );
         assert!(extract_message_content("not json at all").is_none());
         assert!(extract_message_content(r#"{"error":"API key required"}"#).is_none());
     }
@@ -1240,8 +1251,12 @@ mod tests {
 
     #[test]
     fn generate_laravel_plan_has_seven_sequential_steps() {
-        let plan = generate_plan("Setup Laravel 11 on Ubuntu with PHP and Composer", None, false)
-            .expect("generate_plan failed");
+        let plan = generate_plan(
+            "Setup Laravel 11 on Ubuntu with PHP and Composer",
+            None,
+            false,
+        )
+        .expect("generate_plan failed");
 
         assert_eq!(
             plan.steps.len(),
@@ -1267,8 +1282,8 @@ mod tests {
 
     #[test]
     fn generate_docker_plan_has_docker_steps() {
-        let plan =
-            generate_plan("Install Docker and docker compose", None, false).expect("generate_plan failed");
+        let plan = generate_plan("Install Docker and docker compose", None, false)
+            .expect("generate_plan failed");
 
         assert!(plan.steps.len() >= 5);
         assert!(plan.steps.iter().any(|s| s.command.contains("docker-ce")));
@@ -1287,8 +1302,8 @@ mod tests {
 
     #[test]
     fn generate_python_plan_has_python_and_venv() {
-        let plan =
-            generate_plan("Setup Python Django backend", None, false).expect("generate_plan failed");
+        let plan = generate_plan("Setup Python Django backend", None, false)
+            .expect("generate_plan failed");
 
         assert!(plan.steps.iter().any(|s| s.command.contains("python3")));
         assert!(plan.requirements.iter().any(|r| r.contains("Python 3")));

@@ -76,8 +76,16 @@ fn parse_metrics(host_id: &str, raw: &str) -> Result<HostMetrics, CatermError> {
     let output = raw.trim();
     let parts: Vec<&str> = output.split('|').collect();
 
-    let [hostname, os_name, uptime, cpu, mem_total, mem_used, disk_total, disk_used] =
-        parts.as_slice()
+    let [
+        hostname,
+        os_name,
+        uptime,
+        cpu,
+        mem_total,
+        mem_used,
+        disk_total,
+        disk_used,
+    ] = parts.as_slice()
     else {
         return Err(ssh_err(format!("Invalid metrics response: {output}")));
     };

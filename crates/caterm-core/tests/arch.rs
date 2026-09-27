@@ -258,9 +258,8 @@ fn tauri_command_registry_build_script_and_acl_agree() {
         .expect("gagal membaca caterm-app/src/lib.rs");
     let build_rs = std::fs::read_to_string(app_dir.join("build.rs"))
         .expect("gagal membaca caterm-app/build.rs");
-    let capabilities =
-        std::fs::read_to_string(app_dir.join("capabilities").join("default.json"))
-            .expect("gagal membaca caterm-app/capabilities/default.json");
+    let capabilities = std::fs::read_to_string(app_dir.join("capabilities").join("default.json"))
+        .expect("gagal membaca caterm-app/capabilities/default.json");
 
     // `commands::<name>,` inside generate_handler![...]
     let handler_block = lib_rs
@@ -304,7 +303,10 @@ fn tauri_command_registry_build_script_and_acl_agree() {
         diff
     };
 
-    assert!(!registered.is_empty(), "tidak ada command yang terbaca dari generate_handler!");
+    assert!(
+        !registered.is_empty(),
+        "tidak ada command yang terbaca dari generate_handler!"
+    );
 
     let missing_from_build = sorted(&registered, &declared);
     assert!(

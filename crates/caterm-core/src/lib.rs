@@ -27,6 +27,7 @@ pub mod backup;
 pub mod crash;
 pub mod db;
 pub mod error;
+pub mod feedback;
 pub mod ftp;
 pub mod groups;
 pub mod investigations;
@@ -34,6 +35,9 @@ pub mod keys;
 pub mod local_fs;
 pub mod monitor;
 pub mod paths;
+pub mod prefs;
+pub mod pro;
+pub mod s3;
 pub mod scp;
 pub mod secret;
 pub mod sftp;
@@ -46,10 +50,6 @@ pub mod tunnels;
 pub mod vault;
 pub mod vfs;
 pub mod webdav;
-pub mod s3;
-pub mod feedback;
-pub mod prefs;
-pub mod pro;
 
 pub use error::CatermError;
 pub use vfs::RemoteFileSystem;
@@ -79,7 +79,8 @@ pub(crate) mod test_support {
 
     pub(crate) fn isolated_data_dir(label: &str) -> IsolatedDataDir {
         let guard = GLOBAL_STATE.lock();
-        let path = std::env::temp_dir().join(format!("caterm_test_{label}_{}", uuid::Uuid::new_v4()));
+        let path =
+            std::env::temp_dir().join(format!("caterm_test_{label}_{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&path).expect("create isolated test data dir");
         let previous = std::env::var_os("CATERM_DATA_DIR");
         // SAFETY: tests that depend on CATERM_DATA_DIR hold GLOBAL_STATE (taken above), so no
@@ -88,7 +89,11 @@ pub(crate) mod test_support {
         unsafe {
             std::env::set_var("CATERM_DATA_DIR", &path);
         }
-        IsolatedDataDir { path, previous, _guard: guard }
+        IsolatedDataDir {
+            path,
+            previous,
+            _guard: guard,
+        }
     }
 
     impl Drop for IsolatedDataDir {

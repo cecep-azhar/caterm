@@ -132,9 +132,7 @@ fn row_to_host(row: &rusqlite::Row) -> rusqlite::Result<HostRecord> {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
     })?;
     let os: Option<String> = row.get("os").unwrap_or(None);
-    let protocol_str: String = row
-        .get("protocol")
-        .unwrap_or_else(|_| "ssh".to_string());
+    let protocol_str: String = row.get("protocol").unwrap_or_else(|_| "ssh".to_string());
     let protocol = ConnectionProtocol::from_str_opt(&protocol_str);
     Ok(HostRecord {
         id: row.get("id")?,

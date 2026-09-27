@@ -524,12 +524,9 @@ pub fn start_watch(
                                 if let Ok(remote_path) =
                                     sftp::join_remote(&remote_dir_clone, &rel_str)
                                 {
-                                    let _ =
-                                        ensure_remote_parent_dir(&host_id_clone, &remote_path);
-                                    let transfer_id =
-                                        format!("watch-up-{}", uuid::Uuid::new_v4());
-                                    let noop =
-                                        std::sync::Arc::new(parking_lot::Mutex::new(|_| {}));
+                                    let _ = ensure_remote_parent_dir(&host_id_clone, &remote_path);
+                                    let transfer_id = format!("watch-up-{}", uuid::Uuid::new_v4());
+                                    let noop = std::sync::Arc::new(parking_lot::Mutex::new(|_| {}));
                                     let _ = sftp::upload_file_with_progress(
                                         &host_id_clone,
                                         &path.to_string_lossy(),

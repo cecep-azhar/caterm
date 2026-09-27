@@ -35,11 +35,12 @@ pub fn open_encrypted(data_dir: &Path, passphrase: &str) -> Result<Connection, C
                 // Not on the fast path yet: open with the legacy passphrase-derived key, then
                 // rekey to raw so this (and every later) open is fast from now on.
                 let conn = open_keyed(&db_path, &passphrase_literal(passphrase))?;
-                conn.execute_batch(&format!("PRAGMA rekey = {raw_key};")).map_err(|e| {
-                    CatermError::Db(DbError::Generic(format!(
-                        "failed to migrate database to raw-key mode: {e}"
-                    )))
-                })?;
+                conn.execute_batch(&format!("PRAGMA rekey = {raw_key};"))
+                    .map_err(|e| {
+                        CatermError::Db(DbError::Generic(format!(
+                            "failed to migrate database to raw-key mode: {e}"
+                        )))
+                    })?;
                 conn
             }
         }
@@ -204,9 +205,7 @@ fn migrate_hosts_os_column(conn: &Connection) -> Result<(), CatermError> {
     if !has_column {
         conn.execute_batch("ALTER TABLE hosts ADD COLUMN os TEXT")
             .map_err(|e| {
-                CatermError::Db(DbError::Generic(format!(
-                    "gagal migrasi kolom os: {e}"
-                )))
+                CatermError::Db(DbError::Generic(format!("gagal migrasi kolom os: {e}")))
             })?;
     }
     Ok(())
@@ -324,7 +323,10 @@ mod tests {
         let count: i64 = migrated
             .query_row("SELECT count(*) FROM hosts", [], |r| r.get(0))
             .expect("query hosts after migration");
-        assert_eq!(count, 1, "data survives the passphrase -> raw-key migration");
+        assert_eq!(
+            count, 1,
+            "data survives the passphrase -> raw-key migration"
+        );
         drop(migrated);
 
         // Prove it: key with *only* the raw-key PRAGMA, bypassing open_encrypted's fallback

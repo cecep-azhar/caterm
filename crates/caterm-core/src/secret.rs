@@ -67,9 +67,9 @@ pub fn encrypt_bytes(key: &[u8; 32], plaintext: &[u8]) -> Result<String, CatermE
 }
 
 pub fn decrypt_bytes(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, CatermError> {
-    let payload = encoded.strip_prefix(PREFIX).ok_or_else(|| {
-        CatermError::Vault(VaultError::Generic("unknown secret format".into()))
-    })?;
+    let payload = encoded
+        .strip_prefix(PREFIX)
+        .ok_or_else(|| CatermError::Vault(VaultError::Generic("unknown secret format".into())))?;
     let raw = base64::engine::general_purpose::STANDARD
         .decode(payload)
         .map_err(|e| {
@@ -88,12 +88,16 @@ pub fn decrypt_bytes(key: &[u8; 32], encoded: &str) -> Result<Vec<u8>, CatermErr
     })?;
     cipher
         .decrypt(Nonce::from_slice(nonce_bytes), ciphertext)
-        .map_err(|e| CatermError::Vault(VaultError::Generic(format!("failed to decrypt secret: {e}"))))
+        .map_err(|e| {
+            CatermError::Vault(VaultError::Generic(format!(
+                "failed to decrypt secret: {e}"
+            )))
+        })
 }
 pub fn decrypt(local_key_hex: &str, encoded: &str) -> Result<String, CatermError> {
-    let payload = encoded.strip_prefix(PREFIX).ok_or_else(|| {
-        CatermError::Vault(VaultError::Generic("unknown secret format".into()))
-    })?;
+    let payload = encoded
+        .strip_prefix(PREFIX)
+        .ok_or_else(|| CatermError::Vault(VaultError::Generic("unknown secret format".into())))?;
     let raw = base64::engine::general_purpose::STANDARD
         .decode(payload)
         .map_err(|e| {

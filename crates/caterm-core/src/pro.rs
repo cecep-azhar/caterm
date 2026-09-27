@@ -16,13 +16,13 @@
 //! (`INVALID_CREDENTIALS`, `DEVICE_LIMIT_EXCEEDED`, `NETWORK`, ...) so the UI can translate it.
 
 use crate::error::{CatermError, DbError, ProError};
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 
@@ -100,10 +100,17 @@ struct SignedToken {
     key_version: u32,
 }
 
-fn verify_with(key: &VerifyingKey, payload: &str, signature_b64: &str) -> Result<TokenPayload, &'static str> {
-    let sig_bytes = STANDARD.decode(signature_b64).map_err(|_| "BAD_SIGNATURE")?;
+fn verify_with(
+    key: &VerifyingKey,
+    payload: &str,
+    signature_b64: &str,
+) -> Result<TokenPayload, &'static str> {
+    let sig_bytes = STANDARD
+        .decode(signature_b64)
+        .map_err(|_| "BAD_SIGNATURE")?;
     let signature = Signature::from_slice(&sig_bytes).map_err(|_| "BAD_SIGNATURE")?;
-    key.verify(payload.as_bytes(), &signature).map_err(|_| "BAD_SIGNATURE")?;
+    key.verify(payload.as_bytes(), &signature)
+        .map_err(|_| "BAD_SIGNATURE")?;
     serde_json::from_str(payload).map_err(|_| "BAD_PAYLOAD")
 }
 
@@ -140,24 +147,53 @@ fn evaluate(
         return (Entitlement::None, last_seen);
     };
     let Some(key) = key_for(version) else {
-        return (Entitlement::Invalid { reason: "KEY_NOT_CONFIGURED".into() }, last_seen);
+        return (
+            Entitlement::Invalid {
+                reason: "KEY_NOT_CONFIGURED".into(),
+            },
+            last_seen,
+        );
     };
     let claims = match verify_with(&key, payload, signature) {
         Ok(c) => c,
-        Err(reason) => return (Entitlement::Invalid { reason: reason.into() }, last_seen),
+        Err(reason) => {
+            return (
+                Entitlement::Invalid {
+                    reason: reason.into(),
+                },
+                last_seen,
+            );
+        }
     };
     if claims.hwid != hwid {
         // A database copied from another machine carries that machine's token.
-        return (Entitlement::Invalid { reason: "OTHER_DEVICE".into() }, last_seen);
+        return (
+            Entitlement::Invalid {
+                reason: "OTHER_DEVICE".into(),
+            },
+            last_seen,
+        );
     }
     if now < last_seen - CLOCK_DRIFT_TOLERANCE_SECS {
-        return (Entitlement::RevalidationRequired { reason: "CLOCK_ROLLBACK".into() }, last_seen);
+        return (
+            Entitlement::RevalidationRequired {
+                reason: "CLOCK_ROLLBACK".into(),
+            },
+            last_seen,
+        );
     }
     let seen = now.max(last_seen);
     if now >= claims.exp {
         return (Entitlement::Expired, seen);
     }
-    (Entitlement::Valid { expires_at: claims.exp, tier: claims.tier, features: claims.features }, seen)
+    (
+        Entitlement::Valid {
+            expires_at: claims.exp,
+            tier: claims.tier,
+            features: claims.features,
+        },
+        seen,
+    )
 }
 
 // ---- Device identity -------------------------------------------------------------------------
@@ -206,7 +242,12 @@ fn device_body(hwid: &str) -> Value {
 
 // ---- HTTP ------------------------------------------------------------------------------------
 
-fn request(method: &str, path: &str, bearer: Option<&str>, body: Option<&Value>) -> Result<(u16, Value), CatermError> {
+fn request(
+    method: &str,
+    path: &str,
+    bearer: Option<&str>,
+    body: Option<&Value>,
+) -> Result<(u16, Value), CatermError> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(HTTP_TIMEOUT))
         .http_status_as_error(false) // we need the JSON error code in 4xx bodies
@@ -215,7 +256,11 @@ fn request(method: &str, path: &str, bearer: Option<&str>, body: Option<&Value>)
     let url = format!("{}{path}", api_base());
     let result = match method {
         "GET" | "DELETE" => {
-            let mut req = if method == "GET" { agent.get(&url) } else { agent.delete(&url) };
+            let mut req = if method == "GET" {
+                agent.get(&url)
+            } else {
+                agent.delete(&url)
+            };
             if let Some(token) = bearer {
                 req = req.header("Authorization", &format!("Bearer {token}"));
             }
@@ -245,7 +290,10 @@ fn api_error(status: u16, body: &Value) -> CatermError {
 
 /// Server ids (UUIDs) are interpolated into paths: refuse anything else.
 fn path_id(id: &str) -> Result<&str, CatermError> {
-    if !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') {
+    if !id.is_empty()
+        && id.len() <= 64
+        && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+    {
         Ok(id)
     } else {
         Err(pro_err("BAD_REQUEST"))
@@ -253,7 +301,9 @@ fn path_id(id: &str) -> Result<&str, CatermError> {
 }
 
 fn parse<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Option<T> {
-    body.get(key).filter(|v| !v.is_null()).and_then(|v| serde_json::from_value(v.clone()).ok())
+    body.get(key)
+        .filter(|v| !v.is_null())
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
 }
 
 // ---- Wire types ------------------------------------------------------------------------------
@@ -377,10 +427,16 @@ struct Session {
 fn parse_session(body: &Value) -> Result<Session, CatermError> {
     let field = |k: &str| body.get(k).and_then(Value::as_str).map(str::to_string);
     Ok(Session {
-        account: body.get("account").cloned().ok_or_else(|| pro_err("BAD_RESPONSE"))?,
+        account: body
+            .get("account")
+            .cloned()
+            .ok_or_else(|| pro_err("BAD_RESPONSE"))?,
         refresh_token: field("refresh_token").ok_or_else(|| pro_err("BAD_RESPONSE"))?,
         access_token: field("access_token").ok_or_else(|| pro_err("BAD_RESPONSE"))?,
-        access_expires_at: body.get("access_expires_at").and_then(Value::as_i64).unwrap_or(0),
+        access_expires_at: body
+            .get("access_expires_at")
+            .and_then(Value::as_i64)
+            .unwrap_or(0),
     })
 }
 
@@ -455,8 +511,11 @@ fn load_state(conn: &Connection) -> Result<Option<StoredState>, CatermError> {
 
 fn save_session(conn: &Connection, session: &Session) -> Result<(), CatermError> {
     ensure_table(conn)?;
-    let previous_account = load_state(conn)?.and_then(|s| account_from(&s.account)).map(|a| a.id);
-    let same_account = previous_account.as_deref() == account_from(&session.account).map(|a| a.id).as_deref();
+    let previous_account = load_state(conn)?
+        .and_then(|s| account_from(&s.account))
+        .map(|a| a.id);
+    let same_account =
+        previous_account.as_deref() == account_from(&session.account).map(|a| a.id).as_deref();
     let account_json = session.account.to_string();
     if same_account {
         conn.execute(
@@ -476,8 +535,16 @@ fn save_session(conn: &Connection, session: &Session) -> Result<(), CatermError>
     Ok(())
 }
 
-fn save_license(conn: &Connection, license: &Value, token: Option<&SignedToken>) -> Result<(), CatermError> {
-    let license_json = if license.is_null() { None } else { Some(license.to_string()) };
+fn save_license(
+    conn: &Connection,
+    license: &Value,
+    token: Option<&SignedToken>,
+) -> Result<(), CatermError> {
+    let license_json = if license.is_null() {
+        None
+    } else {
+        Some(license.to_string())
+    };
     conn.execute(
         "UPDATE pro_state SET license_json = ?1, token_payload = ?2, token_signature = ?3,
                               token_key_version = ?4, last_sync_at = ?5
@@ -534,7 +601,12 @@ fn access_token(conn: &Connection) -> Result<String, CatermError> {
     Ok(session.access_token)
 }
 
-fn authed(conn: &Connection, method: &str, path: &str, body: Option<&Value>) -> Result<(u16, Value), CatermError> {
+fn authed(
+    conn: &Connection,
+    method: &str,
+    path: &str,
+    body: Option<&Value>,
+) -> Result<(u16, Value), CatermError> {
     let token = access_token(conn)?;
     let (status, value) = request(method, path, Some(&token), body)?;
     if status == 401 {
@@ -598,7 +670,9 @@ pub fn register(email: &str, password: &str, name: &str, locale: &str) -> Result
         "POST",
         "/auth/register",
         None,
-        Some(&json!({ "email": email.trim(), "password": password, "name": name.trim(), "locale": locale })),
+        Some(
+            &json!({ "email": email.trim(), "password": password, "name": name.trim(), "locale": locale }),
+        ),
     )?;
     if status == 201 {
         Ok(())
@@ -608,11 +682,23 @@ pub fn register(email: &str, password: &str, name: &str, locale: &str) -> Result
 }
 
 pub fn resend_verification(email: &str) -> Result<(), CatermError> {
-    request("POST", "/auth/resend-verification", None, Some(&json!({ "email": email.trim() }))).map(|_| ())
+    request(
+        "POST",
+        "/auth/resend-verification",
+        None,
+        Some(&json!({ "email": email.trim() })),
+    )
+    .map(|_| ())
 }
 
 pub fn forgot_password(email: &str, locale: &str) -> Result<(), CatermError> {
-    request("POST", "/auth/password/forgot", None, Some(&json!({ "email": email.trim(), "locale": locale }))).map(|_| ())
+    request(
+        "POST",
+        "/auth/password/forgot",
+        None,
+        Some(&json!({ "email": email.trim(), "locale": locale })),
+    )
+    .map(|_| ())
 }
 
 /// Signs in. With the vault unlocked the session is saved immediately; on the lock screen it
@@ -653,7 +739,10 @@ pub fn commit_pending() -> Result<bool, CatermError> {
 /// Offline status: what this device is entitled to right now, from the stored signed token.
 pub fn status() -> Result<ProStatus, CatermError> {
     if !crate::vault::is_unlocked().unwrap_or(false) {
-        let pending = PENDING.lock().as_ref().and_then(|s| account_from(&s.account));
+        let pending = PENDING
+            .lock()
+            .as_ref()
+            .and_then(|s| account_from(&s.account));
         return Ok(ProStatus {
             signed_in: pending.is_some(),
             pending: pending.is_some(),
@@ -677,30 +766,49 @@ pub fn status() -> Result<ProStatus, CatermError> {
         });
     };
     let hwid = hwid()?;
-    let token = state.token.as_ref().map(|(p, s, v)| (p.as_str(), s.as_str(), *v));
+    let token = state
+        .token
+        .as_ref()
+        .map(|(p, s, v)| (p.as_str(), s.as_str(), *v));
     let (entitlement, seen) = evaluate(token, public_key, &hwid, state.last_seen, now());
     if seen != state.last_seen {
-        conn.execute("UPDATE pro_state SET last_seen_wall_clock = ?1 WHERE id = 1", params![seen])
-            .map_err(db_err)?;
+        conn.execute(
+            "UPDATE pro_state SET last_seen_wall_clock = ?1 WHERE id = 1",
+            params![seen],
+        )
+        .map_err(db_err)?;
     }
     Ok(ProStatus {
         signed_in: true,
         pending: false,
         account: account_from(&state.account),
-        license: state.license.as_ref().and_then(|l| serde_json::from_value(l.clone()).ok()),
+        license: state
+            .license
+            .as_ref()
+            .and_then(|l| serde_json::from_value(l.clone()).ok()),
         entitlement,
         last_sync_at: state.last_sync_at,
         key_configured: key_configured(),
     })
 }
 
-fn apply_license_response(conn: &Connection, status: u16, body: &Value) -> Result<SyncOutcome, CatermError> {
+fn apply_license_response(
+    conn: &Connection,
+    status: u16,
+    body: &Value,
+) -> Result<SyncOutcome, CatermError> {
     if status == 409 && body.get("error").and_then(Value::as_str) == Some("DEVICE_LIMIT_EXCEEDED") {
         let limit = DeviceLimit {
-            limit: body.get("device_limit").and_then(Value::as_i64).unwrap_or(1),
+            limit: body
+                .get("device_limit")
+                .and_then(Value::as_i64)
+                .unwrap_or(1),
             devices: parse(body, "devices").unwrap_or_default(),
         };
-        return Ok(SyncOutcome { status: self::status()?, device_limit: Some(limit) });
+        return Ok(SyncOutcome {
+            status: self::status()?,
+            device_limit: Some(limit),
+        });
     }
     if !(200..300).contains(&status) {
         return Err(api_error(status, body));
@@ -711,7 +819,10 @@ fn apply_license_response(conn: &Connection, status: u16, body: &Value) -> Resul
         .filter(|t| !t.is_null())
         .and_then(|t| serde_json::from_value(t.clone()).ok());
     save_license(conn, &license, token.as_ref())?;
-    Ok(SyncOutcome { status: self::status()?, device_limit: None })
+    Ok(SyncOutcome {
+        status: self::status()?,
+        device_limit: None,
+    })
 }
 
 /// Heartbeat: activates this device (if a slot is free) and refreshes the offline token.
@@ -814,24 +925,44 @@ pub fn team() -> Result<ProTeamView, CatermError> {
 /// Invites `email` to the signed-in owner's team; `locale` is used for the invite email when
 /// the invitee has no account yet.
 pub fn team_invite(email: &str, locale: &str) -> Result<ProTeamView, CatermError> {
-    team_call("POST", "/team/invites", Some(&json!({ "email": email.trim(), "locale": locale })))
+    team_call(
+        "POST",
+        "/team/invites",
+        Some(&json!({ "email": email.trim(), "locale": locale })),
+    )
 }
 
 pub fn team_cancel_invite(invite_id: &str) -> Result<ProTeamView, CatermError> {
-    team_call("DELETE", &format!("/team/invites/{}", path_id(invite_id)?), None)
+    team_call(
+        "DELETE",
+        &format!("/team/invites/{}", path_id(invite_id)?),
+        None,
+    )
 }
 
 pub fn team_remove_member(account_id: &str) -> Result<ProTeamView, CatermError> {
-    team_call("DELETE", &format!("/team/members/{}", path_id(account_id)?), None)
+    team_call(
+        "DELETE",
+        &format!("/team/members/{}", path_id(account_id)?),
+        None,
+    )
 }
 
 /// Joining or leaving changes what this device may do: callers should [`sync`] afterwards.
 pub fn team_accept(invitation_id: &str) -> Result<ProTeamView, CatermError> {
-    team_call("POST", &format!("/team/invitations/{}/accept", path_id(invitation_id)?), None)
+    team_call(
+        "POST",
+        &format!("/team/invitations/{}/accept", path_id(invitation_id)?),
+        None,
+    )
 }
 
 pub fn team_decline(invitation_id: &str) -> Result<ProTeamView, CatermError> {
-    team_call("POST", &format!("/team/invitations/{}/decline", path_id(invitation_id)?), None)
+    team_call(
+        "POST",
+        &format!("/team/invitations/{}/decline", path_id(invitation_id)?),
+        None,
+    )
 }
 
 pub fn team_leave() -> Result<ProTeamView, CatermError> {
@@ -844,7 +975,12 @@ pub fn logout() -> Result<(), CatermError> {
     *PENDING.lock() = None;
     let conn = open_db()?;
     if let Some(state) = load_state(&conn)? {
-        let _ = request("POST", "/auth/logout", None, Some(&json!({ "refresh_token": state.refresh_token })));
+        let _ = request(
+            "POST",
+            "/auth/logout",
+            None,
+            Some(&json!({ "refresh_token": state.refresh_token })),
+        );
     }
     clear_local(&conn)
 }
@@ -868,14 +1004,26 @@ mod tests {
 
     fn eval(payload: &str, sig: &str, hwid: &str, last_seen: i64, now: i64) -> (Entitlement, i64) {
         let vk = key().verifying_key();
-        evaluate(Some((payload, sig, 1)), |v| (v == 1).then_some(vk), hwid, last_seen, now)
+        evaluate(
+            Some((payload, sig, 1)),
+            |v| (v == 1).then_some(vk),
+            hwid,
+            last_seen,
+            now,
+        )
     }
 
     #[test]
     fn valid_token_is_valid_and_ratchets_last_seen() {
         let (p, s) = token("dev", 2_000);
         let (ent, seen) = eval(&p, &s, "dev", 900, 1_000);
-        assert!(matches!(ent, Entitlement::Valid { expires_at: 2_000, .. }));
+        assert!(matches!(
+            ent,
+            Entitlement::Valid {
+                expires_at: 2_000,
+                ..
+            }
+        ));
         assert_eq!(seen, 1_000);
     }
 
@@ -889,13 +1037,23 @@ mod tests {
     fn tampered_payload_is_invalid() {
         let (p, s) = token("dev", 2_000);
         let forged = p.replace("2000", "9999999999");
-        assert_eq!(eval(&forged, &s, "dev", 0, 1_000).0, Entitlement::Invalid { reason: "BAD_SIGNATURE".into() });
+        assert_eq!(
+            eval(&forged, &s, "dev", 0, 1_000).0,
+            Entitlement::Invalid {
+                reason: "BAD_SIGNATURE".into()
+            }
+        );
     }
 
     #[test]
     fn token_from_another_machine_is_invalid() {
         let (p, s) = token("other", 2_000);
-        assert_eq!(eval(&p, &s, "dev", 0, 1_000).0, Entitlement::Invalid { reason: "OTHER_DEVICE".into() });
+        assert_eq!(
+            eval(&p, &s, "dev", 0, 1_000).0,
+            Entitlement::Invalid {
+                reason: "OTHER_DEVICE".into()
+            }
+        );
     }
 
     #[test]
@@ -903,17 +1061,30 @@ mod tests {
         let (p, s) = token("dev", 10_000);
         // Last seen at 5000, now claims 1000: far beyond NTP drift.
         let (ent, seen) = eval(&p, &s, "dev", 5_000, 1_000);
-        assert_eq!(ent, Entitlement::RevalidationRequired { reason: "CLOCK_ROLLBACK".into() });
+        assert_eq!(
+            ent,
+            Entitlement::RevalidationRequired {
+                reason: "CLOCK_ROLLBACK".into()
+            }
+        );
         assert_eq!(seen, 5_000, "last_seen never moves backwards");
         // Small NTP corrections are tolerated.
-        assert!(matches!(eval(&p, &s, "dev", 5_000, 4_900).0, Entitlement::Valid { .. }));
+        assert!(matches!(
+            eval(&p, &s, "dev", 5_000, 4_900).0,
+            Entitlement::Valid { .. }
+        ));
     }
 
     #[test]
     fn unknown_key_version_is_invalid() {
         let (p, s) = token("dev", 2_000);
         let (ent, _) = evaluate(Some((&p, &s, 9)), |_| None, "dev", 0, 1_000);
-        assert_eq!(ent, Entitlement::Invalid { reason: "KEY_NOT_CONFIGURED".into() });
+        assert_eq!(
+            ent,
+            Entitlement::Invalid {
+                reason: "KEY_NOT_CONFIGURED".into()
+            }
+        );
     }
 
     #[test]

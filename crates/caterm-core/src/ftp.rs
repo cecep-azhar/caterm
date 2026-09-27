@@ -236,10 +236,7 @@ impl RemoteFileSystem for FtpFileSystem {
         crate::sftp::clear_cancel_token(transfer_id);
         let mut local_file = File::open(local_path)
             .map_err(|e| ftp_err(format!("Failed to open local file {local_path}: {e}")))?;
-        let total_bytes = local_file
-            .metadata()
-            .map(|m| m.len())
-            .unwrap_or(0);
+        let total_bytes = local_file.metadata().map(|m| m.len()).unwrap_or(0);
 
         let t_id = transfer_id.to_string();
         let r_p = remote_path.to_string();

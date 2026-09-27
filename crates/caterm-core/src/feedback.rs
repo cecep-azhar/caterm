@@ -37,7 +37,9 @@ pub fn submit_feedback(rating: i32, content: &str) -> Result<(), CatermError> {
         .post(PROXY_URL)
         .header("Content-Type", "application/json")
         .send_json(&payload)
-        .map_err(|e| CatermError::Io(IoError::Generic(format!("Failed to submit feedback: {e}"))))?;
+        .map_err(|e| {
+            CatermError::Io(IoError::Generic(format!("Failed to submit feedback: {e}")))
+        })?;
 
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
@@ -67,4 +69,3 @@ mod tests {
         assert!(submit_feedback(5, "   ").is_err());
     }
 }
-

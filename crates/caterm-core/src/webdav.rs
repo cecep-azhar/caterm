@@ -24,15 +24,17 @@ fn percent_decode(s: &str) -> String {
     let mut i = 0;
     while i < bytes.len() {
         if let Some(&b'%') = bytes.get(i)
-            && let (Some(&h1), Some(&h2)) = (bytes.get(i + 1), bytes.get(i + 2)) {
-                let hex_bytes = [h1, h2];
-                if let Ok(hex_str) = std::str::from_utf8(&hex_bytes)
-                    && let Ok(byte) = u8::from_str_radix(hex_str, 16) {
-                        out.push(byte);
-                        i += 3;
-                        continue;
-                    }
+            && let (Some(&h1), Some(&h2)) = (bytes.get(i + 1), bytes.get(i + 2))
+        {
+            let hex_bytes = [h1, h2];
+            if let Ok(hex_str) = std::str::from_utf8(&hex_bytes)
+                && let Ok(byte) = u8::from_str_radix(hex_str, 16)
+            {
+                out.push(byte);
+                i += 3;
+                continue;
             }
+        }
         if let Some(&b) = bytes.get(i) {
             out.push(b);
         }

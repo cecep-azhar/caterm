@@ -4,8 +4,8 @@
 //! `caterm-core` for the guard that enforces this.
 
 use caterm_core::{
-    CatermError, ai, audit, backup, feedback, groups, investigations, keys, monitor, prefs, sftp, snippets, ssh,
-    store, sync, teams, tunnels, vault, vfs,
+    CatermError, ai, audit, backup, feedback, groups, investigations, keys, monitor, prefs, sftp,
+    snippets, ssh, store, sync, teams, tunnels, vault, vfs,
 };
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
@@ -164,12 +164,16 @@ pub async fn sftp_chmod(
     run_blocking(move || vfs::get_remote_fs(&host_id)?.chmod(&remote_path, mode)).await
 }
 
-fn emit_progress_fn(app: &tauri::AppHandle) -> std::sync::Arc<parking_lot::Mutex<impl FnMut(sftp::SftpProgressPayload) + Send + 'static>> {
+fn emit_progress_fn(
+    app: &tauri::AppHandle,
+) -> std::sync::Arc<parking_lot::Mutex<impl FnMut(sftp::SftpProgressPayload) + Send + 'static>> {
     use tauri::Emitter;
     let app_clone = app.clone();
-    std::sync::Arc::new(parking_lot::Mutex::new(move |p: sftp::SftpProgressPayload| {
-        let _ = app_clone.emit("sftp-progress", p);
-    }))
+    std::sync::Arc::new(parking_lot::Mutex::new(
+        move |p: sftp::SftpProgressPayload| {
+            let _ = app_clone.emit("sftp-progress", p);
+        },
+    ))
 }
 
 #[tauri::command]
@@ -304,7 +308,10 @@ pub async fn calculate_remote_checksum(
 }
 
 #[tauri::command]
-pub async fn calculate_local_checksum(path: String, algorithm: String) -> Result<String, CatermError> {
+pub async fn calculate_local_checksum(
+    path: String,
+    algorithm: String,
+) -> Result<String, CatermError> {
     run_blocking(move || {
         caterm_core::local_fs::calculate_local_checksum(std::path::Path::new(&path), &algorithm)
     })
@@ -318,7 +325,10 @@ pub async fn compare_file_checksums(
     local_path: String,
     algorithm: String,
 ) -> Result<sftp::ChecksumComparison, CatermError> {
-    run_blocking(move || sftp::compare_file_checksums(&host_id, &remote_path, &local_path, &algorithm)).await
+    run_blocking(move || {
+        sftp::compare_file_checksums(&host_id, &remote_path, &local_path, &algorithm)
+    })
+    .await
 }
 #[tauri::command]
 pub async fn export_encrypted_backup(passphrase: String) -> Result<String, CatermError> {
@@ -528,9 +538,7 @@ pub async fn save_ai_settings(
     settings: Option<ai::AiSettings>,
     input: Option<ai::AiSettings>,
 ) -> Result<ai::AiSettings, CatermError> {
-    let s = settings
-        .or(input)
-        .unwrap_or_default();
+    let s = settings.or(input).unwrap_or_default();
     run_blocking(move || ai::save_ai_settings(s)).await
 }
 
@@ -540,7 +548,8 @@ pub async fn ai_generate_plan(
     host_id: Option<String>,
     hosted: Option<bool>,
 ) -> Result<ai::AiExecutionPlan, CatermError> {
-    run_blocking(move || ai::generate_plan(&goal, host_id.as_deref(), hosted.unwrap_or(false))).await
+    run_blocking(move || ai::generate_plan(&goal, host_id.as_deref(), hosted.unwrap_or(false)))
+        .await
 }
 
 #[tauri::command]
@@ -562,7 +571,8 @@ pub async fn pro_ai_usage() -> Result<caterm_core::pro::ProAiUsage, CatermError>
 // ---- Crash reporting (opt-in, local-first — caterm-crash-reporting-spec-v1.md) -------------
 
 #[tauri::command]
-pub async fn get_pending_crash_report() -> Result<Option<caterm_core::crash::ScrubbedCrashReport>, CatermError> {
+pub async fn get_pending_crash_report()
+-> Result<Option<caterm_core::crash::ScrubbedCrashReport>, CatermError> {
     run_blocking(caterm_core::crash::pending_crash_report).await
 }
 
@@ -572,32 +582,50 @@ pub async fn submit_crash_report(report_id: String) -> Result<(), CatermError> {
 }
 
 #[tauri::command]
-pub async fn dismiss_crash_report(report_id: String, never_again: Option<bool>) -> Result<(), CatermError> {
-    run_blocking(move || caterm_core::crash::dismiss_crash_report(&report_id, never_again.unwrap_or(false))).await
+pub async fn dismiss_crash_report(
+    report_id: String,
+    never_again: Option<bool>,
+) -> Result<(), CatermError> {
+    run_blocking(move || {
+        caterm_core::crash::dismiss_crash_report(&report_id, never_again.unwrap_or(false))
+    })
+    .await
 }
 
 fn do_open_url(url: &str) -> Result<(), CatermError> {
     // Web and mail links only: this must never become a way to launch local files or other
     // protocol handlers from the WebView.
     let lower = url.trim_start().to_ascii_lowercase();
-    if !(lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("mailto:")) {
-        return Err(caterm_core::error::ValidationError::Generic(format!("refusing to open non-web URL: {url}")).into());
+    if !(lower.starts_with("https://")
+        || lower.starts_with("http://")
+        || lower.starts_with("mailto:"))
+    {
+        return Err(caterm_core::error::ValidationError::Generic(format!(
+            "refusing to open non-web URL: {url}"
+        ))
+        .into());
     }
     #[cfg(target_os = "linux")]
     let res = std::process::Command::new("xdg-open").arg(url).spawn();
     // rundll32 hands the URL straight to the default browser. `cmd /C start` re-parsed it, and
     // an `&` in the query string would split the command (and it flashed a console window).
     #[cfg(target_os = "windows")]
-    let res = std::process::Command::new("rundll32").args(["url.dll,FileProtocolHandler", url]).spawn();
+    let res = std::process::Command::new("rundll32")
+        .args(["url.dll,FileProtocolHandler", url])
+        .spawn();
     #[cfg(target_os = "macos")]
     let res = std::process::Command::new("open").arg(url).spawn();
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
     let res: Result<(), std::io::Error> = Ok(());
 
     #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
-    let result = res.map(|_| ()).map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into());
+    let result = res.map(|_| ()).map_err(|e| {
+        caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into()
+    });
     #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
-    let result = res.map_err(|e| caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into());
+    let result = res.map_err(|e| {
+        caterm_core::error::IoError::Generic(format!("Failed to open URL: {e}")).into()
+    });
 
     result
 }
@@ -657,7 +685,7 @@ pub async fn list_watches() -> Result<Vec<sync::WatchInfo>, CatermError> {
 /// applies after a restart — the Settings page says so and offers to relaunch.
 #[tauri::command]
 pub fn get_performance_prefs() -> prefs::PerformancePrefs {
-	prefs::load_performance_prefs().unwrap_or_default()
+    prefs::load_performance_prefs().unwrap_or_default()
 }
 
 #[tauri::command]
@@ -678,7 +706,12 @@ pub async fn pro_server_available() -> Result<bool, CatermError> {
 }
 
 #[tauri::command]
-pub async fn pro_register(email: String, password: String, name: String, locale: String) -> Result<(), CatermError> {
+pub async fn pro_register(
+    email: String,
+    password: String,
+    name: String,
+    locale: String,
+) -> Result<(), CatermError> {
     run_blocking(move || caterm_core::pro::register(&email, &password, &name, &locale)).await
 }
 
@@ -693,7 +726,10 @@ pub async fn pro_forgot_password(email: String, locale: String) -> Result<(), Ca
 }
 
 #[tauri::command]
-pub async fn pro_login(email: String, password: String) -> Result<caterm_core::pro::ProAccount, CatermError> {
+pub async fn pro_login(
+    email: String,
+    password: String,
+) -> Result<caterm_core::pro::ProAccount, CatermError> {
     run_blocking(move || caterm_core::pro::login(&email, &password)).await
 }
 
@@ -733,27 +769,38 @@ pub async fn pro_team() -> Result<caterm_core::pro::ProTeamView, CatermError> {
 }
 
 #[tauri::command]
-pub async fn pro_team_invite(email: String, locale: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+pub async fn pro_team_invite(
+    email: String,
+    locale: String,
+) -> Result<caterm_core::pro::ProTeamView, CatermError> {
     run_blocking(move || caterm_core::pro::team_invite(&email, &locale)).await
 }
 
 #[tauri::command]
-pub async fn pro_team_cancel_invite(invite_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+pub async fn pro_team_cancel_invite(
+    invite_id: String,
+) -> Result<caterm_core::pro::ProTeamView, CatermError> {
     run_blocking(move || caterm_core::pro::team_cancel_invite(&invite_id)).await
 }
 
 #[tauri::command]
-pub async fn pro_team_remove_member(account_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+pub async fn pro_team_remove_member(
+    account_id: String,
+) -> Result<caterm_core::pro::ProTeamView, CatermError> {
     run_blocking(move || caterm_core::pro::team_remove_member(&account_id)).await
 }
 
 #[tauri::command]
-pub async fn pro_team_accept(invitation_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+pub async fn pro_team_accept(
+    invitation_id: String,
+) -> Result<caterm_core::pro::ProTeamView, CatermError> {
     run_blocking(move || caterm_core::pro::team_accept(&invitation_id)).await
 }
 
 #[tauri::command]
-pub async fn pro_team_decline(invitation_id: String) -> Result<caterm_core::pro::ProTeamView, CatermError> {
+pub async fn pro_team_decline(
+    invitation_id: String,
+) -> Result<caterm_core::pro::ProTeamView, CatermError> {
     run_blocking(move || caterm_core::pro::team_decline(&invitation_id)).await
 }
 
@@ -766,6 +813,3 @@ pub async fn pro_team_leave() -> Result<caterm_core::pro::ProTeamView, CatermErr
 pub async fn submit_feedback(rating: i32, content: String) -> Result<(), CatermError> {
     run_blocking(move || feedback::submit_feedback(rating, &content)).await
 }
-
-
-

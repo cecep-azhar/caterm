@@ -145,9 +145,7 @@ impl RemoteFileSystem for SftpFileSystem {
 pub fn get_remote_fs(host_id: &str) -> Result<Box<dyn RemoteFileSystem>, CatermError> {
     let host = crate::store::get_host(host_id)?;
     match host.protocol {
-        crate::store::ConnectionProtocol::Ssh => {
-            Ok(Box::new(SftpFileSystem::new(host_id)))
-        }
+        crate::store::ConnectionProtocol::Ssh => Ok(Box::new(SftpFileSystem::new(host_id))),
         crate::store::ConnectionProtocol::Scp => {
             Ok(Box::new(crate::scp::ScpFileSystem::new(host_id)))
         }
@@ -160,8 +158,6 @@ pub fn get_remote_fs(host_id: &str) -> Result<Box<dyn RemoteFileSystem>, CatermE
         crate::store::ConnectionProtocol::WebDav => {
             Ok(Box::new(crate::webdav::WebDavFileSystem::new(host_id)))
         }
-        crate::store::ConnectionProtocol::S3 => {
-            Ok(Box::new(crate::s3::S3FileSystem::new(host_id)))
-        }
+        crate::store::ConnectionProtocol::S3 => Ok(Box::new(crate::s3::S3FileSystem::new(host_id))),
     }
 }
