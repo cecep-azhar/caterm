@@ -86,7 +86,16 @@ pub(crate) struct SessionHandle {
     /// just a heuristic against common prompt text.
     pub(crate) last_output_tail: Arc<Mutex<String>>,
     pub(crate) channel: Option<Arc<Mutex<ssh2::Channel>>>,
-    pub(crate) child: Option<Arc<Mutex<std::process::Child>>>,
+    /// The local-shell child process — a real PTY-backed one since the fix for the "Local
+    /// Terminal" garbled-output bug (no job control, no `TERM`, misaligned prompts because the
+    /// shell had no real terminal device at all). `portable_pty::Child` instead of
+    /// `std::process::Child` because it was spawned via `PtySystem::openpty` +
+    /// `PtyPair::slave.spawn_command`, not `std::process::Command` directly.
+    pub(crate) child: Option<Arc<Mutex<Box<dyn portable_pty::Child + Send + Sync>>>>,
+    /// The local PTY's master side, kept only so [`resize`] can propagate a frontend resize to
+    /// it — `ssh2::Channel` already carries its own size via `request_pty_size`, this is the
+    /// local-session equivalent.
+    pub(crate) pty_master: Option<Arc<Mutex<Box<dyn portable_pty::MasterPty + Send>>>>,
     pub(crate) host_id: String,
 }
 
@@ -486,8 +495,12 @@ fn flush_pty_output(session_id: &str, pending: &mut String, tail: &Arc<Mutex<Str
 }
 
 /// Spawns a local shell (PowerShell on Windows, the user's `$SHELL` on Unix) as a local
-/// session. Not a real PTY yet (see the doc comment on the platform-specific blocks below for
-/// what that costs); stdio is plain OS pipes, decoded and pushed to the xterm.js pane as text.
+/// session, attached to a real pseudo-terminal (`openpty` on Unix, ConPTY on Windows via
+/// `portable-pty`). Before this, the shell's stdio were plain OS pipes with no controlling
+/// terminal at all — visible as "cannot set terminal process group", "no job control in this
+/// shell", "TERM environment variable not set", and a prompt that renders in the wrong place
+/// because the shell has no real notion of the pane's width. A real PTY fixes all of that at
+/// once, the same way the remote-SSH path already gets it from `ssh2`'s `request_pty`.
 fn connect_local() -> Result<SshSession, CatermError> {
     let session_id = format!(
         "local-{}",
@@ -497,82 +510,86 @@ fn connect_local() -> Result<SshSession, CatermError> {
             .unwrap_or(0)
     );
 
+    let pty_system = portable_pty::native_pty_system();
+    // 80x24 is only the starting size: the frontend calls `fit.fit()` + `sshResize` right after
+    // connecting, same as it does for a remote SSH pane, and `resize()` below propagates that to
+    // `pty_master`.
+    let pty_pair = pty_system
+        .openpty(portable_pty::PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .map_err(|e| invalid(format!("Failed to allocate a local PTY: {e}")))?;
+
     #[cfg(windows)]
-    let mut cmd = std::process::Command::new("powershell.exe");
+    let mut cmd = portable_pty::CommandBuilder::new("powershell.exe");
     // Unix has no single canonical shell the way Windows has powershell.exe: macOS has
     // defaulted to zsh since Catalina, many Linux desktops to bash, some users to fish. `$SHELL`
     // is how every terminal emulator picks this, so CATerm matches that instead of forcing bash
     // on people who never asked for it.
     #[cfg(not(windows))]
-    let mut cmd = std::process::Command::new(
+    let mut cmd = portable_pty::CommandBuilder::new(
         std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".to_string()),
     );
 
     #[cfg(windows)]
-    {
-        cmd.args(["-NoLogo"]);
-        // Without this, spawning a console-subsystem process (powershell.exe) from a GUI app
-        // that owns no console of its own (Tauri's webview host) makes Windows allocate and
-        // show a brand-new console window for the child — piping its stdio does not suppress
-        // that window, only this flag does. The pane already renders the piped output; that
-        // second window was a stray real console sitting on top of it with nothing wired to it.
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
-    // `-i`: without a real tty on stdin, a shell defaults to non-interactive and skips its rc
-    // file (.bashrc/.zshrc) and prompt — forcing interactive mode is what makes this act like a
-    // terminal instead of a script runner. Job control (Ctrl+Z) still won't work: that needs a
-    // real PTY (ConPTY/openpty), which this session-based, pipe-backed shell doesn't allocate.
+    cmd.args(["-NoLogo"]);
+    // `-i`: forces interactive mode (loads .bashrc/.zshrc, shows a prompt) regardless of how the
+    // shell's own isatty() heuristics read the pty. Job control and readline's own line-width
+    // handling now work unaided, since this is a real terminal device — this used to be the one
+    // thing `-i` alone could not fake.
     #[cfg(not(windows))]
     cmd.arg("-i");
+    // The actual "TERM environment variable not set" fix: a PTY only supplies a terminal
+    // *device*, not this variable — the process spawning the shell still has to set it, exactly
+    // as a real terminal emulator would.
+    cmd.env("TERM", "xterm-256color");
 
-    cmd.stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-
-    let mut child = cmd
-        .spawn()
+    let child = pty_pair
+        .slave
+        .spawn_command(cmd)
         .map_err(|e| invalid(format!("Failed to spawn local shell: {e}")))?;
+    // The child now owns the slave side of the pty; our handle to it has nothing left to do, and
+    // ConPTY on Windows specifically expects it dropped once the child is spawned.
+    drop(pty_pair.slave);
 
-    let mut stdin = child
-        .stdin
-        .take()
-        .ok_or_else(|| invalid("Failed to open child stdin".to_string()))?;
-    let mut stdout = child
-        .stdout
-        .take()
-        .ok_or_else(|| invalid("Failed to open child stdout".to_string()))?;
-    let mut stderr = child
-        .stderr
-        .take()
-        .ok_or_else(|| invalid("Failed to open child stderr".to_string()))?;
+    let mut pty_writer = pty_pair
+        .master
+        .take_writer()
+        .map_err(|e| invalid(format!("Failed to open local PTY writer: {e}")))?;
+    let mut pty_reader = pty_pair
+        .master
+        .try_clone_reader()
+        .map_err(|e| invalid(format!("Failed to open local PTY reader: {e}")))?;
 
     let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
     let output_buffer = Arc::new(Mutex::new(Vec::<u8>::new()));
     let last_output_tail = Arc::new(Mutex::new(String::new()));
 
-    // Writer thread: pipe user keystrokes into child stdin
+    // Writer thread: pipe user keystrokes into the PTY master — the shell reads them off its
+    // slave side exactly as if they had been typed at a real terminal.
     thread::spawn(move || {
-        use std::io::Write;
         while let Ok(data) = rx.recv() {
-            if stdin.write_all(&data).is_err() {
+            if pty_writer.write_all(&data).is_err() {
                 break;
             }
-            let _ = stdin.flush();
+            let _ = pty_writer.flush();
         }
     });
 
-    // Reader thread: stdout -> xterm events
+    // Reader thread: PTY output -> xterm events. A real PTY interleaves stdout and stderr the
+    // same way an actual terminal does (there is no separate stderr stream once a program is
+    // attached to one), so this single thread replaces the old stdout *and* stderr readers.
     let buffer_read = Arc::clone(&output_buffer);
     let tail_read = Arc::clone(&last_output_tail);
     let reader_session_id = session_id.clone();
     thread::spawn(move || {
-        use std::io::Read;
         let mut buf = [0u8; 4096];
         let push = has_event_sink();
         loop {
-            match stdout.read(&mut buf) {
+            match pty_reader.read(&mut buf) {
                 Ok(0) => break,
                 Ok(n) => {
                     let chunk = buf.get(..n).map(|b| b.to_vec()).unwrap_or_default();
@@ -587,6 +604,8 @@ fn connect_local() -> Result<SshSession, CatermError> {
                         ob.extend_from_slice(&chunk);
                     }
                 }
+                // The shell exiting can surface as a read error rather than a clean Ok(0)
+                // depending on platform — either way, the session is over.
                 Err(_) => break,
             }
         }
@@ -595,43 +614,14 @@ fn connect_local() -> Result<SshSession, CatermError> {
         });
     });
 
-    // Reader thread: stderr -> xterm events
-    let err_session_id = session_id.clone();
-    let err_buffer = Arc::clone(&output_buffer);
-    let err_tail = Arc::clone(&last_output_tail);
-    thread::spawn(move || {
-        use std::io::Read;
-        let mut buf = [0u8; 4096];
-        let push = has_event_sink();
-        loop {
-            match stderr.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
-                    let chunk = buf.get(..n).map(|b| b.to_vec()).unwrap_or_default();
-                    if push {
-                        let text = String::from_utf8_lossy(&chunk).to_string();
-                        record_output_tail(&err_tail, &text);
-                        emit(SshEvent::Output {
-                            session_id: err_session_id.clone(),
-                            data: text,
-                        });
-                    } else if let Ok(mut ob) = err_buffer.lock() {
-                        ob.extend_from_slice(&chunk);
-                    }
-                }
-                Err(_) => break,
-            }
-        }
-    });
-
-    let child_arc = Arc::new(Mutex::new(child));
     let handle = SessionHandle {
         tx,
         output_buffer,
         input_buffer: Arc::new(Mutex::new(String::new())),
         last_output_tail,
         channel: None,
-        child: Some(child_arc),
+        child: Some(Arc::new(Mutex::new(child))),
+        pty_master: Some(Arc::new(Mutex::new(pty_pair.master))),
         host_id: "local".to_string(),
     };
 
@@ -816,6 +806,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         last_output_tail,
         channel: Some(channel_arc),
         child: None,
+        pty_master: None,
         host_id: host.id.clone(),
     };
 
@@ -937,11 +928,25 @@ pub fn resize(session_id: &str, cols: u16, rows: u16) -> Result<(), CatermError>
     let sessions = SESSIONS
         .lock()
         .map_err(|_| invalid("Lock failure".to_string()))?;
-    if let Some(handle) = sessions.get(session_id)
-        && let Some(channel) = &handle.channel
-        && let Ok(mut ch) = channel.lock()
-    {
-        let _ = ch.request_pty_size(cols as u32, rows as u32, None, None);
+    if let Some(handle) = sessions.get(session_id) {
+        if let Some(channel) = &handle.channel
+            && let Ok(mut ch) = channel.lock()
+        {
+            let _ = ch.request_pty_size(cols as u32, rows as u32, None, None);
+        }
+        // Local sessions have no ssh2::Channel — resize their real PTY instead (see the
+        // `pty_master` field doc comment). Without this the pane could be fit()'d to the
+        // frontend's width but the shell itself would still think it was 80x24 forever.
+        if let Some(master) = &handle.pty_master
+            && let Ok(m) = master.lock()
+        {
+            let _ = m.resize(portable_pty::PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            });
+        }
     }
     Ok(())
 }
@@ -1359,6 +1364,7 @@ mod tests {
             last_output_tail: Arc::new(Mutex::new("[sudo] password for alice: ".to_string())),
             channel: None,
             child: None,
+            pty_master: None,
             host_id: "host-under-test".to_string(),
         };
         SESSIONS
@@ -1500,5 +1506,34 @@ PRETTY_NAME="Ubuntu 24.04 LTS"
 
         disconnect(&session.session_id).expect("failed to disconnect local terminal");
         assert!(write(&session.session_id, "test").is_err());
+    }
+
+    // $TERM / job-control messages are bash/zsh-specific, so this is Unix-only; the Windows
+    // path (ConPTY + powershell.exe) is exercised by the cross-platform test above instead.
+    #[cfg(not(windows))]
+    #[test]
+    fn local_terminal_gets_a_real_pty_with_term_set() {
+        // Regression test: the local shell used to run on plain `Stdio::piped()` with no
+        // controlling terminal at all, which surfaced to the user as "cannot set terminal
+        // process group", "no job control in this shell", and any program that queried the
+        // terminal (even `clear`) failing with "TERM environment variable not set". A real PTY
+        // (portable-pty's `openpty`) fixes all three at once, the same way the SSH-to-remote
+        // path already gets them from ssh2's `request_pty`.
+        let session = connect("local").expect("failed to connect local terminal");
+
+        let _ = write(&session.session_id, "echo TERM_IS:$TERM\r\n");
+        std::thread::sleep(Duration::from_millis(300));
+        let out = read(&session.session_id).expect("read local terminal output");
+
+        assert!(
+            out.contains("TERM_IS:xterm-256color"),
+            "shell should see TERM=xterm-256color from a real PTY, got: {out:?}"
+        );
+        assert!(
+            !out.contains("cannot set terminal process group") && !out.contains("no job control"),
+            "a real PTY should give the shell job control, not the old pipe-based errors: {out:?}"
+        );
+
+        disconnect(&session.session_id).expect("failed to disconnect local terminal");
     }
 }
