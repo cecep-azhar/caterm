@@ -44,3 +44,4 @@ dist/
 *.rpm
 *.AppImage
 *.apk
+flatpak/tools/.venv
