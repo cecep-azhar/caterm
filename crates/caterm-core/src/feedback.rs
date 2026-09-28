@@ -15,7 +15,12 @@ const PROXY_URL: &str = "https://caterm.fathforce.com/api/feedback";
 ///
 /// This function performs a blocking HTTP request; callers in `caterm-app`
 /// must spawn it on `run_blocking`.
-pub fn submit_feedback(rating: i32, content: &str) -> Result<(), CatermError> {
+pub fn submit_feedback(
+    rating: i32,
+    content: &str,
+    name: Option<&str>,
+    profession: Option<&str>,
+) -> Result<(), CatermError> {
     if !(1..=5).contains(&rating) {
         return Err(CatermError::Io(IoError::Generic(
             "Rating must be between 1 and 5".into(),
@@ -27,10 +32,17 @@ pub fn submit_feedback(rating: i32, content: &str) -> Result<(), CatermError> {
         )));
     }
 
-    let payload = serde_json::json!({
+    let mut payload = serde_json::json!({
         "rating": rating,
         "content": content.trim(),
     });
+
+    if let Some(n) = name.map(str::trim).filter(|s| !s.is_empty()) {
+        payload["name"] = serde_json::Value::String(n.to_string());
+    }
+    if let Some(p) = profession.map(str::trim).filter(|s| !s.is_empty()) {
+        payload["profession"] = serde_json::Value::String(p.to_string());
+    }
 
     let agent = ureq::Agent::new_with_defaults();
     let mut resp = agent
@@ -58,14 +70,14 @@ mod tests {
 
     #[test]
     fn rejects_invalid_rating() {
-        assert!(submit_feedback(0, "bagus").is_err());
-        assert!(submit_feedback(6, "bagus").is_err());
-        assert!(submit_feedback(-1, "bagus").is_err());
+        assert!(submit_feedback(0, "bagus", None, None).is_err());
+        assert!(submit_feedback(6, "bagus", None, None).is_err());
+        assert!(submit_feedback(-1, "bagus", None, None).is_err());
     }
 
     #[test]
     fn rejects_empty_content() {
-        assert!(submit_feedback(5, "").is_err());
-        assert!(submit_feedback(5, "   ").is_err());
+        assert!(submit_feedback(5, "", None, None).is_err());
+        assert!(submit_feedback(5, "   ", None, None).is_err());
     }
 }

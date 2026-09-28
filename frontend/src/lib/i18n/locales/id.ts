@@ -739,6 +739,10 @@ const id: Dictionary = {
       '4': 'Sangat Baik',
       '5': 'Luar Biasa'
     },
+    nameLabel: 'Nama',
+    namePlaceholder: 'Nama Anda (opsional)',
+    activityLabel: 'Aktivitas / Profesi',
+    activityPlaceholder: 'Contoh: DevOps Engineer, Sysadmin (opsional)',
     messageLabel: 'Pesan atau Deskripsi Bug',
     optional: '(opsional)',
     messagePlaceholder: 'Ceritakan apa yang terjadi, apa yang Anda sukai, atau laporkan bug...',

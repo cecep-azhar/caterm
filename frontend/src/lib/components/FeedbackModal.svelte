@@ -17,6 +17,8 @@
 
   let rating = $state(5);
   let hoverRating = $state(0);
+  let name = $state('');
+  let profession = $state('');
   let content = $state('');
   let isSubmitting = $state(false);
   let submitted = $state(false);
@@ -55,7 +57,7 @@
         ? content.trim()
         : `${rating} stars (no notes)`;
 
-      await submitFeedback(rating, effectiveContent);
+      await submitFeedback(rating, effectiveContent, name, profession);
 
       try {
         localStorage.setItem(storageKey('submitted'), 'true');
@@ -77,6 +79,8 @@
 
   function handleReset() {
     submitted = false;
+    name = '';
+    profession = '';
     content = '';
     rating = 5;
     errorMessage = '';
@@ -200,6 +204,37 @@
             <span class="text-xs font-medium text-neutral-600 dark:text-neutral-400 ml-2">
               {ratingLabel(hoverRating || rating)}
             </span>
+          </div>
+        </div>
+
+        <!-- Name & Profession Inputs -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="space-y-1.5">
+            <label for="feedback-name-modal" class="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
+              {t('feedback.nameLabel')} <span class="text-neutral-400 font-normal normal-case">{t('feedback.optional')}</span>
+            </label>
+            <input
+              id="feedback-name-modal"
+              type="text"
+              bind:value={name}
+              maxlength="100"
+              placeholder={t('feedback.namePlaceholder')}
+              class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500"
+            />
+          </div>
+
+          <div class="space-y-1.5">
+            <label for="feedback-profession-modal" class="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wider">
+              {t('feedback.activityLabel')} <span class="text-neutral-400 font-normal normal-case">{t('feedback.optional')}</span>
+            </label>
+            <input
+              id="feedback-profession-modal"
+              type="text"
+              bind:value={profession}
+              maxlength="100"
+              placeholder={t('feedback.activityPlaceholder')}
+              class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500"
+            />
           </div>
         </div>
 

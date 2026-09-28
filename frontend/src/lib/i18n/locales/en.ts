@@ -738,6 +738,10 @@ const en = {
       '4': 'Very Good',
       '5': 'Excellent'
     },
+    nameLabel: 'Name',
+    namePlaceholder: 'Your name (optional)',
+    activityLabel: 'Activity / Profession',
+    activityPlaceholder: 'e.g. DevOps Engineer, Cloud Architect (optional)',
     messageLabel: 'Message or Bug Description',
     optional: '(optional)',
     messagePlaceholder: 'Tell us what happened, what you like, or report a bug...',

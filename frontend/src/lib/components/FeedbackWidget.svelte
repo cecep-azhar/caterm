@@ -18,6 +18,8 @@
 
   let rating = $state(5);
   let hoverRating = $state(0);
+  let name = $state('');
+  let profession = $state('');
   let content = $state('');
   let isSubmitting = $state(false);
   let submitted = $state(false);
@@ -60,7 +62,7 @@
         ? content.trim()
         : `${rating} stars (no notes)`;
 
-      await submitFeedback(rating, effectiveContent);
+      await submitFeedback(rating, effectiveContent, name, profession);
 
       try {
         localStorage.setItem(storageKey('submitted'), 'true');
@@ -183,6 +185,37 @@
           <span class="text-xs font-medium text-neutral-600 dark:text-neutral-400 ml-2">
             {ratingLabels[hoverRating || rating] || ''}
           </span>
+        </div>
+      </div>
+
+      <!-- Name & Activity Inputs -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="space-y-1.5">
+          <label for="feedback-name" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+            Name <span class="text-neutral-500 font-normal normal-case">(optional)</span>
+          </label>
+          <input
+            id="feedback-name"
+            type="text"
+            bind:value={name}
+            maxlength="100"
+            placeholder="Your name (optional)"
+            class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-md text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <label for="feedback-profession" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 uppercase tracking-wider">
+            Activity / Role <span class="text-neutral-500 font-normal normal-case">(optional)</span>
+          </label>
+          <input
+            id="feedback-profession"
+            type="text"
+            bind:value={profession}
+            maxlength="100"
+            placeholder="e.g. DevOps, Sysadmin (optional)"
+            class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-md text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500"
+          />
         </div>
       </div>
 

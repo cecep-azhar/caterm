@@ -810,6 +810,11 @@ pub async fn pro_team_leave() -> Result<caterm_core::pro::ProTeamView, CatermErr
 }
 
 #[tauri::command]
-pub async fn submit_feedback(rating: i32, content: String) -> Result<(), CatermError> {
-    run_blocking(move || feedback::submit_feedback(rating, &content)).await
+pub async fn submit_feedback(
+    rating: i32,
+    content: String,
+    name: Option<String>,
+    profession: Option<String>,
+) -> Result<(), CatermError> {
+    run_blocking(move || feedback::submit_feedback(rating, &content, name.as_deref(), profession.as_deref())).await
 }
