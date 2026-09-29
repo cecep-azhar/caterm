@@ -43,3 +43,4 @@ ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", default-features = false }
 
+tauri-plugin-single-instance = "2.0.0"

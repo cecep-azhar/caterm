@@ -104,6 +104,9 @@ pub fn run_with_start(start: std::time::Instant) {
         // silently failed with a "plugin not found" error at the call site.
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let _ = app.get_webview_window("main").map(|w| w.set_focus());
+        }))
         .setup(move |app| {
             window::create_main_window(app)?;
             install_ssh_event_bridge(app.handle());
