@@ -105,6 +105,7 @@ pub fn run_with_start(start: std::time::Instant) {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            use tauri::Manager;
             let _ = app.get_webview_window("main").map(|w| w.set_focus());
         }))
         .setup(move |app| {
