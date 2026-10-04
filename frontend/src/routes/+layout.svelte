@@ -820,8 +820,8 @@
          so it behaves like the Files panel: the content narrows instead of being covered. Both
          never show at once — see handleAiToggle. -->
     <main class="flex-1 min-w-0 flex overflow-hidden relative bg-white dark:bg-[#161616] border-t border-neutral-200 dark:border-neutral-800 md:border-l md:rounded-tl-xl transition-colors duration-150">
-      <!-- Session Viewport: Persisted across routes so SSH terminals are never unmounted or resized to 0 -->
-      <div class="absolute inset-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 invisible'}">
+      <!-- Session Viewport: fleksibel agar menyisakan ruang untuk AI panel -->
+      <div class="flex-1 min-w-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 absolute inset-0 invisible'}">
         <SessionViewport />
       </div>
 
