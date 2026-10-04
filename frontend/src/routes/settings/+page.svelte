@@ -174,7 +174,7 @@
   const EYE_BUTTON = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors p-1';
 
   // Subscription tab
-  let billing = $state<BillingInterval>('yearly');
+  let billing = $state<BillingInterval>('monthly');
   const proFeatures = $derived([
     t('settings.subscription.featureSync', { devices: PRO_PRICING.syncDevices }),
     t('settings.subscription.featureAi', { requests: PRO_PRICING.aiRequestsPerMonth }),
