@@ -138,9 +138,11 @@
         const step = proposedSteps[i];
 
         if (execMode === 'terminal') {
-          // Fire-and-forget: the shell shows the result, we cannot read it back.
+          runs[i] = { status: 'running', output: '' };
           injectIntoActiveSession(step.command);
           runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
+          // Jeda agar terminal sempat memproses command sebelum command berikutnya dikirim
+          await new Promise((resolve) => setTimeout(resolve, 600));
           continue;
         }
 
@@ -168,6 +170,46 @@
     } finally {
       isExecuting = false;
       scrollToBottom();
+    }
+  }
+
+  async function sendSingleStep(i: number) {
+    const step = proposedSteps[i];
+    if (!step) return;
+
+    if (execMode === 'terminal') {
+      if (!activeSession) {
+        showToast(t('aiChat.errNoTerminal'), 'error');
+        return;
+      }
+      runs[i] = { status: 'running', output: '' };
+      injectIntoActiveSession(step.command);
+      runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
+      return;
+    }
+
+    if (!targetHostId) {
+      showToast(t('aiChat.errSelectHost'), 'error');
+      return;
+    }
+
+    runs[i] = { status: 'running', output: '' };
+    try {
+      const result = await aiExecuteStep(targetHostId, step);
+      const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+      runs[i] = {
+        status: result.success ? 'ok' : 'failed',
+        output: output || t('aiChat.noOutput'),
+        exitCode: result.exit_code
+      };
+      if (!result.success) {
+        showToast(t('aiChat.stepFailed', { step: i + 1, code: result.exit_code ?? '?' }), 'error');
+      }
+    } catch (err) {
+      runs[i] = {
+        status: 'failed',
+        output: errorText(err)
+      };
     }
   }
 
@@ -354,6 +396,23 @@
                     <span class="block mt-0.5 text-[11px] text-neutral-500">{step.description}</span>
                   {/if}
                 </span>
+
+                <button
+                  type="button"
+                  onclick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void sendSingleStep(i);
+                  }}
+                  disabled={isExecuting}
+                  class="p-1 rounded text-neutral-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
+                  title={runs[i]?.status === 'ok' ? 'Resend to terminal' : 'Send to terminal'}
+                  aria-label="Send step"
+                >
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </button>
               </label>
 
               {#if runs[i] && runs[i].status !== 'pending'}
