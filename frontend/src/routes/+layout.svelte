@@ -820,13 +820,13 @@
          so it behaves like the Files panel: the content narrows instead of being covered. Both
          never show at once — see handleAiToggle. -->
     <main class="flex-1 min-w-0 flex overflow-hidden relative bg-white dark:bg-[#161616] border-t border-neutral-200 dark:border-neutral-800 md:border-l md:rounded-tl-xl transition-colors duration-150">
-      <!-- Session Viewport: Persisted across routes so SSH terminals are never unmounted -->
-      <div class="flex-1 min-w-0 h-full relative {page.url.pathname.startsWith('/session') ? 'flex' : 'hidden'}">
+      <!-- Session Viewport: Persisted across routes so SSH terminals are never unmounted or resized to 0 -->
+      <div class="absolute inset-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 invisible'}">
         <SessionViewport />
       </div>
 
       <!-- Other pages routed via SvelteKit children -->
-      <div class="flex-1 min-w-0 overflow-auto text-neutral-900 dark:text-neutral-100 relative px-4 py-6 md:px-10 md:py-10 [@media(max-height:500px)]:py-4 bg-[linear-gradient(to_right,#0000000a_1px,transparent_1px),linear-gradient(to_bottom,#0000000a_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:56px_56px] {page.url.pathname.startsWith('/session') ? 'hidden' : 'z-10'}">
+      <div class="flex-1 min-w-0 overflow-auto text-neutral-900 dark:text-neutral-100 relative px-4 py-6 md:px-10 md:py-10 [@media(max-height:500px)]:py-4 bg-[linear-gradient(to_right,#0000000a_1px,transparent_1px),linear-gradient(to_bottom,#0000000a_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:56px_56px] {page.url.pathname.startsWith('/session') ? 'hidden' : 'z-20'}">
         {@render children()}
       </div>
 

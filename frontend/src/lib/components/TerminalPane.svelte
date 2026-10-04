@@ -236,11 +236,14 @@
   $effect(() => {
     if (!isActive || !session) return;
     markActive();
-    fitAddon?.fit();
-    if (term) {
-      void sshResize(session.sessionId, term.cols, term.rows).catch(() => {});
-      term.focus();
-    }
+    requestAnimationFrame(() => {
+      fitAddon?.fit();
+      if (term) {
+        term.refresh(0, (term.rows ?? 1) - 1);
+        void sshResize(session.sessionId, term.cols, term.rows).catch(() => {});
+        term.focus();
+      }
+    });
   });
 
   onMount(() => {
