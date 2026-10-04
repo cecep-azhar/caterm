@@ -830,9 +830,9 @@
         {@render children()}
       </div>
 
-      {#if aiChat.open}
+      <div class={['contents', !aiChat.open && 'hidden'].filter(Boolean).join(' ')}>
         <AiChatPanel onClose={closeAiChat} />
-      {/if}
+      </div>
 
       {#if feedbackPrompt.show}
         <!-- Feedback popup modal: auto-prompted after the 3rd closed session, or opened from the
