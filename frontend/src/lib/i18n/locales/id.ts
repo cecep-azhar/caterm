@@ -606,7 +606,8 @@ const id: Dictionary = {
     loadFailed: 'Gagal memuat workspace',
     deleteConfirm: 'Yakin ingin menghapus workspace "{{name}}"?',
     deleteHeading: 'Hapus Workspace',
-    deleted: 'Workspace "{{name}}" dihapus'
+    deleted: 'Workspace "{{name}}" dihapus',
+    groupTag: 'Grup: {{group}}'
   },
   terminal: {
     smartAutocomplete: 'Autocomplete Pintar',
@@ -1212,6 +1213,9 @@ const id: Dictionary = {
     collapseSidebar: 'Ciutkan sidebar',
     sessionTabMenu: 'Tab sesi',
     rename: 'Ganti nama',
+    setGroup: 'Atur Grup',
+    removeGroup: 'Hapus dari Grup',
+    closeGroup: 'Tutup Grup "{{group}}"',
     closeSession: 'Tutup sesi'
   },
   sftp: {

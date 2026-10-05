@@ -605,7 +605,8 @@ const en = {
     loadFailed: 'Failed to load workspace',
     deleteConfirm: 'Are you sure you want to delete workspace "{{name}}"?',
     deleteHeading: 'Delete Workspace',
-    deleted: 'Workspace "{{name}}" deleted'
+    deleted: 'Workspace "{{name}}" deleted',
+    groupTag: 'Group: {{group}}'
   },
   terminal: {
     smartAutocomplete: 'Smart Autocomplete',
@@ -1211,6 +1212,9 @@ const en = {
     collapseSidebar: 'Collapse sidebar',
     sessionTabMenu: 'Session tab',
     rename: 'Rename',
+    setGroup: 'Set Group',
+    removeGroup: 'Remove from Group',
+    closeGroup: 'Close Group "{{group}}"',
     closeSession: 'Close session'
   },
   sftp: {

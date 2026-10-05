@@ -130,8 +130,13 @@
                   onclick={() => setSelectedTabId(tab.id)}
                   class="px-2.5 py-1 rounded text-xs font-mono transition-colors shrink-0 flex items-center gap-1.5 {view.selectedTabId === tab.id ? 'bg-sky-600 text-white font-semibold shadow-xs' : 'bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 border border-neutral-200 dark:border-neutral-800'}"
                 >
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span class="w-1.5 h-1.5 rounded-full" style="background-color: {tab.groupColor || '#10b981'}"></span>
                   <span class="truncate max-w-[120px]">{tabLabel(tab)}</span>
+                  {#if tab.group}
+                    <span class="px-1 py-0.1 rounded text-[9px] font-sans font-medium" style="background-color: {tab.groupColor ? tab.groupColor + '25' : 'rgba(2,132,199,0.2)'}; color: {tab.groupColor || '#0284c7'}">
+                      {tab.group}
+                    </span>
+                  {/if}
                 </button>
               {/each}
             </div>

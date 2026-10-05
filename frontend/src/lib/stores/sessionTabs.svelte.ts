@@ -22,7 +22,23 @@ export interface SessionTab {
   seq: number;
   /** Name the user gave this tab (right-click > Rename). Unset = derived from the host. */
   title?: string;
+  /** Group name this tab belongs to (optional, for tab grouping). */
+  group?: string;
+  /** Color theme for the group badge (e.g. hex or CSS color). */
+  groupColor?: string;
 }
+
+/** Predefined palette of distinctive colors for tab groups */
+export const GROUP_COLORS = [
+  '#0284c7', // Sky
+  '#10b981', // Emerald
+  '#8b5cf6', // Violet
+  '#f59e0b', // Amber
+  '#ec4899', // Pink
+  '#06b6d4', // Cyan
+  '#ef4444', // Red
+  '#84cc16', // Lime
+];
 
 /** Host id the Local Terminal button uses; there is no stored host behind it. */
 export const LOCAL_HOST_ID = 'local';
@@ -66,12 +82,14 @@ function nextSeq(hostId: string): number {
 }
 
 /** Always opens a *new* session. Returns the new tab's id so the caller can focus it. */
-export function openTab(host: HostRecord): string {
+export function openTab(host: HostRecord, group?: string, groupColor?: string): string {
   counter += 1;
   const tab: SessionTab = {
     id: `tab-${host.id}-${counter}`,
     host,
-    seq: nextSeq(host.id)
+    seq: nextSeq(host.id),
+    group: group?.trim() || undefined,
+    groupColor: groupColor?.trim() || undefined
   };
   tabs = [...tabs, tab];
   markHostUsed(host.id);
@@ -81,9 +99,9 @@ export function openTab(host: HostRecord): string {
 }
 
 /** Opens a session for `host` only if none is open yet; returns the existing or new tab id. */
-export function openTabOnce(host: HostRecord): string {
+export function openTabOnce(host: HostRecord, group?: string, groupColor?: string): string {
   const existing = tabs.find((t) => t.host.id === host.id);
-  return existing ? existing.id : openTab(host);
+  return existing ? existing.id : openTab(host, group, groupColor);
 }
 
 export function closeTab(id: string) {
@@ -102,6 +120,61 @@ export function closeSessionTab(id: string) {
   if (tabs.length === 0) resetLayout();
   const view = getSessionView();
   if (view.selectedTabId === id) setSelectedTabId(tabs[Math.max(0, index - 1)]?.id ?? '');
+}
+
+/**
+ * Sets or removes the group association and optional group color for a specific tab.
+ */
+export function setTabGroup(tabId: string, group?: string, groupColor?: string) {
+  const tab = tabs.find((t) => t.id === tabId);
+  if (tab) {
+    tab.group = group?.trim() || undefined;
+    tab.groupColor = groupColor?.trim() || undefined;
+  }
+}
+
+/**
+ * Returns tabs filtered by a specific group name (or ungrouped if group is undefined/empty).
+ */
+export function getTabsByGroup(group?: string): SessionTab[] {
+  const trimmed = group?.trim();
+  if (!trimmed) {
+    return tabs.filter((t) => !t.group);
+  }
+  return tabs.filter((t) => t.group?.toLowerCase() === trimmed.toLowerCase());
+}
+
+/**
+ * Returns a list of all distinct group names currently in use across open tabs.
+ */
+export function getDistinctTabGroups(): string[] {
+  const groups = new Set<string>();
+  for (const tab of tabs) {
+    if (tab.group) groups.add(tab.group);
+  }
+  return Array.from(groups);
+}
+
+/**
+ * Bulk-closes all session tabs in a specific group.
+ */
+export function closeTabsInGroup(group: string) {
+  const trimmed = group.trim().toLowerCase();
+  const toClose = tabs.filter((t) => t.group?.toLowerCase() === trimmed);
+  for (const tab of toClose) {
+    closeSessionTab(tab.id);
+  }
+}
+
+/**
+ * Focuses the first tab in the specified group.
+ */
+export function focusTabGroup(group: string) {
+  const trimmed = group.trim().toLowerCase();
+  const target = tabs.find((t) => t.group?.toLowerCase() === trimmed);
+  if (target) {
+    setSelectedTabId(target.id);
+  }
 }
 
 /**

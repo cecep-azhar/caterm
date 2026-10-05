@@ -9,7 +9,7 @@
   import SessionViewport from '$lib/components/SessionViewport.svelte';
   import { getAiChatState, toggleAiChat, closeAiChat } from '$lib/stores/aiChat.svelte';
   import { page } from '$app/state';
-  import { getTabs, closeSessionTab, closeAllTabs, renameTab, tabLabel } from '$lib/stores/sessionTabs.svelte';
+  import { getTabs, closeSessionTab, closeAllTabs, renameTab, tabLabel, setTabGroup, closeTabsInGroup, GROUP_COLORS } from '$lib/stores/sessionTabs.svelte';
   import {
     getSessionView,
     setLayout,
@@ -266,10 +266,14 @@
     }
   ]);
 
-  // Session tab right-click menu + inline rename
+  // Session tab right-click menu + inline rename + group assignment
   let tabMenu = $state<{ tabId: string; x: number; y: number } | null>(null);
   let renamingTabId = $state<string | null>(null);
   let renameDraft = $state('');
+  let isGroupModalOpen = $state(false);
+  let groupingTabId = $state<string | null>(null);
+  let groupDraft = $state('');
+  let groupColorDraft = $state(GROUP_COLORS[0]);
 
   function openTabMenu(e: MouseEvent, tabId: string) {
     e.preventDefault();
@@ -288,6 +292,29 @@
   function commitRename() {
     if (renamingTabId) renameTab(renamingTabId, renameDraft);
     renamingTabId = null;
+  }
+
+  function openGroupModal(tabId: string) {
+    const tab = sessionTabs.find((item) => item.id === tabId);
+    tabMenu = null;
+    if (!tab) return;
+    groupingTabId = tabId;
+    groupDraft = tab.group || '';
+    groupColorDraft = tab.groupColor || GROUP_COLORS[0];
+    isGroupModalOpen = true;
+  }
+
+  function commitGroup() {
+    if (groupingTabId) {
+      setTabGroup(groupingTabId, groupDraft, groupDraft.trim() ? groupColorDraft : undefined);
+    }
+    isGroupModalOpen = false;
+    groupingTabId = null;
+  }
+
+  function removeGroup(tabId: string) {
+    tabMenu = null;
+    setTabGroup(tabId, undefined, undefined);
   }
 
   function focusAndSelect(node: HTMLInputElement) {
@@ -505,7 +532,7 @@
         </svg>
       </button>
 
-      <div class="flex gap-1 text-xs items-center overflow-x-auto scrollbar-none min-w-0" data-tauri-drag-region>
+      <div class="flex gap-1 text-xs items-center overflow-x-auto scrollbar-none min-w-0 flex-1" data-tauri-drag-region>
         <!-- Where you are, like a breadcrumb. Hidden while a terminal is showing: there the
              session tabs are the context. -->
         {#if !page.url.pathname.startsWith('/session')}
@@ -523,11 +550,11 @@
             role="group"
             aria-label={t('shell.sessionTabAria', { label: tabLabel(tab) })}
             oncontextmenu={(e) => openTabMenu(e, tab.id)}
-            class="hidden sm:flex items-center rounded-md shrink-0 transition-colors {isSessionTabActive(tab.id) ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/70 dark:hover:bg-neutral-800/60'}"
+            class="hidden sm:flex items-center rounded-md shrink-0 transition-all border {isSessionTabActive(tab.id) ? 'bg-neutral-200 dark:bg-neutral-800 text-neutral-900 dark:text-white border-neutral-300 dark:border-neutral-700 shadow-2xs' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/70 dark:hover:bg-neutral-800/60 border-transparent'}"
           >
             {#if renamingTabId === tab.id}
               <span class="py-0.5 pl-2 pr-1 flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {tab.groupColor || '#10b981'}"></span>
                 <input
                   use:focusAndSelect
                   bind:value={renameDraft}
@@ -546,11 +573,19 @@
                 href="/session"
                 onclick={() => setSelectedTabId(tab.id)}
                 ondblclick={() => startRename(tab.id)}
-                class="py-1 pl-2 pr-1 flex items-center gap-1.5 truncate max-w-[110px] md:max-w-[160px]"
-                title={t('shell.tabTitle', { label: tabLabel(tab), address: tab.host.address })}
+                class="py-1 pl-2 pr-1 flex items-center gap-1.5 truncate max-w-[120px] md:max-w-[170px]"
+                title={tab.group ? `[${tab.group}] ` + t('shell.tabTitle', { label: tabLabel(tab), address: tab.host.address }) : t('shell.tabTitle', { label: tabLabel(tab), address: tab.host.address })}
               >
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {tab.groupColor || '#10b981'}"></span>
                 <span class="truncate">{tabLabel(tab)}</span>
+                {#if tab.group}
+                  <span
+                    class="px-1 py-0.1 rounded text-[9px] font-medium shrink-0 leading-tight"
+                    style="background-color: {tab.groupColor ? tab.groupColor + '25' : 'rgba(2, 132, 199, 0.15)'}; color: {tab.groupColor || '#0284c7'}"
+                  >
+                    {tab.group}
+                  </span>
+                {/if}
               </a>
             {/if}
             <button
@@ -585,27 +620,27 @@
       {#if sessionTabs.length > 0}
         <button
           onclick={handleFilesToggle}
-          class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {view.showFiles ? 'bg-sky-600/20 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
+          class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center justify-center {view.showFiles ? 'bg-sky-600/20 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
           title={view.showFiles ? t('shell.hideFiles') : t('shell.showFiles')}
+          aria-label={view.showFiles ? t('shell.hideFiles') : t('shell.showFiles')}
         >
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
           </svg>
-          <span class="hidden lg:inline">{t('shell.files')}</span>
         </button>
       {/if}
 
       <!-- Right next to Files because they share the same column: opening one closes the other -->
       <button
         onclick={handleAiToggle}
-        class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
+        class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center justify-center {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
         title={aiChat.open ? t('shell.closeAi') : t('shell.openAi')}
+        aria-label={aiChat.open ? t('shell.closeAi') : t('shell.openAi')}
         aria-pressed={aiChat.open}
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
         </svg>
-        <span class="hidden lg:inline">AI</span>
       </button>
 
       <!-- Split Controls: ONLY shown when more than one host is open -->
@@ -671,9 +706,8 @@
       </div>
 
       <!-- Live Status Indicator -->
-      <div class="hidden sm:flex items-center gap-1.5 text-xs" data-tauri-drag-region>
+      <div class="hidden sm:flex items-center text-xs" data-tauri-drag-region title={timeAgo}>
         <span class="text-emerald-500 animate-pulse text-[10px]" class:opacity-50={monitorState.isPolling}>●</span>
-        <span class="text-neutral-600 dark:text-neutral-400 hidden lg:inline">{timeAgo}</span>
       </div>
 
       <!-- Custom Window Controls -->
@@ -860,26 +894,156 @@
       data-tab-menu
       role="menu"
       aria-label={t('shell.sessionTabMenu')}
-      class="fixed z-[200] w-44 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#141414] shadow-2xl py-1 text-sm"
+      class="fixed z-[200] w-48 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#141414] shadow-2xl py-1 text-sm"
       style="left: {tabMenu.x}px; top: {tabMenu.y}px;"
     >
       <button
         role="menuitem"
         onclick={() => startRename(menuTab.id)}
-        class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors"
+        class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors cursor-pointer"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M16.9 4.1a2.1 2.1 0 013 3L8.5 18.5 4 20l1.5-4.5z" /></svg>
         {t('shell.rename')}
       </button>
+
+      <button
+        role="menuitem"
+        onclick={() => openGroupModal(menuTab.id)}
+        class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-neutral-700 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors cursor-pointer"
+      >
+        <svg class="w-3.5 h-3.5 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        </svg>
+        {t('shell.setGroup')}
+      </button>
+
+      {#if menuTab.group}
+        <button
+          role="menuitem"
+          onclick={() => removeGroup(menuTab.id)}
+          class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800/60 transition-colors cursor-pointer text-xs"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12" /></svg>
+          {t('shell.removeGroup')}
+        </button>
+
+        <button
+          role="menuitem"
+          onclick={() => { const grp = menuTab.group; tabMenu = null; if (grp) closeTabsInGroup(grp); }}
+          class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 transition-colors cursor-pointer text-xs"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          {t('shell.closeGroup', { group: menuTab.group })}
+        </button>
+      {/if}
+
+      <div class="my-1 border-t border-neutral-200 dark:border-neutral-800"></div>
+
       <button
         role="menuitem"
         onclick={() => { const id = menuTab.id; tabMenu = null; closeSessionTab(id); }}
-        class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+        class="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
       >
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="1.8" d="M6 18L18 6M6 6l12 12" /></svg>
         {t('shell.closeSession')}
       </button>
     </div>
   {/if}
+{/if}
+
+<!-- Tab Grouping Modal -->
+{#if isGroupModalOpen}
+  <div
+    class="fixed inset-0 z-[99999] bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+  >
+    <div
+      class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4 animate-in zoom-in-95 duration-150"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+          </div>
+          <h3 class="font-bold text-neutral-900 dark:text-white text-sm">{t('shell.setGroup')}</h3>
+        </div>
+        <button
+          type="button"
+          onclick={() => isGroupModalOpen = false}
+          aria-label={t('common.cancel')}
+          class="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div class="space-y-3">
+        <div>
+          <label for="tab-group-name-input" class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+            Group Name
+          </label>
+          <input
+            id="tab-group-name-input"
+            type="text"
+            bind:value={groupDraft}
+            placeholder="e.g. Production, Backend, Database"
+            maxlength="24"
+            class="w-full bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500 transition-colors"
+            onkeydown={(e) => e.key === 'Enter' && commitGroup()}
+          />
+        </div>
+
+        <div>
+          <span class="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
+            Group Color
+          </span>
+          <div class="flex items-center gap-2">
+            {#each GROUP_COLORS as color}
+              <button
+                type="button"
+                onclick={() => groupColorDraft = color}
+                class="w-6 h-6 rounded-full transition-transform flex items-center justify-center {groupColorDraft === color ? 'scale-115 ring-2 ring-offset-2 ring-neutral-400 dark:ring-neutral-500' : 'hover:scale-105'}"
+                style="background-color: {color};"
+                aria-label={color}
+              >
+                {#if groupColorDraft === color}
+                  <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" /></svg>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
+        {#if groupingTabId && sessionTabs.find(t => t.id === groupingTabId)?.group}
+          <button
+            type="button"
+            onclick={() => { if (groupingTabId) removeGroup(groupingTabId); isGroupModalOpen = false; }}
+            class="mr-auto px-2.5 py-1 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg text-xs font-medium transition-colors"
+          >
+            {t('common.remove')}
+          </button>
+        {/if}
+        <button
+          type="button"
+          onclick={() => isGroupModalOpen = false}
+          class="px-3 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          onclick={commitGroup}
+          class="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-medium transition-colors shadow-md shadow-sky-600/20 cursor-pointer"
+        >
+          {t('common.save')}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 {/if}

@@ -536,13 +536,13 @@
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M3 12h18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
         </button>
       {/if}
+      <span class="ml-1 text-neutral-500 hidden sm:inline">SSH</span>
+      <span class="text-neutral-500 hidden sm:inline">UTF-8</span>
       {#if onClose}
-        <button onclick={onClose} class="hover:text-rose-600 dark:hover:text-rose-400 p-0.5 rounded transition-colors" title={t('terminal.closePane')} aria-label={t('terminal.closePane')}>
+        <button onclick={onClose} class="hover:text-rose-600 dark:hover:text-rose-400 p-0.5 rounded transition-colors ml-1" title={t('terminal.closePane')} aria-label={t('terminal.closePane')}>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" stroke-linecap="round" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
       {/if}
-      <span class="ml-1 text-neutral-500 hidden sm:inline">SSH</span>
-      <span class="text-neutral-500 hidden sm:inline">UTF-8</span>
     </div>
   </div>
 

@@ -8,7 +8,8 @@
     restoreWorkspace,
     getCurrentLayout,
     getCurrentShowFiles,
-    type Workspace
+    type Workspace,
+    type WorkspaceSessionConfig
   } from '$lib/stores/workspaceStore.svelte';
   import { getTabs } from '$lib/stores/sessionTabs.svelte';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
@@ -17,6 +18,7 @@
 
   interface Props {
     hostIds?: string[];
+    sessions?: WorkspaceSessionConfig[];
     layout?: number;
     showFiles?: boolean;
     onLoad?: (ws: Workspace) => void;
@@ -28,6 +30,7 @@
 
   let {
     hostIds,
+    sessions,
     layout,
     showFiles,
     onLoad,
@@ -55,6 +58,17 @@
     hostIds && hostIds.length > 0
       ? hostIds
       : sessionTabs.map((tab) => tab.host.id)
+  );
+
+  const activeSessions = $derived<WorkspaceSessionConfig[]>(
+    sessions && sessions.length > 0
+      ? sessions
+      : sessionTabs.map((tab) => ({
+          hostId: tab.host.id,
+          group: tab.group,
+          groupColor: tab.groupColor,
+          title: tab.title
+        }))
   );
 
   const effectiveLayout = $derived(
@@ -150,7 +164,9 @@
         trimmed,
         activeHostIds,
         effectiveLayout,
-        effectiveShowFiles
+        effectiveShowFiles,
+        undefined,
+        activeSessions
       );
 
       closeSaveModal();
@@ -174,9 +190,10 @@
         showToast(t('workspaces.notLoaded', { name: ws.name }), 'error');
         return;
       }
+      const totalRequested = ws.sessions?.length || ws.hostIds.length;
       if (result.missingCount > 0) {
         showToast(
-          t('workspaces.partial', { name: ws.name, opened: result.openedCount, total: ws.hostIds.length, missing: result.missingCount }),
+          t('workspaces.partial', { name: ws.name, opened: result.openedCount, total: totalRequested, missing: result.missingCount }),
           'info'
         );
       } else {
@@ -247,10 +264,10 @@
         d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
       />
     </svg>
-    <span class="font-medium hidden sm:inline">{t('workspaces.title')}</span>
+    <span class="hidden sm:inline">{t('workspaces.title')}</span>
     {#if workspaces.length > 0}
       <span
-        class="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-semibold bg-sky-500/15 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30"
+        class="px-1 py-0.2 rounded-full text-[10px] font-mono font-semibold bg-sky-500/15 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30"
       >
         {workspaces.length}
       </span>
@@ -291,7 +308,7 @@
         <button
           type="button"
           onclick={openSaveModal}
-          class="px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1 shadow-xs"
+          class="px-2 py-1 bg-sky-600 hover:bg-sky-500 text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
         >
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
@@ -325,7 +342,7 @@
                 </div>
                 <div class="text-[10px] text-neutral-500 dark:text-neutral-400 flex items-center flex-wrap gap-1.5 mt-0.5">
                   <span class="px-1.5 py-0.2 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 font-mono">
-                    {t('workspaces.hostCount', { count: ws.hostIds.length })}
+                    {t('workspaces.hostCount', { count: ws.sessions?.length || ws.hostIds.length })}
                   </span>
                   <span>•</span>
                   <span>{getLayoutName(ws.layout)}</span>
@@ -333,13 +350,28 @@
                     <span class="text-neutral-400 dark:text-neutral-500">• {formatTimeAgo(ws.updatedAt)}</span>
                   {/if}
                 </div>
+                <!-- Group tags badge summary -->
+                {#if ws.sessions && ws.sessions.some(s => s.group)}
+                  <div class="flex items-center gap-1 mt-1 flex-wrap">
+                    {#each Array.from(new Set(ws.sessions.filter(s => s.group).map(s => JSON.stringify({ name: s.group, color: s.groupColor })))) as jsonGroup}
+                      {@const g = JSON.parse(jsonGroup)}
+                      <span
+                        class="px-1.5 py-0.2 rounded text-[9px] font-medium flex items-center gap-1 border"
+                        style="background-color: {g.color ? g.color + '15' : 'rgba(2, 132, 199, 0.1)'}; color: {g.color || '#0284c7'}; border-color: {g.color ? g.color + '40' : 'rgba(2, 132, 199, 0.3)'}"
+                      >
+                        <span class="w-1 h-1 rounded-full" style="background-color: {g.color || '#0284c7'}"></span>
+                        <span>{g.name}</span>
+                      </span>
+                    {/each}
+                  </div>
+                {/if}
               </div>
               <div class="flex items-center gap-1 shrink-0">
                 <button
                   type="button"
                   onclick={() => handleLoadWorkspace(ws)}
                   disabled={isLoadingWs}
-                  class="px-2 py-1 bg-sky-600/10 hover:bg-sky-600 text-sky-600 hover:text-white dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white border border-sky-500/30 rounded text-xs font-medium transition-colors shadow-xs"
+                  class="px-2 py-1 bg-sky-600/10 hover:bg-sky-600 text-sky-600 hover:text-white dark:bg-sky-500/20 dark:text-sky-300 dark:hover:bg-sky-600 dark:hover:text-white border border-sky-500/30 rounded text-xs font-medium transition-colors shadow-xs cursor-pointer"
                   title={t('workspaces.loadTitle', { name: ws.name })}
                 >
                   {t('workspaces.load')}
@@ -347,7 +379,7 @@
                 <button
                   type="button"
                   onclick={() => handleDeleteWorkspace(ws)}
-                  class="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors"
+                  class="p-1 text-neutral-400 hover:text-rose-500 hover:bg-rose-500/10 rounded transition-colors cursor-pointer"
                   title={t('workspaces.deleteTitle', { name: ws.name })}
                   aria-label={t('workspaces.deleteTitle', { name: ws.name })}
                 >
@@ -426,16 +458,27 @@
           <div class="flex items-center justify-between text-xs">
             <span class="text-neutral-500 dark:text-neutral-400">{t('workspaces.activeHosts')}</span>
             <span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-500/10 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30">
-              {t('workspaces.hostCount', { count: activeHostIds.length })}
+              {t('workspaces.hostCount', { count: activeSessions.length })}
             </span>
           </div>
 
-          {#if activeHostIds.length > 0}
-            <div class="flex flex-wrap gap-1 pt-1">
-              {#each getHostLabels(activeHostIds) as label}
-                <span class="px-2 py-0.5 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[11px] text-neutral-800 dark:text-neutral-200 font-mono">
-                  {label}
-                </span>
+          {#if activeSessions.length > 0}
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              {#each sessionTabs as tab}
+                <div class="px-2 py-0.5 rounded bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-[11px] text-neutral-800 dark:text-neutral-200 font-mono flex items-center gap-1.5">
+                  {#if tab.group}
+                    <span class="w-1.5 h-1.5 rounded-full" style="background-color: {tab.groupColor || '#0284c7'}"></span>
+                  {/if}
+                  <span>{tab.title || tab.host.label}</span>
+                  {#if tab.group}
+                    <span
+                      class="px-1 py-0.1 rounded text-[9px] font-sans font-medium"
+                      style="background-color: {tab.groupColor ? tab.groupColor + '20' : 'rgba(2, 132, 199, 0.1)'}; color: {tab.groupColor || '#0284c7'}"
+                    >
+                      {tab.group}
+                    </span>
+                  {/if}
+                </div>
               {/each}
             </div>
           {:else}
@@ -466,7 +509,7 @@
         <button
           type="button"
           onclick={closeSaveModal}
-          class="px-3.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-medium transition-colors"
+          class="px-3.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
         >
           {t('common.cancel')}
         </button>
@@ -474,7 +517,7 @@
           type="button"
           onclick={handleSaveWorkspace}
           disabled={!workspaceName.trim() || activeHostIds.length === 0 || isSaving}
-          class="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors shadow-lg shadow-sky-600/20 flex items-center gap-1.5"
+          class="px-4 py-1.5 bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors shadow-lg shadow-sky-600/20 flex items-center gap-1.5 cursor-pointer"
         >
           {#if isSaving}
             <span class="animate-spin text-xs">●</span>
