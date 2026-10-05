@@ -7,6 +7,17 @@
 
 use crate::error::{CatermError, IoError};
 use std::path::PathBuf;
+use std::sync::RwLock;
+
+static CUSTOM_DATA_DIR: RwLock<Option<PathBuf>> = RwLock::new(None);
+
+/// Explicitly configure the application data directory at runtime (e.g. from Tauri AppHandle on Android/iOS).
+pub fn set_custom_data_dir(path: PathBuf) -> Result<(), CatermError> {
+    if let Ok(mut lock) = CUSTOM_DATA_DIR.write() {
+        *lock = Some(path);
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DataDirSource {
@@ -51,6 +62,15 @@ pub fn resolve_data_dir() -> Result<DataDirInfo, CatermError> {
 /// mutating the real process environment (`std::env::set_var` in tests is a data-race
 /// hazard across parallel test threads — the same reason it's banned in `clippy.toml`).
 fn resolve_data_dir_with(env_override: Option<&str>) -> Result<DataDirInfo, CatermError> {
+    if let Ok(lock) = CUSTOM_DATA_DIR.read() {
+        if let Some(ref dir) = *lock {
+            return Ok(DataDirInfo {
+                path: dir.clone(),
+                source: DataDirSource::EnvOverride,
+            });
+        }
+    }
+
     if let Some(dir) = env_override {
         return Ok(DataDirInfo {
             path: PathBuf::from(dir),
@@ -65,15 +85,40 @@ fn resolve_data_dir_with(env_override: Option<&str>) -> Result<DataDirInfo, Cate
         });
     }
 
-    let base = directories::BaseDirs::new().ok_or_else(|| {
-        CatermError::Io(IoError::Generic(
-            "unable to determine OS data directory (HOME/APPDATA unreadable)".into(),
-        ))
-    })?;
-    Ok(DataDirInfo {
-        path: base.data_dir().join("caterm"),
-        source: DataDirSource::PerOsDefault,
-    })
+    if let Some(base) = directories::BaseDirs::new() {
+        return Ok(DataDirInfo {
+            path: base.data_dir().join("caterm"),
+            source: DataDirSource::PerOsDefault,
+        });
+    }
+
+    // Fallbacks for Android & embedded systems where BaseDirs::new() returns None
+    if let Ok(files_dir) = std::env::var("FILES_DIR") {
+        return Ok(DataDirInfo {
+            path: PathBuf::from(files_dir).join("caterm"),
+            source: DataDirSource::PerOsDefault,
+        });
+    }
+
+    if let Ok(home) = std::env::var("HOME") {
+        return Ok(DataDirInfo {
+            path: PathBuf::from(home).join(".local/share/caterm"),
+            source: DataDirSource::PerOsDefault,
+        });
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        return Ok(DataDirInfo {
+            path: PathBuf::from("/data/data/com.fathforce.caterm/files/caterm"),
+            source: DataDirSource::PerOsDefault,
+        });
+    }
+
+    #[cfg(not(target_os = "android"))]
+    Err(CatermError::Io(IoError::Generic(
+        "unable to determine OS data directory (HOME/APPDATA unreadable)".into(),
+    )))
 }
 
 /// Conventional path to the SQLite store inside the resolved data directory. The real

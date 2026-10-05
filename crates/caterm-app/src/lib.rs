@@ -109,6 +109,10 @@ pub fn run_with_start(start: std::time::Instant) {
             let _ = app.get_webview_window("main").map(|w| w.set_focus());
         }))
         .setup(move |app| {
+            use tauri::Manager;
+            if let Ok(app_data) = app.path().app_data_dir() {
+                caterm_core::paths::set_custom_data_dir(app_data);
+            }
             window::create_main_window(app)?;
             install_ssh_event_bridge(app.handle());
 
