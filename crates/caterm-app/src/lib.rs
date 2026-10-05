@@ -94,7 +94,7 @@ pub fn run_with_start(start: std::time::Instant) {
     // code that calls `std::process::exit` internally (Tauri's own codegen, not ours) —
     // the lint attributes that call to this statement's span.
     #[allow(clippy::expect_used, clippy::disallowed_methods)]
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
         // The frontend imports @tauri-apps/plugin-dialog (native save/open dialogs on the
         // Command Logs CSV export and the Snippets import/export) and @tauri-apps/plugin-fs
@@ -103,15 +103,19 @@ pub fn run_with_start(start: std::time::Instant) {
         // tauri-plugin-dialog, and tauri-plugin-fs wasn't even a dependency — both features
         // silently failed with a "plugin not found" error at the call site.
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            use tauri::Manager;
-            let _ = app.get_webview_window("main").map(|w| w.set_focus());
-        }))
+        .plugin(tauri_plugin_fs::init());
+
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        use tauri::Manager;
+        let _ = app.get_webview_window("main").map(|w| w.set_focus());
+    }));
+
+    builder
         .setup(move |app| {
             use tauri::Manager;
             if let Ok(app_data) = app.path().app_data_dir() {
-                caterm_core::paths::set_custom_data_dir(app_data);
+                let _ = caterm_core::paths::set_custom_data_dir(app_data);
             }
             window::create_main_window(app)?;
             install_ssh_event_bridge(app.handle());

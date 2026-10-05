@@ -477,11 +477,11 @@
 <!-- Shell: one title bar across the full width, then sidebar + content panel. Title bar and
      sidebar share the app background with no dividers; the content sits on a raised panel with
      a left/top hairline and a rounded top-left corner. -->
-<div class="flex flex-col h-screen bg-neutral-100 dark:bg-[#0e0e0e] text-neutral-800 dark:text-neutral-300 font-sans transition-colors duration-150">
+<div class="flex flex-col h-screen bg-neutral-100 dark:bg-[#0e0e0e] text-neutral-800 dark:text-neutral-300 font-sans transition-colors duration-150 pb-[env(safe-area-inset-bottom,0px)]">
   <!-- Title bar. Also hosts the terminal workspace controls (session tabs, Files, AI, split)
        so a session never costs a second stacked header row. -->
   <header
-    class="h-12 flex items-center gap-1 md:gap-2 pl-2 pr-1 md:pl-3 shrink-0 select-none cursor-default"
+    class="min-h-[3rem] h-[calc(3rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center gap-1 md:gap-2 pl-2 pr-1 md:pl-3 shrink-0 select-none cursor-default"
     data-tauri-drag-region
     onmousedown={startDragging}
     ondblclick={(e) => {
@@ -708,7 +708,7 @@
       aria-label={t('shell.mobileNav')}
     >
       <div class="min-h-0 flex flex-col">
-        <div class="h-12 flex items-center justify-between px-4">
+        <div class="min-h-[3rem] h-[calc(3rem+env(safe-area-inset-top,0px))] pt-[env(safe-area-inset-top,0px)] flex items-center justify-between px-4">
           <div class="flex items-center gap-2">
             <Logo size={22} mode="brand" />
             <span class="font-bold text-neutral-900 dark:text-white text-base tracking-tight">CATerm</span>
@@ -744,7 +744,7 @@
         </nav>
       </div>
 
-      <div class="p-2">
+      <div class="p-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
         <ProfileMenu onLock={lockApp} onSignOut={signOut} onNavigate={() => (mobileDrawerOpen = false)} />
       </div>
     </aside>

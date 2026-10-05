@@ -28,7 +28,27 @@ button, input, textarea, a, select, [role="button"], .no-drag {
   --border-subtle: #e5e5e5;
   --text-primary: #171717;
   --text-secondary: #737373;
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
   color-scheme: light;
+}
+
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.safe-pt-header {
+  padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+}
+
+.safe-pb-nav {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
 }
 
 html.dark {

@@ -9,7 +9,7 @@ description = "CATerm v2 desktop shell — thin Tauri binding layer over caterm-
 
 [lib]
 name = "caterm_app_lib"
-crate-type = ["staticlib", "rlib"]
+crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -29,6 +29,7 @@ tauri-plugin-fs = "2"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 tauri-plugin-updater = "2"
+tauri-plugin-single-instance = "2.0.0"
 
 [target.'cfg(windows)'.dependencies]
 ssh2 = "0.9.6"
@@ -42,5 +43,3 @@ ssh2 = { version = "0.9.6", features = ["vendored-openssl"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit2gtk = { version = "2.0", default-features = false }
-
-tauri-plugin-single-instance = "2.0.0"
