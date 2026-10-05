@@ -466,7 +466,10 @@
     const observer = new ResizeObserver(() => {
       if (fitQueued) return;
       fitQueued = true;
-      requestAnimationFrame(applyFit);
+      // Debounce slightly or requestAnimationFrame to prevent layout thrashing on sidebar transitions
+      setTimeout(() => {
+        requestAnimationFrame(applyFit);
+      }, 50);
     });
     observer.observe(terminalContainer);
 

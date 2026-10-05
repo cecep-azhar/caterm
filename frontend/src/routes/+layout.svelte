@@ -751,7 +751,7 @@
 
     <!-- Desktop Sidebar -->
     <aside
-      class="hidden md:flex flex-col shrink-0 transition-all duration-200 ease-in-out {isCollapsed ? 'w-16' : 'w-60'}"
+      class="hidden md:flex flex-col shrink-0 will-change-[width] {isCollapsed ? 'w-16' : 'w-60'}"
       aria-label={t('shell.sidebar')}
     >
       <!-- Brand + collapse -->
