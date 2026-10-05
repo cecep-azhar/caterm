@@ -2,6 +2,7 @@
   import "../app.css";
   import LockScreen from '$lib/components/LockScreen.svelte';
   import { onVaultUnlocked, onVaultLocked } from '$lib/stores/pro.svelte';
+  import HeaderQuickControls from '$lib/components/HeaderQuickControls.svelte';
   import NotificationCenter from '$lib/components/NotificationCenter.svelte';
   import Logo from '$lib/components/Logo.svelte';
   import WorkspaceMenu from '$lib/components/WorkspaceMenu.svelte';
@@ -615,59 +616,7 @@
       <div class="flex-1 h-full min-w-[20px]" data-tauri-drag-region></div>
     </div>
 
-    <div class="flex items-center gap-1 md:gap-2 text-neutral-500 dark:text-neutral-400 shrink-0" data-tauri-drag-region>
-      <!-- Session view controls: only meaningful while terminals are open -->
-      {#if sessionTabs.length > 0}
-        <button
-          onclick={handleFilesToggle}
-          class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center justify-center {view.showFiles ? 'bg-sky-600/20 text-sky-600 dark:text-sky-400 border-sky-500/30 hover:bg-sky-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
-          title={view.showFiles ? t('shell.hideFiles') : t('shell.showFiles')}
-          aria-label={view.showFiles ? t('shell.hideFiles') : t('shell.showFiles')}
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path>
-          </svg>
-        </button>
-      {/if}
-
-      <!-- Right next to Files because they share the same column: opening one closes the other -->
-      <button
-        onclick={handleAiToggle}
-        class="px-2 py-1 rounded text-xs font-medium border transition-colors flex items-center justify-center {aiChat.open ? 'bg-violet-600/20 text-violet-600 dark:text-violet-400 border-violet-500/30 hover:bg-violet-600/30' : 'bg-transparent text-neutral-500 dark:text-neutral-400 border-neutral-200 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white'}"
-        title={aiChat.open ? t('shell.closeAi') : t('shell.openAi')}
-        aria-label={aiChat.open ? t('shell.closeAi') : t('shell.openAi')}
-        aria-pressed={aiChat.open}
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-        </svg>
-      </button>
-
-      <!-- Split Controls: ONLY shown when more than one host is open -->
-      {#if sessionTabs.length > 1}
-        <div class="hidden sm:flex items-center gap-0.5 p-0.5 rounded border border-neutral-200 dark:border-neutral-800">
-          {#each splitOptions as option}
-            <button
-              onclick={() => setLayout(option.value)}
-              disabled={sessionTabs.length < option.minTabs}
-              class="p-1 rounded transition-colors disabled:opacity-30 {view.layout === option.value ? 'bg-sky-600/25 text-sky-600 dark:text-sky-400' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
-              title={option.title}
-              aria-label={option.title}
-            >
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {#if option.value === 1}
-                  <rect x="3" y="3" width="18" height="18" rx="2" stroke-width="2"></rect>
-                {:else}
-                  <path stroke-width="2" d={option.path}></path>
-                {/if}
-              </svg>
-            </button>
-          {/each}
-        </div>
-      {/if}
-
-      <div class="w-px h-4 bg-neutral-200 dark:bg-neutral-800 hidden sm:block"></div>
-
+    <div class="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400 shrink-0" data-tauri-drag-region>
       <!-- Workspaces Menu -->
       <WorkspaceMenu />
 
@@ -679,35 +628,21 @@
         {/if}
       </button>
 
-      <!-- Language: EN/ID now, more locales just register in $lib/i18n — same segmented style
-           as the theme toggle right next to it, so they read as one family of controls. -->
-      <LanguageSwitcher />
+      <!-- Unified Header Preferences: Theme, Language, Split View & Panels in 1 Elegant Icon -->
+      <HeaderQuickControls
+        layout={view.layout}
+        showFiles={view.showFiles}
+        aiOpen={aiChat.open}
+        sessionCount={sessionTabs.length}
+        {splitOptions}
+        onSetLayout={setLayout}
+        onToggleFiles={handleFilesToggle}
+        onToggleAi={handleAiToggle}
+      />
 
-      <!-- Theme: segmented light / dark -->
-      <div class="flex items-center p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-800" role="group" aria-label={t('shell.theme')}>
-        <button
-          onclick={() => setTheme('light')}
-          aria-pressed={!isDarkTheme}
-          class="p-1 rounded-md transition-colors {!isDarkTheme ? 'bg-white text-amber-500 shadow-sm' : 'hover:text-neutral-900 dark:hover:text-white'}"
-          title={t('shell.lightTheme')}
-          aria-label={t('shell.lightTheme')}
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-        </button>
-        <button
-          onclick={() => setTheme('dark')}
-          aria-pressed={isDarkTheme}
-          class="p-1 rounded-md transition-colors {isDarkTheme ? 'bg-neutral-800 text-white' : 'hover:text-neutral-900'}"
-          title={t('shell.darkTheme')}
-          aria-label={t('shell.darkTheme')}
-        >
-          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
-        </button>
-      </div>
-
-      <!-- Live Status Indicator -->
+      <!-- Live Status Indicator Dot -->
       <div class="hidden sm:flex items-center text-xs" data-tauri-drag-region title={timeAgo}>
-        <span class="text-emerald-500 animate-pulse text-[10px]" class:opacity-50={monitorState.isPolling}>●</span>
+        <span class="text-emerald-500 animate-pulse text-[10px] p-1" class:opacity-50={monitorState.isPolling}>●</span>
       </div>
 
       <!-- Custom Window Controls -->
