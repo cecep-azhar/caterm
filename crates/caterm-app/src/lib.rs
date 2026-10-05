@@ -113,9 +113,12 @@ pub fn run_with_start(start: std::time::Instant) {
 
     builder
         .setup(move |app| {
-            use tauri::Manager;
-            if let Ok(app_data) = app.path().app_data_dir() {
-                let _ = caterm_core::paths::set_custom_data_dir(app_data);
+            #[cfg(target_os = "android")]
+            {
+                use tauri::Manager;
+                if let Ok(app_data) = app.path().app_data_dir() {
+                    let _ = caterm_core::paths::set_custom_data_dir(app_data);
+                }
             }
             window::create_main_window(app)?;
             install_ssh_event_bridge(app.handle());
