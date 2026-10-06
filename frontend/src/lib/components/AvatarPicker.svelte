@@ -72,23 +72,23 @@
   <!-- Dropdown / Popover for selecting avatars -->
   {#if isOpen}
     <div
-      class="absolute top-full mt-3 z-50 p-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-150 w-64"
+      class="absolute top-full mt-3 z-50 p-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-150 w-72 max-h-80 overflow-y-auto scrollbar-none"
       role="dialog"
       aria-label={t('avatars.pickerLabel')}
     >
       <div class="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-2 px-1 text-center">
-        {t('avatars.pickerLabel')}
+        {t('avatars.pickerLabel')} (30 Avatars)
       </div>
-      <div class="grid grid-cols-5 gap-2" role="radiogroup">
+      <div class="grid grid-cols-5 gap-2.5 p-1" role="radiogroup">
         {#each AVATARS as option (option.id)}
           <button
             type="button"
             role="radio"
             aria-checked={value === option.id}
-            aria-label={t(`avatars.${option.id}`)}
-            title={t(`avatars.${option.id}`)}
+            aria-label={option.label}
+            title={option.label}
             onclick={(e) => selectAvatar(option.id, e)}
-            class="justify-self-center flex items-center justify-center rounded-full p-1 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 transition-all cursor-pointer {value === option.id ? 'ring-sky-500 scale-105 shadow-sm' : 'ring-transparent hover:ring-neutral-300 dark:hover:ring-neutral-700 hover:scale-105'}"
+            class="justify-self-center flex items-center justify-center rounded-full p-1 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 transition-all cursor-pointer {value === option.id ? 'ring-sky-500 scale-110 shadow-sm' : 'ring-transparent hover:ring-neutral-300 dark:hover:ring-neutral-700 hover:scale-105'}"
           >
             <ProfileAvatar avatar={option.id} size={32} />
           </button>

@@ -122,13 +122,14 @@
   async function runPlan() {
     if (isExecuting || proposedSteps.length === 0) return;
 
-    if (execMode === 'ssh' && !targetHostId) {
-      showToast(t('aiChat.errSelectHost'), 'error');
-      return;
+    // If terminal mode is picked but there is no active terminal pane, fallback to background exec
+    let effectiveExecMode = execMode;
+    if (effectiveExecMode === 'terminal' && !activeSession) {
+      effectiveExecMode = 'ssh';
     }
-    if (execMode === 'terminal' && !activeSession) {
-      showToast(t('aiChat.errNoTerminal'), 'error');
-      return;
+
+    if (effectiveExecMode === 'ssh' && !targetHostId) {
+      targetHostId = LOCAL_HOST_ID;
     }
 
     isExecuting = true;
@@ -137,7 +138,7 @@
         if (!acceptedSteps[i]) continue;
         const step = proposedSteps[i];
 
-        if (execMode === 'terminal') {
+        if (effectiveExecMode === 'terminal') {
           runs[i] = { status: 'running', output: '' };
           injectIntoActiveSession(step.command);
           runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
@@ -177,20 +178,19 @@
     const step = proposedSteps[i];
     if (!step) return;
 
-    if (execMode === 'terminal') {
-      if (!activeSession) {
-        showToast(t('aiChat.errNoTerminal'), 'error');
-        return;
-      }
-      runs[i] = { status: 'running', output: '' };
+    let effectiveExecMode = execMode;
+    if (effectiveExecMode === 'terminal' && !activeSession) {
+      effectiveExecMode = 'ssh';
+    }
+
+    if (effectiveExecMode === 'terminal') {
       injectIntoActiveSession(step.command);
       runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
       return;
     }
 
     if (!targetHostId) {
-      showToast(t('aiChat.errSelectHost'), 'error');
-      return;
+      targetHostId = LOCAL_HOST_ID;
     }
 
     runs[i] = { status: 'running', output: '' };
