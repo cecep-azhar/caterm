@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-delete-totp-entry"
+description = "Enables the delete_totp_entry command without any pre-configured scope."
+commands.allow = ["delete_totp_entry"]
+
+[[permission]]
+identifier = "deny-delete-totp-entry"
+description = "Denies the delete_totp_entry command without any pre-configured scope."
+commands.deny = ["delete_totp_entry"]

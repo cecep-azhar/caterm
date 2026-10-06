@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-generate-current-totp"
+description = "Enables the generate_current_totp command without any pre-configured scope."
+commands.allow = ["generate_current_totp"]
+
+[[permission]]
+identifier = "deny-generate-current-totp"
+description = "Denies the generate_current_totp command without any pre-configured scope."
+commands.deny = ["generate_current_totp"]

@@ -3,6 +3,7 @@
 use crate::db;
 use crate::error::{CatermError, DbError, ValidationError};
 use crate::totp::{generate_totp_at_timestamp, parse_otpauth_uri};
+use crate::vault::get_active_dek;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +44,8 @@ fn now_sec() -> u64 {
 }
 
 pub fn list_totp_entries() -> Result<Vec<TotpEntryRecord>, CatermError> {
+    let key = get_active_dek()?;
+    let key_hex = hex::encode(key);
     let conn = db::open()?;
     let mut stmt = conn
         .prepare("SELECT id, label, issuer, secret_enc, created_at, updated_at FROM totp_entries ORDER BY label COLLATE NOCASE ASC;")
@@ -67,7 +70,7 @@ pub fn list_totp_entries() -> Result<Vec<TotpEntryRecord>, CatermError> {
         let (id, label, issuer, secret_enc, created_at, updated_at) =
             r.map_err(|e| CatermError::Db(DbError::Generic(e.to_string())))?;
 
-        let (token, remaining_seconds) = match crate::secret::decrypt_string(&secret_enc) {
+        let (token, remaining_seconds) = match crate::secret::decrypt(&key_hex, &secret_enc) {
             Ok(secret) => generate_totp_at_timestamp(&secret, now, 30, 6)
                 .unwrap_or_else(|_| ("------".to_string(), 0)),
             Err(_) => ("------".to_string(), 0),
@@ -90,7 +93,10 @@ pub fn list_totp_entries() -> Result<Vec<TotpEntryRecord>, CatermError> {
 
 pub fn save_totp_entry(input: TotpEntryInput) -> Result<TotpEntryRecord, CatermError> {
     let mut label = input.label.trim().to_string();
-    let mut issuer = input.issuer.map(|s| s.trim().to_string()).filter(|s| !s.is_empty());
+    let mut issuer = input
+        .issuer
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
     let mut raw_secret = input.secret.unwrap_or_default().trim().to_string();
 
     // Support pasting raw otpauth:// URI directly
@@ -112,14 +118,18 @@ pub fn save_totp_entry(input: TotpEntryInput) -> Result<TotpEntryRecord, CatermE
         )));
     }
 
+    let key = get_active_dek()?;
+    let key_hex = hex::encode(key);
     let conn = db::open()?;
     let now = now_sec() as i64;
-    let id = input.id.unwrap_or_else(|| format!("totp-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]));
+    let id = input
+        .id
+        .unwrap_or_else(|| format!("totp-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]));
 
     let secret_enc = if !raw_secret.is_empty() {
         // Validate base32 secret before encrypting
         crate::totp::decode_base32(&raw_secret)?;
-        crate::secret::encrypt_string(&raw_secret)?
+        crate::secret::encrypt(&key_hex, &raw_secret)?
     } else {
         // If editing without changing secret, preserve existing
         let existing: Option<String> = conn
@@ -148,7 +158,7 @@ pub fn save_totp_entry(input: TotpEntryInput) -> Result<TotpEntryRecord, CatermE
     )
     .map_err(|e| CatermError::Db(DbError::Generic(e.to_string())))?;
 
-    let (token, remaining_seconds) = match crate::secret::decrypt_string(&secret_enc) {
+    let (token, remaining_seconds) = match crate::secret::decrypt(&key_hex, &secret_enc) {
         Ok(secret) => generate_totp_at_timestamp(&secret, now as u64, 30, 6)
             .unwrap_or_else(|_| ("------".to_string(), 0)),
         Err(_) => ("------".to_string(), 0),
@@ -177,6 +187,8 @@ pub fn generate_current_totp(secret_or_id: &str) -> Result<TotpGeneratedToken, C
     let now = now_sec();
     let secret = if secret_or_id.starts_with("totp-") || secret_or_id.len() <= 20 {
         // Treat as ID
+        let key = get_active_dek()?;
+        let key_hex = hex::encode(key);
         let conn = db::open()?;
         let enc: String = conn
             .query_row(
@@ -185,7 +197,7 @@ pub fn generate_current_totp(secret_or_id: &str) -> Result<TotpGeneratedToken, C
                 |row| row.get(0),
             )
             .map_err(|e| CatermError::Db(DbError::Generic(e.to_string())))?;
-        crate::secret::decrypt_string(&enc)?
+        crate::secret::decrypt(&key_hex, &enc)?
     } else if secret_or_id.starts_with("otpauth://") {
         parse_otpauth_uri(secret_or_id)?.secret
     } else {

@@ -1661,8 +1661,16 @@ PRETTY_NAME="Ubuntu 24.04 LTS"
         let session = connect("local").expect("failed to connect local terminal");
 
         let _ = write(&session.session_id, "echo TERM_IS:$TERM\r\n");
-        std::thread::sleep(Duration::from_millis(300));
-        let out = read(&session.session_id).expect("read local terminal output");
+        let mut out = String::new();
+        for _ in 0..20 {
+            std::thread::sleep(Duration::from_millis(100));
+            if let Ok(chunk) = read(&session.session_id) {
+                out.push_str(&chunk);
+                if out.contains("TERM_IS:xterm-256color") {
+                    break;
+                }
+            }
+        }
 
         assert!(
             out.contains("TERM_IS:xterm-256color"),

@@ -419,6 +419,30 @@ pub async fn save_snippet(
 }
 
 #[tauri::command]
+pub async fn list_totp_entries() -> Result<Vec<caterm_core::totp_store::TotpEntryRecord>, CatermError> {
+    run_blocking(caterm_core::totp_store::list_totp_entries).await
+}
+
+#[tauri::command]
+pub async fn save_totp_entry(
+    input: caterm_core::totp_store::TotpEntryInput,
+) -> Result<caterm_core::totp_store::TotpEntryRecord, CatermError> {
+    run_blocking(move || caterm_core::totp_store::save_totp_entry(input)).await
+}
+
+#[tauri::command]
+pub async fn delete_totp_entry(id: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::totp_store::delete_totp_entry(&id)).await
+}
+
+#[tauri::command]
+pub async fn generate_current_totp(
+    secret_or_id: String,
+) -> Result<caterm_core::totp_store::TotpGeneratedToken, CatermError> {
+    run_blocking(move || caterm_core::totp_store::generate_current_totp(&secret_or_id)).await
+}
+
+#[tauri::command]
 pub async fn delete_snippet(id: String) -> Result<(), CatermError> {
     run_blocking(move || snippets::delete_snippet(&id)).await
 }

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-save-totp-entry"
+description = "Enables the save_totp_entry command without any pre-configured scope."
+commands.allow = ["save_totp_entry"]
+
+[[permission]]
+identifier = "deny-save-totp-entry"
+description = "Denies the save_totp_entry command without any pre-configured scope."
+commands.deny = ["save_totp_entry"]

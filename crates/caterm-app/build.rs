@@ -27,6 +27,11 @@ const COMMANDS: &[&str] = &[
     "list_snippets",
     "save_snippet",
     "delete_snippet",
+    // 2FA / TOTP Authenticator
+    "list_totp_entries",
+    "save_totp_entry",
+    "delete_totp_entry",
+    "generate_current_totp",
     // Port forwarding
     "list_tunnels",
     "save_tunnel",

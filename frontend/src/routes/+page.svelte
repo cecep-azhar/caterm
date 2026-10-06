@@ -90,6 +90,8 @@
   let showFormSecret = $state(false);
   let formTags = $state('');
   let formOs = $state('');
+  let formTotpSecret = $state('');
+  let testTotpResult = $state<{ token: string; remaining: number } | null>(null);
   let unlistenOsDetected: UnlistenFn | null = null;
 
   onMount(async () => {
@@ -132,6 +134,8 @@
   }
 
   function openAddModal() {
+    openMenuId = null;
+    detailHost = null;
     editingId = null;
     editingHadSecret = false;
     formLabel = '';
@@ -141,14 +145,20 @@
     formProtocol = 'ssh';
     formAuthType = 'password';
     formKeyPath = '';
+    formKeyId = '';
     formSecret = '';
     formTags = '';
     formOs = '';
+    formTotpSecret = '';
+    testTotpResult = null;
     errorMsg = '';
     isAddModalOpen = true;
   }
 
-  function openEditModal(host: HostRecord) {
+  function openEditModal(host: HostRecord, e?: MouseEvent) {
+    e?.stopPropagation();
+    openMenuId = null;
+    detailHost = null;
     editingId = host.id;
     editingHadSecret = host.hasSecret;
     formLabel = host.label;
@@ -162,6 +172,8 @@
     formSecret = '';
     formTags = host.tags.join(', ');
     formOs = host.os || '';
+    formTotpSecret = '';
+    testTotpResult = null;
     errorMsg = '';
     isAddModalOpen = true;
   }
@@ -627,7 +639,7 @@
             </span>
 
             <button
-              onclick={() => openEditModal(host)}
+              onclick={(e) => openEditModal(host, e)}
               class="ml-auto w-8 h-8 flex items-center justify-center rounded-lg text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
               title={t('hosts.editHost')}
               aria-label={`${t('common.edit')} ${host.label}`}
@@ -907,6 +919,24 @@
             placeholder={t('hosts.form.tagsPlaceholder')}
             class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
           />
+        </div>
+
+        <!-- 2FA / TOTP Authenticator Secret -->
+        <div>
+          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">
+            2FA / TOTP Secret Key (Opsional)
+          </label>
+          <div class="space-y-1.5">
+            <input 
+              type="password" 
+              bind:value={formTotpSecret} 
+              placeholder="Base32 Key (misal: JBSWY3DPEHPK3PXP) atau otpauth:// URL"
+              class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none text-xs font-mono"
+            />
+            <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
+              Digunakan untuk auto-inject kode 6-digit saat server meminta verifikasi SSH 2FA / OTP.
+            </p>
+          </div>
         </div>
       </div>
 

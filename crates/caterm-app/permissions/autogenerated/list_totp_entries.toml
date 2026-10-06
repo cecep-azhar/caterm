@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-totp-entries"
+description = "Enables the list_totp_entries command without any pre-configured scope."
+commands.allow = ["list_totp_entries"]
+
+[[permission]]
+identifier = "deny-list-totp-entries"
+description = "Denies the list_totp_entries command without any pre-configured scope."
+commands.deny = ["list_totp_entries"]

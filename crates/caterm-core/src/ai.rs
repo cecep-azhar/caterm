@@ -1046,10 +1046,13 @@ fn parse_chat_reply(content: &str) -> AiChatReply {
         .unwrap_or_else(|| content.trim())
         .to_string();
 
-    // If steps are present, surface them immediately as actionable plan
-    let steps = parse_plan_steps(&parsed);
-    let ready = (parsed.get("ready").and_then(|r| r.as_bool()).unwrap_or(false) || !steps.is_empty())
-        && !steps.is_empty();
+    let ready = parsed.get("ready").and_then(|r| r.as_bool()).unwrap_or(false);
+    let steps = if ready {
+        parse_plan_steps(&parsed)
+    } else {
+        Vec::new()
+    };
+    let ready = ready && !steps.is_empty();
 
     AiChatReply {
         reply,
