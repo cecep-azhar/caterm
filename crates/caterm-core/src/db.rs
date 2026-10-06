@@ -114,6 +114,7 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             name TEXT NOT NULL,
             color TEXT NOT NULL,
             host_ids TEXT NOT NULL,
+            categories TEXT NOT NULL DEFAULT '[\"hosts\"]',
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
          );

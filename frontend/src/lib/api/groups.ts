@@ -8,6 +8,7 @@ export interface GroupRecord {
   name: string;
   color: string;
   hostIds: string[];
+  categories: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -17,6 +18,7 @@ export interface GroupInput {
   name: string;
   color: string;
   hostIds: string[];
+  categories?: string[];
 }
 
 export function listGroups(): Promise<GroupRecord[]> {

@@ -67,7 +67,7 @@ const en = {
     investigations: 'Investigations',
     sshKeys: 'SSH Keys',
     totp: '2FA Authenticator',
-    groups: 'Host Groups',
+    groups: 'Work Groups',
     teams: 'Teams',
     contribution: 'Contribution',
     settings: 'Settings'

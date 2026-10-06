@@ -17,8 +17,14 @@ pub struct GroupRecord {
     pub name: String,
     pub color: String,
     pub host_ids: Vec<String>,
+    #[serde(default = "default_categories")]
+    pub categories: Vec<String>,
     pub created_at: u64,
     pub updated_at: u64,
+}
+
+fn default_categories() -> Vec<String> {
+    vec!["hosts".to_string()]
 }
 
 /// Payload for `save_group`: same shape as `GroupRecord` minus the fields the store itself
@@ -30,6 +36,8 @@ pub struct GroupInput {
     pub name: String,
     pub color: String,
     pub host_ids: Vec<String>,
+    #[serde(default)]
+    pub categories: Option<Vec<String>>,
 }
 
 fn now_unix() -> u64 {
@@ -52,11 +60,19 @@ fn row_to_group(row: &rusqlite::Row) -> rusqlite::Result<GroupRecord> {
     let host_ids: Vec<String> = serde_json::from_str(&host_ids_json).map_err(|e| {
         rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
     })?;
+    let categories: Vec<String> = row
+        .get::<_, Option<String>>("categories")
+        .ok()
+        .flatten()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| vec!["hosts".to_string()]);
+
     Ok(GroupRecord {
         id: row.get("id")?,
         name: row.get("name")?,
         color: row.get("color")?,
         host_ids,
+        categories,
         created_at: row.get::<_, i64>("created_at")? as u64,
         updated_at: row.get::<_, i64>("updated_at")? as u64,
     })
@@ -64,7 +80,7 @@ fn row_to_group(row: &rusqlite::Row) -> rusqlite::Result<GroupRecord> {
 
 pub(crate) fn list_groups_in(conn: &Connection) -> Result<Vec<GroupRecord>, CatermError> {
     let mut stmt = conn
-        .prepare("SELECT id, name, color, host_ids, created_at, updated_at FROM groups ORDER BY created_at ASC")
+        .prepare("SELECT id, name, color, host_ids, categories, created_at, updated_at FROM groups ORDER BY created_at ASC")
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal query groups: {e}"))))?;
     let rows = stmt
         .query_map([], row_to_group)
@@ -110,23 +126,30 @@ pub(crate) fn save_group_in(
     };
     let id = id.unwrap_or_else(generate_id);
 
+    let categories = input.categories.unwrap_or_else(|| vec!["hosts".to_string()]);
+    let categories_json = serde_json::to_string(&categories).map_err(|e| {
+        CatermError::Db(DbError::Generic(format!("gagal serialisasi categories: {e}")))
+    })?;
+
     let host_ids_json = serde_json::to_string(&input.host_ids).map_err(|e| {
         CatermError::Db(DbError::Generic(format!("gagal serialisasi host_ids: {e}")))
     })?;
 
     conn.execute(
-        "INSERT INTO groups (id, name, color, host_ids, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+        "INSERT INTO groups (id, name, color, host_ids, categories, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
          ON CONFLICT(id) DO UPDATE SET
             name = excluded.name,
             color = excluded.color,
             host_ids = excluded.host_ids,
+            categories = excluded.categories,
             updated_at = excluded.updated_at",
         params![
             id,
             input.name,
             input.color,
             host_ids_json,
+            categories_json,
             created_at as i64,
             now as i64
         ],
@@ -138,6 +161,7 @@ pub(crate) fn save_group_in(
         name: input.name,
         color: input.color,
         host_ids: input.host_ids,
+        categories,
         created_at,
         updated_at: now,
     })
@@ -248,6 +272,7 @@ mod tests {
                 name: "Prod".into(),
                 color: "#ef4444".into(),
                 host_ids: vec!["host-does-not-exist".into()],
+                categories: None,
             },
         );
         assert!(result.is_err());
@@ -265,6 +290,7 @@ mod tests {
                 name: "Web Tier".into(),
                 color: "#3b82f6".into(),
                 host_ids: vec![host_id.clone()],
+                categories: None,
             },
         )
         .expect("save_group gagal");
@@ -285,6 +311,7 @@ mod tests {
                 name: "Temp".into(),
                 color: "#10b981".into(),
                 host_ids: vec![],
+                categories: None,
             },
         )
         .expect("save_group gagal");

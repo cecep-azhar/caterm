@@ -105,6 +105,7 @@ pub fn import_encrypted_backup(
             name: group.name,
             color: group.color,
             host_ids: group.host_ids,
+            categories: Some(group.categories),
         })?;
         imported_count += 1;
     }

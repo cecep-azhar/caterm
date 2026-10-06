@@ -552,6 +552,7 @@ mod tests {
                 name: "Prod".into(),
                 color: "#ef4444".into(),
                 host_ids: vec![host.id.clone()],
+                categories: Some(vec!["hosts".into()]),
             },
         )
         .expect("save_group gagal");

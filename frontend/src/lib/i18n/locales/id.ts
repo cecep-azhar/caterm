@@ -68,8 +68,8 @@ const id: Dictionary = {
     investigations: 'Investigasi',
     sshKeys: 'Kunci SSH',
     totp: 'Autentikasi 2FA',
-    groups: 'Grup Host',
-    teams: 'Tim',
+    groups: 'Grup Kerja',
+    teams: 'Tim Kolaborasi',
     contribution: 'Kontribusi',
     settings: 'Pengaturan'
   },
