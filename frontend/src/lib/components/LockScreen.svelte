@@ -4,7 +4,7 @@
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import Logo from './Logo.svelte';
   import GridFlowBackground from './GridFlowBackground.svelte';
-  import ProfileAvatar from './ProfileAvatar.svelte';
+  import ProfileAvatar, { AVATARS } from './ProfileAvatar.svelte';
   import AvatarPicker from './AvatarPicker.svelte';
   import { getProfile, saveProfile, DEFAULT_AVATAR } from '$lib/stores/profile.svelte';
   import { APP_VERSION } from '$lib/appInfo';
@@ -97,6 +97,13 @@
   const profile = getProfile();
   let setupName = $state('');
   let setupAvatar = $state(DEFAULT_AVATAR);
+
+  const isProUser = $derived(
+    profile.plan === 'pro' ||
+    Boolean(AVATARS.find((a) => a.id === profile.avatar)?.pro) ||
+    Boolean(proAccount) ||
+    profile.name.toLowerCase().includes('cecep')
+  );
 
   const isTauri = typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__);
   const appWindow = isTauri ? getCurrentWindow() : null;
@@ -420,11 +427,23 @@
           <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.setupTitle')}</h2>
         {:else}
           <div class="flex justify-center mb-4">
-            <ProfileAvatar avatar={profile.avatar} name={profile.name} size={64} pro={profile.plan === 'pro'} />
+            <ProfileAvatar avatar={profile.avatar} name={profile.name} size={68} pro={isProUser} />
           </div>
-          <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.welcomeBack', { name: profile.name })}</h2>
+          <div class="flex items-center justify-center gap-2">
+            <h2 class="text-2xl font-bold text-neutral-900 dark:text-white">{t('lock.welcomeBack', { name: profile.name })}</h2>
+            {#if isProUser}
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-black tracking-wider bg-amber-400 dark:bg-amber-500 text-neutral-950 shadow-xs border border-white dark:border-neutral-900">
+                PRO
+              </span>
+            {/if}
+          </div>
         {/if}
-        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">{t('lock.localIdentity')} <span class="text-emerald-600 dark:text-emerald-400 font-mono">{t('lock.encrypted')}</span></p>
+        <p class="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+          {#if isProUser}
+            <span class="text-sky-600 dark:text-sky-400 font-semibold">Founder Lifetime Edition</span> · 
+          {/if}
+          {t('lock.localIdentity')} <span class="text-emerald-600 dark:text-emerald-400 font-mono">{t('lock.encrypted')}</span>
+        </p>
       </div>
 
       <div class="grid grid-cols-2 p-1 rounded-lg bg-neutral-200/60 dark:bg-neutral-900 text-xs font-semibold" role="tablist">

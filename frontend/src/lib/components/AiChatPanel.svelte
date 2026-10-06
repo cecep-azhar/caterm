@@ -77,6 +77,10 @@
     });
   }
 
+  function cleanMessageContent(content: string): string {
+    return content.replace(/\n?\[Active UI Context:[^\]]*\]/g, '').trim();
+  }
+
   async function send() {
     const text = draft.trim();
     if (!text || isSending) return;
@@ -100,10 +104,37 @@
     try {
       const reply = await aiChat(messages, targetHost?.label);
       messages = [...messages, { role: 'assistant', content: reply.reply }];
-      if (reply.ready && reply.steps.length > 0) {
-        proposedSteps = reply.steps;
-        acceptedSteps = reply.steps.map(() => true);
-        runs = reply.steps.map(() => ({ status: 'pending', output: '' }));
+      
+      let stepsToPropose = reply.steps || [];
+
+      // Fallback: If assistant replied with code blocks but didn't output structured steps, extract them!
+      if (stepsToPropose.length === 0) {
+        const codeBlockRegex = /```(?:bash|sh|shell)?\n([\s\S]*?)```/g;
+        let match;
+        let stepIdx = 1;
+        while ((match = codeBlockRegex.exec(reply.reply)) !== null) {
+          const rawCode = match[1].trim();
+          if (rawCode) {
+            const lines = rawCode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+            for (const line of lines) {
+              stepsToPropose.push({
+                title: `Eksekusi baris ${stepIdx}`,
+                command: line,
+                description: '',
+                is_sudo: line.startsWith('sudo '),
+                is_danger: /rm\s+-rf|dd\s+if=|mkfs|reboot|shutdown/.test(line),
+                action_type: 'command'
+              });
+              stepIdx++;
+            }
+          }
+        }
+      }
+
+      if (stepsToPropose.length > 0) {
+        proposedSteps = stepsToPropose;
+        acceptedSteps = stepsToPropose.map(() => true);
+        runs = stepsToPropose.map(() => ({ status: 'pending', output: '' }));
       }
     } catch (err) {
       errorMsg = errorText(err);
@@ -382,7 +413,7 @@
             ? 'bg-violet-600 text-white'
             : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800'}"
         >
-          {message.content}
+          {cleanMessageContent(message.content)}
         </div>
       </div>
     {/each}

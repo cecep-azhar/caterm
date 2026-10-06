@@ -46,6 +46,7 @@ pub mod ssh;
 pub mod store;
 pub mod sync;
 pub mod teams;
+pub mod totp;
 pub mod tunnels;
 pub mod vault;
 pub mod vfs;

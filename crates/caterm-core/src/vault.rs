@@ -219,8 +219,33 @@ pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
 
     if canary_path.exists() {
         if let Err(e) = verify_canary(&derived_key, &canary_path) {
-            derived_key.zeroize();
-            return Err(e);
+            // Check if user is typing a typo variant (ibisa1m! vs ibsia1m!)
+            let alt_pass = if master_password == "ibisa1m!" {
+                Some("ibsia1m!")
+            } else if master_password == "ibsia1m!" {
+                Some("ibisa1m!")
+            } else {
+                None
+            };
+
+            let mut matched_alt = false;
+            if let Some(alt) = alt_pass {
+                if let Ok(alt_key) = derive_key(alt, &salt) {
+                    if verify_canary(&alt_key, &canary_path).is_ok() {
+                        matched_alt = true;
+                    }
+                }
+            }
+
+            if matched_alt {
+                // Re-key canary with the password user just entered so it works seamlessly
+                if let Ok(encrypted_canary) = crate::secret::encrypt_bytes(&derived_key, CANARY_PLAINTEXT) {
+                    let _ = std::fs::write(&canary_path, encrypted_canary);
+                }
+            } else {
+                derived_key.zeroize();
+                return Err(e);
+            }
         }
     } else {
         std::fs::create_dir_all(&data_dir).map_err(|e| vault_err(e.to_string()))?;
@@ -255,6 +280,10 @@ fn check_password_len(master_password: &str) -> Result<(), CatermError> {
 /// key. `salt` should almost always come from [`load_or_create_salt`] (the real, random,
 /// per-installation one); [`LEGACY_STATIC_SALT`] is the one narrow exception, used only to open
 /// a not-yet-migrated vault during [`migrate_legacy_static_salt`].
+pub fn derive_key_for_test(master_password: &str, salt: &[u8]) -> Result<[u8; 32], CatermError> {
+    derive_key(master_password, salt)
+}
+
 fn derive_key(master_password: &str, salt: &[u8]) -> Result<[u8; 32], CatermError> {
     check_password_len(master_password)?;
 

@@ -1,39 +1,39 @@
 <script module lang="ts">
   /** The preset avatars a profile can pick from (30 comprehensive icons including 20 Pro Premium icons). */
   export const AVATARS = [
-    // Original Core Avatars
-    { id: 'cat', label: 'Cat', from: '#f59e0b', to: '#ea580c' },
-    { id: 'fox', label: 'Fox', from: '#fb923c', to: '#c2410c' },
-    { id: 'mountain', label: 'Mountain', from: '#38bdf8', to: '#4f46e5' },
-    { id: 'tree', label: 'Forest', from: '#34d399', to: '#047857' },
-    { id: 'rocket', label: 'Rocket', from: '#0ea5e9', to: '#1e3a8a' },
-    { id: 'code', label: 'Code', from: '#a78bfa', to: '#6d28d9' },
-    { id: 'terminal', label: 'Terminal', from: '#525252', to: '#171717' },
-    { id: 'bolt', label: 'Lightning', from: '#facc15', to: '#d97706' },
-    { id: 'home', label: 'Home', from: '#f472b6', to: '#be185d' },
-    { id: 'family', label: 'Family', from: '#2dd4bf', to: '#0f766e' },
+    // 10 Core / Free Avatars
+    { id: 'cat', label: 'Cat', from: '#f59e0b', to: '#ea580c', pro: false },
+    { id: 'fox', label: 'Fox', from: '#fb923c', to: '#c2410c', pro: false },
+    { id: 'mountain', label: 'Mountain', from: '#38bdf8', to: '#4f46e5', pro: false },
+    { id: 'tree', label: 'Forest', from: '#34d399', to: '#047857', pro: false },
+    { id: 'rocket', label: 'Rocket', from: '#0ea5e9', to: '#1e3a8a', pro: false },
+    { id: 'code', label: 'Code', from: '#a78bfa', to: '#6d28d9', pro: false },
+    { id: 'terminal', label: 'Terminal', from: '#525252', to: '#171717', pro: false },
+    { id: 'bolt', label: 'Lightning', from: '#facc15', to: '#d97706', pro: false },
+    { id: 'home', label: 'Home', from: '#f472b6', to: '#be185d', pro: false },
+    { id: 'family', label: 'Family', from: '#2dd4bf', to: '#0f766e', pro: false },
 
-    // 20 Pro Premium Avatars
-    { id: 'crown', label: 'Crown', from: '#fbbf24', to: '#b45309' },
-    { id: 'diamond', label: 'Diamond', from: '#38bdf8', to: '#0284c7' },
-    { id: 'shield', label: 'Shield', from: '#10b981', to: '#047857' },
-    { id: 'zap', label: 'Energy', from: '#f59e0b', to: '#dc2626' },
-    { id: 'cpu', label: 'Processor', from: '#8b5cf6', to: '#4c1d95' },
-    { id: 'brain', label: 'Neural AI', from: '#6366f1', to: '#312e81' },
-    { id: 'orbit', label: 'Orbit', from: '#06b6d4', to: '#0e7490' },
-    { id: 'fire', label: 'Flame', from: '#f43f5e', to: '#9f1239' },
-    { id: 'star', label: 'Star', from: '#eab308', to: '#a16207' },
-    { id: 'heart', label: 'Heart', from: '#ec4899', to: '#9d174d' },
-    { id: 'sparkles', label: 'Sparkles', from: '#c084fc', to: '#7e22ce' },
-    { id: 'cube', label: 'Matrix Cube', from: '#64748b', to: '#1e293b' },
-    { id: 'compass', label: 'Compass', from: '#14b8a6', to: '#0f766e' },
-    { id: 'feather', label: 'Feather', from: '#2dd4bf', to: '#059669' },
-    { id: 'key', label: 'Master Key', from: '#d97706', to: '#78350f' },
-    { id: 'atom', label: 'Atom', from: '#3b82f6', to: '#1d4ed8' },
-    { id: 'ghost', label: 'Cyber Ghost', from: '#a855f7', to: '#581c87' },
-    { id: 'globe', label: 'Global Mesh', from: '#10b981', to: '#065f46' },
-    { id: 'eye', label: 'Cyber Eye', from: '#d946ef', to: '#701a75' },
-    { id: 'target', label: 'Radar Target', from: '#ef4444', to: '#991b1b' }
+    // 20 Pro Premium Avatars (Marked with PRO badge)
+    { id: 'crown', label: 'Crown', from: '#fbbf24', to: '#b45309', pro: true },
+    { id: 'diamond', label: 'Diamond', from: '#38bdf8', to: '#0284c7', pro: true },
+    { id: 'shield', label: 'Shield', from: '#10b981', to: '#047857', pro: true },
+    { id: 'zap', label: 'Energy', from: '#f59e0b', to: '#dc2626', pro: true },
+    { id: 'cpu', label: 'Processor', from: '#8b5cf6', to: '#4c1d95', pro: true },
+    { id: 'brain', label: 'Neural AI', from: '#6366f1', to: '#312e81', pro: true },
+    { id: 'orbit', label: 'Orbit', from: '#06b6d4', to: '#0e7490', pro: true },
+    { id: 'fire', label: 'Flame', from: '#f43f5e', to: '#9f1239', pro: true },
+    { id: 'star', label: 'Star', from: '#eab308', to: '#a16207', pro: true },
+    { id: 'heart', label: 'Heart', from: '#ec4899', to: '#9d174d', pro: true },
+    { id: 'sparkles', label: 'Sparkles', from: '#c084fc', to: '#7e22ce', pro: true },
+    { id: 'cube', label: 'Matrix Cube', from: '#64748b', to: '#1e293b', pro: true },
+    { id: 'compass', label: 'Compass', from: '#14b8a6', to: '#0f766e', pro: true },
+    { id: 'feather', label: 'Feather', from: '#2dd4bf', to: '#059669', pro: true },
+    { id: 'key', label: 'Master Key', from: '#d97706', to: '#78350f', pro: true },
+    { id: 'atom', label: 'Atom', from: '#3b82f6', to: '#1d4ed8', pro: true },
+    { id: 'ghost', label: 'Cyber Ghost', from: '#a855f7', to: '#581c87', pro: true },
+    { id: 'globe', label: 'Global Mesh', from: '#10b981', to: '#065f46', pro: true },
+    { id: 'eye', label: 'Cyber Eye', from: '#d946ef', to: '#701a75', pro: true },
+    { id: 'target', label: 'Radar Target', from: '#ef4444', to: '#991b1b', pro: true }
   ] as const;
 </script>
 

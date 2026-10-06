@@ -137,6 +137,14 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
          );
+         CREATE TABLE IF NOT EXISTS totp_entries (
+            id TEXT PRIMARY KEY,
+            label TEXT NOT NULL,
+            issuer TEXT,
+            secret_enc TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+         );
          CREATE TABLE IF NOT EXISTS command_logs (
             id TEXT PRIMARY KEY,
             event_type TEXT NOT NULL,

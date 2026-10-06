@@ -413,13 +413,35 @@ fn parse_plan_steps(parsed: &serde_json::Value) -> Vec<AiPlanStep> {
             .and_then(|s| s.as_bool())
             .unwrap_or(false);
 
-        steps.push(AiPlanStep::new(
+        let action_type = item
+            .get("actionType")
+            .or_else(|| item.get("action_type"))
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string());
+        let action_name = item
+            .get("actionName")
+            .or_else(|| item.get("action_name"))
+            .and_then(|s| s.as_str())
+            .map(|s| s.to_string());
+        let action_params = item
+            .get("actionParams")
+            .or_else(|| item.get("action_params"))
+            .cloned();
+
+        let mut plan_step = AiPlanStep::new(
             step_num,
             title,
             command,
             description,
             is_dangerous,
-        ));
+        );
+        if action_type.is_some() {
+            plan_step.action_type = action_type;
+        }
+        plan_step.action_name = action_name;
+        plan_step.action_params = action_params;
+
+        steps.push(plan_step);
     }
 
     steps
@@ -1024,19 +1046,15 @@ fn parse_chat_reply(content: &str) -> AiChatReply {
         .unwrap_or_else(|| content.trim())
         .to_string();
 
+    // If steps are present, surface them immediately as actionable plan
     let steps = parse_plan_steps(&parsed);
-    // `ready` without steps is meaningless, and steps without `ready` would execute something
-    // the user never agreed to — both are treated as "still talking".
-    let ready = parsed
-        .get("ready")
-        .and_then(|r| r.as_bool())
-        .unwrap_or(false)
+    let ready = (parsed.get("ready").and_then(|r| r.as_bool()).unwrap_or(false) || !steps.is_empty())
         && !steps.is_empty();
 
     AiChatReply {
         reply,
         ready,
-        steps: if ready { steps } else { Vec::new() },
+        steps,
     }
 }
 

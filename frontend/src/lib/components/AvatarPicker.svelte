@@ -86,11 +86,20 @@
             role="radio"
             aria-checked={value === option.id}
             aria-label={option.label}
-            title={option.label}
+            title={option.pro ? `${option.label} (Pro Exclusive)` : option.label}
             onclick={(e) => selectAvatar(option.id, e)}
-            class="justify-self-center flex items-center justify-center rounded-full p-1 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 transition-all cursor-pointer {value === option.id ? 'ring-sky-500 scale-110 shadow-sm' : 'ring-transparent hover:ring-neutral-300 dark:hover:ring-neutral-700 hover:scale-105'}"
+            class="relative justify-self-center flex items-center justify-center rounded-full p-1 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 transition-all cursor-pointer {value === option.id ? 'ring-sky-500 scale-110 shadow-sm' : 'ring-transparent hover:ring-neutral-300 dark:hover:ring-neutral-700 hover:scale-105'}"
           >
             <ProfileAvatar avatar={option.id} size={32} />
+            {#if option.pro}
+              <!-- Pro Exclusive Gold Badge -->
+              <span
+                class="absolute -top-1 -right-1 px-1 py-0.2 min-w-[14px] h-3.5 rounded-full text-[8px] font-black tracking-tight bg-amber-400 dark:bg-amber-500 text-neutral-950 flex items-center justify-center shadow-xs border border-white dark:border-neutral-900"
+                title="Pro Exclusive"
+              >
+                PRO
+              </span>
+            {/if}
           </button>
         {/each}
       </div>
