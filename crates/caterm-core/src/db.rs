@@ -181,7 +181,44 @@ fn init_schema(conn: &Connection) -> Result<(), CatermError> {
             speed_limit_bps INTEGER,
             priority INTEGER NOT NULL DEFAULT 0,
             created_at INTEGER NOT NULL
-         );",
+         );
+         CREATE TABLE IF NOT EXISTS scheduled_tasks (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT,
+            task_type TEXT NOT NULL,
+            host_id TEXT REFERENCES hosts(id) ON DELETE CASCADE,
+            schedule_expr TEXT NOT NULL,
+            is_enabled INTEGER NOT NULL DEFAULT 1,
+            command_script TEXT,
+            timeout_seconds INTEGER NOT NULL DEFAULT 300,
+            remote_src_path TEXT,
+            local_dest_dir TEXT,
+            remote_pre_cmd TEXT,
+            remote_post_cmd TEXT,
+            retention_count INTEGER NOT NULL DEFAULT 7,
+            notify_on_success INTEGER NOT NULL DEFAULT 0,
+            notify_on_failure INTEGER NOT NULL DEFAULT 1,
+            last_run_at TEXT,
+            last_status TEXT,
+            next_run_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS task_execution_logs (
+            id TEXT PRIMARY KEY,
+            task_id TEXT NOT NULL REFERENCES scheduled_tasks(id) ON DELETE CASCADE,
+            started_at TEXT NOT NULL,
+            finished_at TEXT,
+            duration_ms INTEGER,
+            exit_code INTEGER,
+            status TEXT NOT NULL,
+            stdout TEXT,
+            stderr TEXT,
+            bytes_transferred INTEGER,
+            error_message TEXT
+         );
+         CREATE INDEX IF NOT EXISTS idx_task_logs_task_id ON task_execution_logs(task_id, started_at DESC);",
     )
     .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal inisialisasi skema: {e}"))))
 }

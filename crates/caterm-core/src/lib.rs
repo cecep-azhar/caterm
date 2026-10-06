@@ -38,6 +38,7 @@ pub mod paths;
 pub mod prefs;
 pub mod pro;
 pub mod s3;
+pub mod scheduler;
 pub mod scp;
 pub mod secret;
 pub mod sftp;
@@ -58,9 +59,9 @@ pub use vfs::RemoteFileSystem;
 
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Test-only helpers shared across modules.
-#[cfg(test)]
-pub(crate) mod test_support {
+/// Test-only helpers shared across modules and integration tests.
+#[doc(hidden)]
+pub mod test_support {
     use parking_lot::{Mutex, MutexGuard};
     use std::ffi::OsString;
     use std::path::PathBuf;
@@ -73,13 +74,14 @@ pub(crate) mod test_support {
     /// A throwaway data directory that `CATERM_DATA_DIR` points at for the lifetime of the
     /// value. Dropping it locks the vault, restores the previous env value and deletes the dir,
     /// so no test ever reads or writes the developer's real vault.
-    pub(crate) struct IsolatedDataDir {
-        pub(crate) path: PathBuf,
+    pub struct IsolatedDataDir {
+        pub path: PathBuf,
         previous: Option<OsString>,
         _guard: MutexGuard<'static, ()>,
     }
 
-    pub(crate) fn isolated_data_dir(label: &str) -> IsolatedDataDir {
+    /// # Infallible — test helper for isolating data dir.
+    pub fn isolated_data_dir(label: &str) -> IsolatedDataDir {
         let guard = GLOBAL_STATE.lock();
         let path =
             std::env::temp_dir().join(format!("caterm_test_{label}_{}", uuid::Uuid::new_v4()));

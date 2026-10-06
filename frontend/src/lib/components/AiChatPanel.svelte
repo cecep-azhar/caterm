@@ -15,8 +15,10 @@
   import { getSessionView } from '$lib/stores/sessionView.svelte';
   import { getActiveSession, injectIntoActiveSession } from '$lib/stores/activeSession.svelte';
   import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
-  import { saveHost } from '$lib/api/hosts';
-  import { saveSnippet } from '$lib/api/snippets';
+  import { saveHost, deleteHost } from '$lib/api/hosts';
+  import { saveSnippet, deleteSnippet } from '$lib/api/snippets';
+  import { saveGroup, deleteGroup } from '$lib/api/groups';
+  import { invoke } from '@tauri-apps/api/core';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
@@ -163,10 +165,21 @@
   async function executeStepItem(step: AiPlanStep, i: number, effectiveExecMode: string) {
     // 1. Native In-App Actions
     if (step.action_type === 'caterm_action' || step.command?.startsWith('caterm:')) {
-      const action = step.action_name || step.command?.replace('caterm:', '');
+      const action = (step.action_name || step.command?.replace('caterm:', '') || '').toLowerCase().trim();
       const params = step.action_params || {};
 
       try {
+        // STRICT SAFETY GUARDRAILS
+        if (action.includes('mass') || action.includes('bulk_delete') || action.includes('delete_all') || action.includes('purge') || action.includes('drop_all')) {
+          throw new Error('Dilarang melakukan penghapusan masal (Mass deletion dilarang oleh guardrail keamanan CATerm).');
+        }
+        if (action.includes('sftp') || action.includes('transfer_file') || action.includes('download_remote') || action.includes('upload_remote')) {
+          throw new Error('Dilarang melakukan SFTP langsung via AI. Gunakan menu SFTP visual.');
+        }
+        if (action.includes('billing') || action.includes('subscription') || action.includes('cancel_pro') || action.includes('reset_license')) {
+          throw new Error('Dilarang memodifikasi atau menghapus data langganan/billing via AI.');
+        }
+
         if (action === 'update_profile') {
           const profile = getProfile();
           const newName = params.name || profile.name;
@@ -179,6 +192,7 @@
 
         if (action === 'save_host' || action === 'add_host') {
           await saveHost({
+            id: params.id,
             label: params.label || 'New Host',
             address: params.address || '127.0.0.1',
             port: params.port || 22,
@@ -190,20 +204,152 @@
             os: params.os || 'linux'
           });
           hosts = await listHosts();
-          runs[i] = { status: 'ok', output: `Host ${params.label} (${params.address}) berhasil disimpan ke CATerm!` };
+          window.dispatchEvent(new CustomEvent('caterm:hosts-updated'));
+          runs[i] = { status: 'ok', output: `Host ${params.label} (${params.address}) berhasil disimpan!` };
           showToast(`Host ${params.label} disimpan!`, 'success');
           return true;
         }
 
-        if (action === 'create_snippet') {
-          await saveSnippet({
-            label: params.label || params.title || 'New Snippet',
-            command: params.command || '',
-            description: params.description || '',
-            tags: params.tags || []
+        if (action === 'delete_host' && params.id) {
+          await deleteHost(params.id);
+          hosts = await listHosts();
+          window.dispatchEvent(new CustomEvent('caterm:hosts-updated'));
+          runs[i] = { status: 'ok', output: `Host berhasil dihapus!` };
+          showToast(`Host dihapus!`, 'success');
+          return true;
+        }
+
+        if (action === 'save_group' || action === 'add_group' || action === 'create_group') {
+          await saveGroup({
+            id: params.id,
+            name: params.name || params.label || 'New Group',
+            color: params.color || '#3b82f6',
+            hostIds: params.host_ids || params.hostIds || []
           });
-          runs[i] = { status: 'ok', output: `Snippet "${params.label || params.title}" berhasil disimpan!` };
-          showToast(`Snippet disimpan!`, 'success');
+          window.dispatchEvent(new CustomEvent('caterm:groups-updated'));
+          runs[i] = { status: 'ok', output: `Group "${params.name || params.label}" berhasil disimpan!` };
+          showToast(`Group disimpan!`, 'success');
+          return true;
+        }
+
+        if (action === 'delete_group' && params.id) {
+          await deleteGroup(params.id);
+          window.dispatchEvent(new CustomEvent('caterm:groups-updated'));
+          runs[i] = { status: 'ok', output: `Group berhasil dihapus!` };
+          showToast(`Group dihapus!`, 'success');
+          return true;
+        }
+
+        if (action === 'create_snippet' || action === 'save_snippet' || action === 'add_snippet') {
+          const snippetCmd = params.command || params.cmd || step.command || '';
+          const snippetTitle = params.label || params.title || step.title || 'New Snippet';
+          const snippetDesc = params.description || params.desc || step.description || '';
+          const snippetTags = params.tags || [];
+          await saveSnippet({
+            id: params.id,
+            label: snippetTitle,
+            command: snippetCmd,
+            description: snippetDesc,
+            tags: Array.isArray(snippetTags) ? snippetTags : [String(snippetTags)]
+          });
+          window.dispatchEvent(new CustomEvent('caterm:snippets-updated'));
+          runs[i] = { status: 'ok', output: `Snippet "${snippetTitle}" berhasil disimpan!` };
+          showToast(`Snippet "${snippetTitle}" disimpan!`, 'success');
+          return true;
+        }
+
+        if (action === 'delete_snippet' && params.id) {
+          await deleteSnippet(params.id);
+          window.dispatchEvent(new CustomEvent('caterm:snippets-updated'));
+          runs[i] = { status: 'ok', output: `Snippet berhasil dihapus!` };
+          showToast(`Snippet dihapus!`, 'success');
+          return true;
+        }
+
+        if (action === 'create_totp' || action === 'save_totp') {
+          await invoke('save_totp_entry', {
+            input: {
+              id: params.id,
+              label: params.label || params.title || '2FA Account',
+              issuer: params.issuer,
+              secret: params.secret || params.key
+            }
+          });
+          window.dispatchEvent(new CustomEvent('caterm:totp-updated'));
+          runs[i] = { status: 'ok', output: `2FA Token "${params.label || params.title}" berhasil disimpan!` };
+          showToast(`2FA Token disimpan!`, 'success');
+          return true;
+        }
+
+        if (action === 'delete_totp' && params.id) {
+          await invoke('delete_totp_entry', { id: params.id });
+          window.dispatchEvent(new CustomEvent('caterm:totp-updated'));
+          runs[i] = { status: 'ok', output: `2FA Token berhasil dihapus!` };
+          showToast(`2FA Token dihapus!`, 'success');
+          return true;
+        }
+
+        if (action === 'save_tunnel' || action === 'create_tunnel') {
+          await invoke('save_tunnel', {
+            input: {
+              id: params.id,
+              label: params.label || 'New Tunnel',
+              hostId: params.host_id || params.hostId,
+              tunnelType: params.tunnel_type || params.tunnelType || 'local',
+              localPort: params.local_port || params.localPort || 8080,
+              remoteHost: params.remote_host || params.remoteHost || 'localhost',
+              remotePort: params.remote_port || params.remotePort || 80
+            }
+          });
+          window.dispatchEvent(new CustomEvent('caterm:tunnels-updated'));
+          runs[i] = { status: 'ok', output: `Tunnel Port Forwarding berhasil disimpan!` };
+          showToast(`Port Forwarding Tunnel disimpan!`, 'success');
+          return true;
+        }
+
+        if (action === 'delete_tunnel' && params.id) {
+          await invoke('delete_tunnel', { id: params.id });
+          window.dispatchEvent(new CustomEvent('caterm:tunnels-updated'));
+          runs[i] = { status: 'ok', output: `Tunnel berhasil dihapus!` };
+          showToast(`Tunnel dihapus!`, 'success');
+          return true;
+        }
+
+        if (action === 'create_investigation' || action === 'save_investigation') {
+          await invoke('save_investigation', {
+            input: {
+              id: params.id,
+              title: params.title || 'Investigation Note',
+              hostId: params.host_id || params.hostId,
+              query: params.query || '',
+              category: params.category || 'incident'
+            }
+          });
+          window.dispatchEvent(new CustomEvent('caterm:investigations-updated'));
+          runs[i] = { status: 'ok', output: `Investigation berhasil disimpan!` };
+          showToast(`Investigation disimpan!`, 'success');
+          return true;
+        }
+
+        if (action === 'delete_investigation' && params.id) {
+          await invoke('delete_investigation', { id: params.id });
+          window.dispatchEvent(new CustomEvent('caterm:investigations-updated'));
+          runs[i] = { status: 'ok', output: `Investigation berhasil dihapus!` };
+          showToast(`Investigation dihapus!`, 'success');
+          return true;
+        }
+
+        if (action === 'save_team' || action === 'create_team') {
+          await invoke('save_team', {
+            input: {
+              id: params.id,
+              name: params.name || 'New Team',
+              description: params.description || ''
+            }
+          });
+          window.dispatchEvent(new CustomEvent('caterm:teams-updated'));
+          runs[i] = { status: 'ok', output: `Team "${params.name}" berhasil disimpan!` };
+          showToast(`Team disimpan!`, 'success');
           return true;
         }
 

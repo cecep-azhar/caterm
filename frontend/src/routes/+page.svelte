@@ -96,6 +96,10 @@
 
   onMount(async () => {
     await refreshHosts();
+    const handleHostsUpdate = () => {
+      void refreshHosts();
+    };
+    window.addEventListener('caterm:hosts-updated', handleHostsUpdate);
     try {
       unlistenOsDetected = await listen<{ hostId: string; os: string }>('host:os_detected', (event) => {
         const { hostId, os } = event.payload;
@@ -110,6 +114,10 @@
     } catch (e) {
       console.error('Failed to listen for host:os_detected', e);
     }
+
+    return () => {
+      window.removeEventListener('caterm:hosts-updated', handleHostsUpdate);
+    };
   });
 
   onDestroy(() => {
@@ -719,18 +727,18 @@
 
       <div class="space-y-4 text-sm">
         <div>
-          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Host Label / Name *</label>
+          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">{t('hosts.form.labelField')}</label>
           <input 
             type="text" 
             bind:value={formLabel} 
-            placeholder="Production VPS / YPC Server"
+            placeholder={t('hosts.form.labelPlaceholder')}
             class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
           />
         </div>
 
         <div class="grid grid-cols-3 gap-3">
           <div class="col-span-2">
-            <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Host / IP Address *</label>
+            <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">{t('hosts.form.addressField')}</label>
             <input 
               type="text" 
               bind:value={formAddress} 
@@ -739,7 +747,7 @@
             />
           </div>
           <div>
-            <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Port</label>
+            <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">{t('hosts.form.port')}</label>
             <input 
               type="number" 
               bind:value={formPort} 
@@ -750,7 +758,7 @@
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Protocol</label>
+          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">{t('hosts.form.protocol')}</label>
           <select
             bind:value={formProtocol}
             onchange={(e) => {
@@ -770,17 +778,17 @@
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Username *</label>
+          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">{t('hosts.form.usernameField')}</label>
           <input 
             type="text" 
             bind:value={formUsername} 
-            placeholder="root / cecep"
+            placeholder={t('hosts.form.usernamePlaceholder')}
             class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-lg text-neutral-900 dark:text-white focus:outline-none focus:border-sky-500 shadow-sm dark:shadow-none"
           />
         </div>
 
         <div>
-          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">Authentication Method</label>
+          <label class="block text-xs font-medium text-neutral-700 dark:text-neutral-400 mb-1">{t('hosts.form.authMethod')}</label>
           <div class="flex gap-4 mb-2">
             <label class="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
               <input type="radio" value="password" bind:group={formAuthType} class="text-sky-600 focus:ring-0" />

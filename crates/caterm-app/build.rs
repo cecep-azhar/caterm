@@ -32,6 +32,12 @@ const COMMANDS: &[&str] = &[
     "save_totp_entry",
     "delete_totp_entry",
     "generate_current_totp",
+    // Scheduled Tasks & Automation (REQ-38)
+    "list_scheduled_tasks",
+    "save_scheduled_task",
+    "delete_scheduled_task",
+    "trigger_task_run_now",
+    "get_task_execution_logs",
     // Port forwarding
     "list_tunnels",
     "save_tunnel",

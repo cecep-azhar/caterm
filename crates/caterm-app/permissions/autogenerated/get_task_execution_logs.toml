@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-task-execution-logs"
+description = "Enables the get_task_execution_logs command without any pre-configured scope."
+commands.allow = ["get_task_execution_logs"]
+
+[[permission]]
+identifier = "deny-get-task-execution-logs"
+description = "Denies the get_task_execution_logs command without any pre-configured scope."
+commands.deny = ["get_task_execution_logs"]

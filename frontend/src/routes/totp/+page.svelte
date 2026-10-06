@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
   import TotpBadge from '$lib/components/TotpBadge.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import { t } from '$lib/i18n/index.svelte';
 
@@ -143,34 +144,27 @@
   <title>2FA Authenticator Vault · CATerm</title>
 </svelte:head>
 
-<div class="space-y-6 max-w-5xl mx-auto">
-  <!-- Header -->
-  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-200 dark:border-neutral-800 pb-5">
-    <div>
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center border border-sky-500/20">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-        </div>
-        <h1 class="text-xl font-bold text-neutral-900 dark:text-white">2FA Authenticator Vault</h1>
-      </div>
-      <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-        Kelola kode verifikasi 2FA (RFC 6238 TOTP) terenkripsi zero-knowledge dengan fitur auto-inject SSH.
-      </p>
-    </div>
-
-    <button
-      type="button"
-      onclick={openAddModal}
-      class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-600/20 transition-all shrink-0"
-    >
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-      </svg>
-      Tambah Token 2FA
-    </button>
-  </div>
+<div class="max-w-5xl mx-auto space-y-6">
+  <!-- Standard Page Header -->
+  <PageHeader
+    icon={['M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z']}
+    accent="sky"
+    title={t('totp.title')}
+    subtitle={t('totp.subtitle')}
+  >
+    {#snippet actions()}
+      <button
+        type="button"
+        onclick={openAddModal}
+        class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-600/20 transition-all shrink-0"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        {t('totp.newKey')}
+      </button>
+    {/snippet}
+  </PageHeader>
 
   <!-- Search & Stats Bar -->
   <div class="flex items-center justify-between gap-3">
@@ -178,7 +172,7 @@
       <input
         type="text"
         bind:value={searchQuery}
-        placeholder="Cari token 2FA, server, atau akun..."
+        placeholder={t('totp.searchPlaceholder')}
         class="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-sky-500 shadow-2xs"
       />
       <svg class="w-4 h-4 text-neutral-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +180,7 @@
       </svg>
     </div>
     <span class="text-xs font-medium text-neutral-500 shrink-0">
-      {filteredEntries.length} Token Tersimpan
+      {filteredEntries.length} {t('totp.title')}
     </span>
   </div>
 
@@ -198,16 +192,16 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
       </div>
-      <h3 class="text-sm font-semibold text-neutral-900 dark:text-white">Belum Ada Token 2FA</h3>
+      <h3 class="text-sm font-semibold text-neutral-900 dark:text-white">{t('totp.emptyTitle')}</h3>
       <p class="text-xs text-neutral-500 max-w-sm mx-auto">
-        Tambahkan secret key 2FA server produksi, jump host, AWS, Cloudflare, atau GitHub Anda di sini untuk kemudahan 1-klik copy & auto-inject SSH.
+        {t('totp.emptyBody')}
       </p>
       <button
         type="button"
         onclick={openAddModal}
         class="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-neutral-100 dark:bg-neutral-800 hover:bg-sky-500 hover:text-white text-neutral-700 dark:text-neutral-300 transition-colors"
       >
-        + Tambah Token Pertama
+        {t('totp.addFirst')}
       </button>
     </div>
   {:else}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-save-scheduled-task"
+description = "Enables the save_scheduled_task command without any pre-configured scope."
+commands.allow = ["save_scheduled_task"]
+
+[[permission]]
+identifier = "deny-save-scheduled-task"
+description = "Denies the save_scheduled_task command without any pre-configured scope."
+commands.deny = ["save_scheduled_task"]

@@ -48,7 +48,7 @@
 <!-- The header pattern every workspace page shares (originally Prompt Studio's): an accent icon
      tile, title + optional pill badge, a one-line subtitle, and room for page-specific actions
      on the right. Kept as one component so the pattern can't drift page to page. -->
-<header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80 mb-6">
+<header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-200 dark:border-neutral-800/80">
   <div class="flex items-center gap-3 min-w-0">
     <div class="w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 {accentClass}">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

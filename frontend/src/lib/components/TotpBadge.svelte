@@ -19,6 +19,7 @@
   } = $props();
 
   let copied = $state(false);
+  let showCode = $state(false);
 
   const formattedToken = $derived.by(() => {
     const clean = token.replace(/\s+/g, '');
@@ -27,6 +28,10 @@
     }
     return token;
   });
+
+  const displayToken = $derived(
+    showCode ? formattedToken : '••• •••'
+  );
 
   const progressPercent = $derived(
     Math.max(0, Math.min(100, (remainingSeconds / totalPeriod) * 100))
@@ -55,14 +60,19 @@
       copied = false;
     }, 2000);
   }
+
+  function toggleShowCode(e: MouseEvent) {
+    e.stopPropagation();
+    showCode = !showCode;
+  }
 </script>
 
 <div
-  class="group relative inline-flex items-center justify-between gap-3 p-3 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl hover:border-sky-500/50 transition-all shadow-xs"
+  class="group relative inline-flex items-center justify-between gap-3 p-3.5 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl hover:border-sky-500/50 transition-all shadow-xs"
 >
   <div class="min-w-0 flex-1">
     {#if issuer || label}
-      <div class="flex items-center gap-1.5 truncate mb-1">
+      <div class="flex items-center gap-1.5 truncate mb-1.5">
         {#if issuer}
           <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30">
             {issuer}
@@ -73,10 +83,31 @@
         </span>
       </div>
     {/if}
-    <div class="flex items-center gap-2">
-      <span class="font-mono text-xl sm:text-2xl font-bold tracking-wider text-neutral-900 dark:text-white">
-        {formattedToken}
+    <div class="flex items-center gap-2.5">
+      <span class="font-mono text-xl sm:text-2xl font-bold tracking-wider text-neutral-900 dark:text-white select-all">
+        {displayToken}
       </span>
+      <!-- Eye Toggle Button -->
+      <button
+        type="button"
+        onclick={toggleShowCode}
+        class="p-1 rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+        title={showCode ? 'Sembunyikan Kode 2FA' : 'Tampilkan Kode 2FA'}
+        aria-label={showCode ? 'Sembunyikan Kode 2FA' : 'Tampilkan Kode 2FA'}
+      >
+        {#if showCode}
+          <!-- Eye Off -->
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+          </svg>
+        {:else}
+          <!-- Eye Open -->
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+        {/if}
+      </button>
     </div>
   </div>
 

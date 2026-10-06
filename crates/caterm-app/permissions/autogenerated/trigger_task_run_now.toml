@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-trigger-task-run-now"
+description = "Enables the trigger_task_run_now command without any pre-configured scope."
+commands.allow = ["trigger_task_run_now"]
+
+[[permission]]
+identifier = "deny-trigger-task-run-now"
+description = "Denies the trigger_task_run_now command without any pre-configured scope."
+commands.deny = ["trigger_task_run_now"]

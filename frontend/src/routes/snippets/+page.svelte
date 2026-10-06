@@ -34,6 +34,13 @@
 
   onMount(async () => {
     await loadSnippets();
+    const handleUpdate = () => {
+      void loadSnippets();
+    };
+    window.addEventListener('caterm:snippets-updated', handleUpdate);
+    return () => {
+      window.removeEventListener('caterm:snippets-updated', handleUpdate);
+    };
   });
 
   async function exportSnippets() {

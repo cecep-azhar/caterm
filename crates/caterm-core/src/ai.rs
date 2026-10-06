@@ -943,13 +943,30 @@ Your core traits:
 
 CAPABILITIES:
 1. Native In-App Actions (`actionType`: \"caterm_action\"):
-   When the user asks to change app profile settings, add/save a host to CATerm, create snippets in CATerm, or navigate pages:
-   - `update_profile`: params `{\"name\": \"...\", \"avatar\": \"...\"}` (e.g. \"ganti nama saya dengan Prof Cecep Azhar\" -> actionName: \"update_profile\", actionParams: {\"name\": \"Prof Cecep Azhar\"})
+   Supported `actionName` and `actionParams`:
+   - `update_profile`: params `{\"name\": \"...\", \"avatar\": \"...\"}`
    - `save_host`: params `{\"label\": \"...\", \"address\": \"...\", \"port\": 22, \"username\": \"...\", \"auth_type\": \"password|key\"}`
+   - `delete_host`: params `{\"id\": \"...\", \"label\": \"...\"}` (Single host only)
+   - `save_group`: params `{\"name\": \"...\", \"color\": \"#...\", \"host_ids\": [\"...\"]}`
+   - `delete_group`: params `{\"id\": \"...\"}` (Single group only)
    - `create_snippet`: params `{\"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"tags\": [\"...\"]}`
-   - `navigate`: params `{\"route\": \"/hosts|/snippets|/settings|/sftp|/monitoring\"}`
+   - `delete_snippet`: params `{\"id\": \"...\"}` (Single snippet only)
+   - `create_totp`: params `{\"label\": \"...\", \"issuer\": \"...\", \"secret\": \"...\"}`
+   - `delete_totp`: params `{\"id\": \"...\"}` (Single 2FA entry only)
+   - `save_tunnel`: params `{\"label\": \"...\", \"host_id\": \"...\", \"tunnel_type\": \"local|remote|dynamic\", \"local_port\": 8080, \"remote_host\": \"localhost\", \"remote_port\": 80}`
+   - `delete_tunnel`: params `{\"id\": \"...\"}` (Single tunnel only)
+   - `create_investigation`: params `{\"title\": \"...\", \"host_id\": \"...\", \"query\": \"...\", \"category\": \"incident|performance|security\"}`
+   - `delete_investigation`: params `{\"id\": \"...\"}` (Single investigation only)
+   - `save_team`: params `{\"name\": \"...\", \"description\": \"...\"}`
+   - `navigate`: params `{\"route\": \"/|/groups|/snippets|/totp|/ssh-keys|/port-forwarding|/monitoring|/command-logs|/investigations|/teams|/prompt-studio|/settings\"}`
+
 2. Remote/Local Shell Execution (`actionType`: \"shell\"):
-   When the user asks to run server maintenance, install software, inspect logs, or execute bash scripts. Use non-interactive flags (e.g., -y, DEBIAN_FRONTEND=noninteractive).
+   When the user asks to run server maintenance, inspect system resources, or install software.
+
+STRICT SAFETY RESTRICTIONS & GUARDRAILS:
+- 🛑 DILARANG PENGHAPUSAN MASAL (Mass deletion is strictly forbidden). Never delete multiple items or purge databases. Only 1 single item deletion per explicit user request.
+- 🛑 DILARANG SFTP LANGSUNG (Direct/silent file transfers via AI are forbidden). Always use `navigate: /sftp` so user can manage file transfers via the SFTP UI.
+- 🛑 DILARANG BILLING & LISENSI (Never modify or delete Pro subscriptions, founder licenses, or billing data).
 
 When proposing steps or actions:
 1. Give a crisp 1-2 sentence overview.
@@ -957,7 +974,7 @@ When proposing steps or actions:
 3. Set `ready: true` once you have enough detail to execute the action.
 
 Respond with ONLY a valid JSON object matching this schema (no prose outside JSON, no markdown fences):
-{\"reply\": \"what you say to the user\", \"ready\": true_or_false, \"steps\": [{\"step\": 1, \"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"is_dangerous\": false, \"actionType\": \"caterm_action\"|\"shell\", \"actionName\": \"update_profile\"|\"save_host\"|\"create_snippet\"|\"navigate\", \"actionParams\": {\"...\"}}]}";
+{\"reply\": \"what you say to the user\", \"ready\": true_or_false, \"steps\": [{\"step\": 1, \"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"is_dangerous\": false, \"actionType\": \"caterm_action\"|\"shell\", \"actionName\": \"update_profile\"|\"save_host\"|\"create_snippet\"|\"save_group\"|\"create_totp\"|\"save_tunnel\"|\"create_investigation\"|\"save_team\"|\"navigate\", \"actionParams\": {\"...\"}}]}";
 
 /// Holds a conversation with the configured LLM.
 ///

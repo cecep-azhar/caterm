@@ -443,6 +443,38 @@ pub async fn generate_current_totp(
 }
 
 #[tauri::command]
+pub async fn list_scheduled_tasks(
+) -> Result<Vec<caterm_core::scheduler::task::ScheduledTaskRecord>, CatermError> {
+    run_blocking(caterm_core::scheduler::store::list_tasks).await
+}
+
+#[tauri::command]
+pub async fn save_scheduled_task(
+    input: caterm_core::scheduler::task::TaskInput,
+) -> Result<caterm_core::scheduler::task::ScheduledTaskRecord, CatermError> {
+    run_blocking(move || caterm_core::scheduler::store::save_task(input)).await
+}
+
+#[tauri::command]
+pub async fn delete_scheduled_task(id: String) -> Result<(), CatermError> {
+    run_blocking(move || caterm_core::scheduler::store::delete_task(&id)).await
+}
+
+#[tauri::command]
+pub async fn trigger_task_run_now(
+    task_id: String,
+) -> Result<caterm_core::scheduler::task::TaskExecutionLog, CatermError> {
+    run_blocking(move || caterm_core::scheduler::runner::execute_task_now(&task_id)).await
+}
+
+#[tauri::command]
+pub async fn get_task_execution_logs(
+    task_id: String,
+) -> Result<Vec<caterm_core::scheduler::task::TaskExecutionLog>, CatermError> {
+    run_blocking(move || caterm_core::scheduler::store::get_task_logs(&task_id)).await
+}
+
+#[tauri::command]
 pub async fn delete_snippet(id: String) -> Result<(), CatermError> {
     run_blocking(move || snippets::delete_snippet(&id)).await
 }
