@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { listHosts, saveHost, deleteHost, type HostRecord, type HostInput, type ConnectionProtocol } from '$lib/api/hosts';
-  import { listGroups } from '$lib/api/groups';
+  import { listGroups, type GroupRecord } from '$lib/api/groups';
   import { listKeys, type KeyRecord } from '$lib/api/keys';
   import HostDetailPanel from '$lib/components/HostDetailPanel.svelte';
   import OsIcon from '$lib/components/OsIcon.svelte';
@@ -15,6 +15,7 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   let hosts = $state<HostRecord[]>([]);
+  let groups = $state<GroupRecord[]>([]);
   let vaultKeys = $state<KeyRecord[]>([]);
   let searchQuery = $state('');
   let isAddModalOpen = $state(false);
@@ -119,10 +120,15 @@
     try {
       hosts = await listHosts();
       vaultKeys = await listKeys();
-      groupCount = (await listGroups()).length;
+      groups = await listGroups();
+      groupCount = groups.length;
     } catch (e: any) {
       errorMsg = String(e);
     }
+  }
+
+  function getGroupsForHost(hostId: string): GroupRecord[] {
+    return groups.filter((g) => Array.isArray(g.hostIds) && g.hostIds.includes(hostId));
   }
 
   function openAddModal() {
@@ -522,7 +528,18 @@
               <OsIcon os={host.os} name={host.label} tags={host.tags} address={host.address} size={22} />
             </span>
             <div class="min-w-0 flex-1">
-              <p class="font-semibold text-neutral-900 dark:text-white truncate">{host.label}</p>
+              <div class="flex items-center gap-2">
+                <p class="font-semibold text-neutral-900 dark:text-white truncate">{host.label}</p>
+                {#each getGroupsForHost(host.id) as grp}
+                  <span
+                    class="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-medium shrink-0"
+                    style="background-color: {grp.color ? grp.color + '20' : 'rgba(2, 132, 199, 0.15)'}; color: {grp.color || '#0284c7'}"
+                  >
+                    <span class="w-1.5 h-1.5 rounded-full shrink-0" style="background-color: {grp.color || '#0284c7'}"></span>
+                    <span>{grp.name}</span>
+                  </span>
+                {/each}
+              </div>
               <p class="text-xs font-mono text-neutral-500 dark:text-neutral-400 truncate" title="{host.username}@{host.address}:{host.port}">{hostAddress(host)}</p>
             </div>
             <button

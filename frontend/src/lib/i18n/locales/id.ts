@@ -794,8 +794,8 @@ const id: Dictionary = {
     saved: 'Pengaturan AI tersimpan.'
   },
   aiChat: {
-    title: 'Asisten AI',
-    tagline: 'Diskusikan dulu, eksekusi dengan aman',
+    title: 'Hana AI 🌸',
+    tagline: 'DevOps Co-Pilot tenang, presisi & siap eksekusi',
     newConversation: 'Mulai percakapan baru',
     close: 'Tutup Asisten AI',
     host: 'Host',

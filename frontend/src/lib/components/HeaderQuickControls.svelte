@@ -116,12 +116,10 @@
           <button
             type="button"
             onclick={() => { onToggleAi(); isOpen = false; }}
-            class="flex items-center gap-2 p-2 rounded-lg border transition-colors {aiOpen ? 'bg-violet-500/15 border-violet-500/40 text-violet-600 dark:text-violet-400' : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
+            class="flex items-center gap-2 p-2 rounded-lg border transition-colors {aiOpen ? 'bg-rose-500/15 border-rose-500/40 text-rose-600 dark:text-rose-400' : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
           >
-            <svg class="w-4 h-4 shrink-0 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-            </svg>
-            <span class="font-medium text-xs truncate">{aiOpen ? 'AI: ON' : 'AI Ops'}</span>
+            <span class="text-xs">🌸</span>
+            <span class="font-medium text-xs truncate">{aiOpen ? 'Hana: ON' : 'Hana AI'}</span>
           </button>
         </div>
       </div>

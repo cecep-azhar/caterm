@@ -241,22 +241,22 @@
 <svelte:window onkeydown={handleKeyDown} />
 
 <div class="relative inline-block text-left {className}" bind:this={dropdownRef}>
-  <!-- Sleek "Workspaces" Trigger Button -->
+  <!-- Sleek Icon-Only "Workspaces" Trigger Button -->
   <button
     type="button"
     onclick={(e) => {
       e.stopPropagation();
       isOpen = !isOpen;
     }}
-    class="px-2.5 py-1 rounded text-xs font-medium border transition-colors flex items-center gap-1.5 {isOpen
+    class="p-1.5 rounded-md border transition-colors relative flex items-center justify-center {isOpen
       ? 'bg-sky-600/15 text-sky-600 dark:text-sky-400 border-sky-500/30'
       : 'bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-300 dark:border-neutral-800 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-400 dark:hover:border-neutral-700'}"
     title={t('workspaces.manage')}
     aria-expanded={isOpen}
     aria-haspopup="true"
   >
-    <!-- Bookmark / Folder Icon -->
-    <svg class="w-3.5 h-3.5 text-sky-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Bookmark / Workspace Icon -->
+    <svg class="w-4 h-4 text-sky-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path
         stroke-linecap="round"
         stroke-linejoin="round"
@@ -264,23 +264,13 @@
         d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"
       />
     </svg>
-    <span class="hidden sm:inline">{t('workspaces.title')}</span>
     {#if workspaces.length > 0}
       <span
-        class="px-1 py-0.2 rounded-full text-[10px] font-mono font-semibold bg-sky-500/15 dark:bg-sky-500/20 text-sky-600 dark:text-sky-400 border border-sky-500/30"
+        class="absolute -top-1 -right-1 px-1 min-w-[14px] h-3.5 rounded-full text-[9px] font-mono font-bold bg-sky-500 text-white flex items-center justify-center shadow-xs"
       >
         {workspaces.length}
       </span>
     {/if}
-    <svg
-      class="w-3 h-3 text-neutral-400 transition-transform duration-150"
-      class:rotate-180={isOpen}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-    </svg>
   </button>
 
   <!-- Dropdown Menu -->

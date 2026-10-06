@@ -604,93 +604,167 @@
         <ProTeamPanel onOutcome={handleOutcome} />
       {/if}
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <!-- Community: what everyone has today -->
-        <div class="{SUBCARD} space-y-2">
-          <div class="flex items-center gap-2">
-            <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.subscription.freePlan')}</span>
-            <span class="text-xs bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 rounded">{t('settings.subscription.current')}</span>
+      {#if pro.isPro}
+        <!-- Active Pro / Lifetime Billing Overview (No need to show upgrade pricing cards) -->
+        <div class="rounded-xl border border-sky-500/40 bg-linear-to-br from-sky-500/10 via-neutral-50 dark:via-neutral-900/60 to-transparent p-6 space-y-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-200 dark:border-neutral-800">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Current Plan</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                  ACTIVE
+                </span>
+              </div>
+              <h3 class="text-xl font-bold text-neutral-900 dark:text-white mt-1">
+                {pro.status?.license?.plan?.toUpperCase() === 'LIFETIME' ? 'CATerm Pro — Founder Lifetime' : 'CATerm Pro Edition'}
+              </h3>
+              <p class="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                Zero-knowledge encrypted cloud synchronization & AI Copilot active.
+              </p>
+            </div>
+            <div class="text-right sm:text-right shrink-0">
+              <span class="text-2xl font-black text-neutral-900 dark:text-white">
+                {pro.status?.license?.plan?.toUpperCase() === 'LIFETIME' ? 'Lifetime Access' : '$6.00 / mo'}
+              </span>
+              <p class="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                {pro.status?.license?.plan?.toUpperCase() === 'LIFETIME' ? 'Never Expires · VIP Founder Tier' : 'Next billing cycle synced'}
+              </p>
+            </div>
           </div>
-          <div class="text-2xl font-bold text-neutral-900 dark:text-white">$0</div>
-          <p class="{MUTED} text-xs leading-relaxed">{t('settings.subscription.freeBody')}</p>
+
+          <!-- Billing Info Grid -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div class="bg-white/60 dark:bg-neutral-950/60 rounded-lg p-3 border border-neutral-200 dark:border-neutral-800/80">
+              <span class="text-neutral-500 dark:text-neutral-400 block text-[11px]">Customer Account</span>
+              <span class="font-semibold text-neutral-900 dark:text-white block mt-0.5 truncate">{pro.status?.account?.email || 'Registered User'}</span>
+            </div>
+            <div class="bg-white/60 dark:bg-neutral-950/60 rounded-lg p-3 border border-neutral-200 dark:border-neutral-800/80">
+              <span class="text-neutral-500 dark:text-neutral-400 block text-[11px]">Device Seats</span>
+              <span class="font-semibold text-neutral-900 dark:text-white block mt-0.5">
+                {proDevices ? proDevices.length : 1} / {proDeviceLimit || 5} Devices Used
+              </span>
+            </div>
+            <div class="bg-white/60 dark:bg-neutral-950/60 rounded-lg p-3 border border-neutral-200 dark:border-neutral-800/80">
+              <span class="text-neutral-500 dark:text-neutral-400 block text-[11px]">License Signature</span>
+              <span class="font-mono text-neutral-900 dark:text-white block mt-0.5 truncate">
+                Ed25519 v1 (Verified Offline)
+              </span>
+            </div>
+          </div>
+
+          <!-- Active Features Checklist -->
+          <div class="pt-2">
+            <p class="text-xs font-semibold text-neutral-900 dark:text-white mb-2">Entitlements & Included Features:</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-neutral-700 dark:text-neutral-300">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <span>End-to-end encrypted cloud sync</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <span>AI Ops Copilot & Prompt Studio</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <span>Team Session & Tag Sharing</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                <span>Multi-Platform License (Desktop & Android)</span>
+              </div>
+            </div>
+          </div>
         </div>
-
-        <!-- Pro -->
-        <div class="rounded-lg border-2 border-sky-500/50 bg-sky-50/60 dark:bg-sky-950/20 p-5 space-y-4">
-          <div class="flex items-center justify-between gap-2 flex-wrap">
-            <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.subscription.proPlan')}</span>
-            <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
-              {t('settings.subscription.introBadge', { percent: PRO_PRICING.introDiscountPercent, months: PRO_PRICING.introMonths })}
-            </span>
+      {:else}
+        <!-- Free / Community Tier: Offer Pro Upgrade options -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+          <!-- Community: what everyone has today -->
+          <div class="{SUBCARD} space-y-2">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.subscription.freePlan')}</span>
+              <span class="text-xs bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border border-neutral-300 dark:border-neutral-700 px-2 py-0.5 rounded">{t('settings.subscription.current')}</span>
+            </div>
+            <div class="text-2xl font-bold text-neutral-900 dark:text-white">$0</div>
+            <p class="{MUTED} text-xs leading-relaxed">{t('settings.subscription.freeBody')}</p>
           </div>
 
-          <div class="inline-flex p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs" role="group">
-            {#each ['monthly', 'yearly'] as const as interval (interval)}
+          <!-- Pro Upgrade -->
+          <div class="rounded-lg border-2 border-sky-500/50 bg-sky-50/60 dark:bg-sky-950/20 p-5 space-y-4">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <span class="font-semibold text-neutral-900 dark:text-white">{t('settings.subscription.proPlan')}</span>
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-500 text-white">
+                {t('settings.subscription.introBadge', { percent: PRO_PRICING.introDiscountPercent, months: PRO_PRICING.introMonths })}
+              </span>
+            </div>
+
+            <div class="inline-flex p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs" role="group">
+              {#each ['monthly', 'yearly'] as const as interval (interval)}
+                <button
+                  type="button"
+                  aria-pressed={billing === interval}
+                  onclick={() => (billing = interval)}
+                  class="px-3 py-1 rounded-md font-medium transition-colors {billing === interval ? 'bg-sky-600 text-white' : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white'}"
+                >
+                  {t(`settings.subscription.${interval}`)}
+                  {#if interval === 'yearly'}
+                    <span class="ml-1 text-[10px] font-semibold {billing === 'yearly' ? 'text-sky-100' : 'text-emerald-600 dark:text-emerald-400'}">{t('settings.subscription.saveYearly', { percent: PRO_PRICING.yearlyDiscountPercent })}</span>
+                  {/if}
+                </button>
+              {/each}
+            </div>
+
+            <div>
+              <div class="flex items-baseline gap-2">
+                <span class="text-sm text-neutral-400 line-through">{formatUsd(PRO_PRICING[billing].list)}</span>
+                <span class="text-3xl font-bold text-neutral-900 dark:text-white">{formatUsd(PRO_PRICING[billing].intro)}</span>
+                <span class="text-sm text-neutral-500">{billing === 'monthly' ? t('settings.subscription.perMonth') : t('settings.subscription.perYear')}</span>
+              </div>
+              <p class="text-xs {MUTED} mt-1">
+                {#if billing === 'monthly'}
+                  {t('settings.subscription.monthlyThen', { months: PRO_PRICING.introMonths, price: formatUsd(PRO_PRICING.monthly.list) })}
+                {:else}
+                  {t('settings.subscription.yearlyThen', { perMonth: formatUsd(PRO_PRICING.yearly.intro / 12), price: formatUsd(PRO_PRICING.yearly.list) })}
+                {/if}
+              </p>
+            </div>
+
+            <ul class="space-y-1.5 text-xs text-neutral-700 dark:text-neutral-300">
+              {#each proFeatures as feature (feature)}
+                <li class="flex items-start gap-2">
+                  <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                  <span>{feature}</span>
+                </li>
+              {/each}
+            </ul>
+
+            <div class="flex flex-col sm:flex-row gap-2">
+              {#if pro.serverAvailable === false}
+                <button disabled class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/40 text-sky-700/70 dark:text-sky-300/70 cursor-not-allowed" title={t('settings.subscription.comingSoon')}>
+                  {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
+                  <span class="block text-[10px] font-normal">{t('settings.subscription.comingSoon')}</span>
+                </button>
+              {:else if !pro.status?.license}
+                <!-- Signed out: opens Pro Login first. A license (trial or paid) hides the trial. -->
+                <button type="button" onclick={startProTrial} disabled={proBusy} class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/60 text-sky-700 dark:text-sky-300 hover:bg-sky-500/10 disabled:opacity-50 transition-colors">
+                  {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
+                </button>
+              {/if}
               <button
                 type="button"
-                aria-pressed={billing === interval}
-                onclick={() => (billing = interval)}
-                class="px-3 py-1 rounded-md font-medium transition-colors {billing === interval ? 'bg-sky-600 text-white' : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white'}"
+                onclick={() => openExternalUrl(pricingUrl(pro.status?.account?.id))}
+                class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors"
               >
-                {t(`settings.subscription.${interval}`)}
-                {#if interval === 'yearly'}
-                  <span class="ml-1 text-[10px] font-semibold {billing === 'yearly' ? 'text-sky-100' : 'text-emerald-600 dark:text-emerald-400'}">{t('settings.subscription.saveYearly', { percent: PRO_PRICING.yearlyDiscountPercent })}</span>
-                {/if}
+                {t('settings.subscription.subscribe')}
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
               </button>
-            {/each}
-          </div>
-
-          <div>
-            <div class="flex items-baseline gap-2">
-              <span class="text-sm text-neutral-400 line-through">{formatUsd(PRO_PRICING[billing].list)}</span>
-              <span class="text-3xl font-bold text-neutral-900 dark:text-white">{formatUsd(PRO_PRICING[billing].intro)}</span>
-              <span class="text-sm text-neutral-500">{billing === 'monthly' ? t('settings.subscription.perMonth') : t('settings.subscription.perYear')}</span>
             </div>
-            <p class="text-xs {MUTED} mt-1">
-              {#if billing === 'monthly'}
-                {t('settings.subscription.monthlyThen', { months: PRO_PRICING.introMonths, price: formatUsd(PRO_PRICING.monthly.list) })}
-              {:else}
-                {t('settings.subscription.yearlyThen', { perMonth: formatUsd(PRO_PRICING.yearly.intro / 12), price: formatUsd(PRO_PRICING.yearly.list) })}
-              {/if}
-            </p>
-          </div>
-
-          <ul class="space-y-1.5 text-xs text-neutral-700 dark:text-neutral-300">
-            {#each proFeatures as feature (feature)}
-              <li class="flex items-start gap-2">
-                <svg class="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
-                <span>{feature}</span>
-              </li>
-            {/each}
-          </ul>
-
-          <div class="flex flex-col sm:flex-row gap-2">
-            {#if pro.serverAvailable === false}
-              <button disabled class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/40 text-sky-700/70 dark:text-sky-300/70 cursor-not-allowed" title={t('settings.subscription.comingSoon')}>
-                {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
-                <span class="block text-[10px] font-normal">{t('settings.subscription.comingSoon')}</span>
-              </button>
-            {:else if !pro.status?.license}
-              <!-- Signed out: opens Pro Login first. A license (trial or paid) hides the trial. -->
-              <button type="button" onclick={startProTrial} disabled={proBusy} class="flex-1 px-4 py-2 rounded-md text-sm font-semibold border border-sky-500/60 text-sky-700 dark:text-sky-300 hover:bg-sky-500/10 disabled:opacity-50 transition-colors">
-                {t('settings.subscription.startTrial', { days: PRO_PRICING.trialDays })}
-              </button>
+            <p class="text-[11px] text-neutral-500">{t('settings.subscription.trialNote')}</p>
+            {#if pro.status?.signedIn}
+              <p class="text-[11px] text-neutral-500">{t('pro.account.checkoutHint')}</p>
             {/if}
-            <button
-              type="button"
-              onclick={() => openExternalUrl(pricingUrl(pro.status?.account?.id))}
-              class="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-md text-sm font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-sm transition-colors"
-            >
-              {t('settings.subscription.subscribe')}
-              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-            </button>
           </div>
-          <p class="text-[11px] text-neutral-500">{t('settings.subscription.trialNote')}</p>
-          {#if pro.status?.signedIn}
-            <p class="text-[11px] text-neutral-500">{t('pro.account.checkoutHint')}</p>
-          {/if}
         </div>
-      </div>
+      {/if}
 
       <div class="pt-4 border-t border-neutral-200 dark:border-neutral-800/80 flex items-center justify-between gap-4">
         <div>

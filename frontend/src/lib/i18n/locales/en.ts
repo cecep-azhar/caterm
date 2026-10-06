@@ -793,8 +793,8 @@ const en = {
     saved: 'AI settings saved.'
   },
   aiChat: {
-    title: 'AI Assistant',
-    tagline: 'Discuss first, execute safely',
+    title: 'Hana AI 🌸',
+    tagline: 'Calm, sharp & actionable DevOps Co-Pilot',
     newConversation: 'Start new conversation',
     close: 'Close AI Assistant',
     host: 'Host',

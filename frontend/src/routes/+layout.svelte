@@ -599,34 +599,32 @@
             </button>
           </div>
         {/each}
-      </div>
 
-      <!-- New session: the Hosts page is where a connection is actually picked. Kept outside
-           the scrolling tab strip so it stays reachable once the tabs overflow. -->
-      <a
-        href="/"
-        class="p-1 rounded shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800 transition-colors"
-        title={t('shell.newSessionTitle')}
-        aria-label={t('shell.newSession')}
-      >
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-      </a>
+        <!-- New session (+) button: directly attached right next to the last tab -->
+        <a
+          href="/"
+          class="p-1 rounded shrink-0 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800 transition-colors"
+          title={t('shell.newSessionTitle')}
+          aria-label={t('shell.newSession')}
+        >
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        </a>
+      </div>
 
       <!-- Draggable blank space spanning remaining left area -->
       <div class="flex-1 h-full min-w-[20px]" data-tauri-drag-region></div>
     </div>
 
     <div class="flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400 shrink-0" data-tauri-drag-region>
-      <!-- Workspaces Menu -->
-      <WorkspaceMenu />
+      <!-- 1. Live Status Indicator Dot (Sleek w-1.5 h-1.5) -->
+      <div class="hidden sm:flex items-center px-1 py-1 shrink-0" data-tauri-drag-region title={timeAgo}>
+        <span
+          class="w-1.5 h-1.5 rounded-full bg-emerald-500 transition-all duration-300 {monitorState.isPolling ? 'opacity-50' : 'animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.8)]'}"
+        ></span>
+      </div>
 
-      <!-- Notification Bell -->
-      <button onclick={() => showToast(t('shell.noNotifications'), 'info')} class="p-1.5 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800 rounded-md transition-colors relative" title={t('shell.notifications')} aria-label={t('shell.notifications')}>
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
-        {#if unreadCount > 0}
-          <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-rose-500 rounded-full border border-white dark:border-[#0e0e0e] animate-pulse"></span>
-        {/if}
-      </button>
+      <!-- 2. Workspaces Icon Menu -->
+      <WorkspaceMenu />
 
       <!-- Unified Header Preferences: Theme, Language, Split View & Panels in 1 Elegant Icon -->
       <HeaderQuickControls
@@ -635,17 +633,20 @@
         aiOpen={aiChat.open}
         sessionCount={sessionTabs.length}
         {splitOptions}
-        onSetLayout={setLayout}
+        onSetLayout={(l) => setLayout(l as any)}
         onToggleFiles={handleFilesToggle}
         onToggleAi={handleAiToggle}
       />
 
-      <!-- Live Status Indicator Dot -->
-      <div class="hidden sm:flex items-center text-xs" data-tauri-drag-region title={timeAgo}>
-        <span class="text-emerald-500 animate-pulse text-[10px] p-1" class:opacity-50={monitorState.isPolling}>●</span>
-      </div>
+      <!-- 4. Notification Bell -->
+      <button onclick={() => showToast(t('shell.noNotifications'), 'info')} class="p-1.5 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-200/70 dark:hover:bg-neutral-800 rounded-md transition-colors relative" title={t('shell.notifications')} aria-label={t('shell.notifications')}>
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+        {#if unreadCount > 0}
+          <span class="absolute top-0.5 right-0.5 w-2 h-2 bg-rose-500 rounded-full border border-white dark:border-[#0e0e0e] animate-pulse"></span>
+        {/if}
+      </button>
 
-      <!-- Custom Window Controls -->
+      <!-- 5. Custom Window Controls -->
       <div class="hidden sm:flex items-center no-drag">
         <button onclick={() => minimizeWindow()} class="p-2 rounded-md hover:bg-neutral-200/70 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white transition-colors" title={t('shell.minimize')} aria-label={t('shell.minimize')}>
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
@@ -762,20 +763,22 @@
         {#each navItems as item}
           <a
             href={item.href}
-            title={item.label}
+            title={isCollapsed ? item.label : ''}
             aria-current={isActive(item.href) ? 'page' : undefined}
-            class="relative px-2.5 py-2 rounded-lg flex items-center {isCollapsed ? 'justify-center' : 'gap-3'} transition-colors {isActive(item.href) ? 'bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/40 hover:text-neutral-900 dark:hover:text-white'}"
+            class="relative px-2.5 py-2 rounded-lg flex items-center gap-3 transition-colors overflow-hidden {isActive(item.href) ? 'bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-900 dark:text-white font-medium' : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/40 hover:text-neutral-900 dark:hover:text-white'}"
           >
             {#if isActive(item.href)}
               <!-- Active marker pinned to the window's left edge -->
               <span class="absolute -left-2 top-1.5 bottom-1.5 w-[3px] rounded-r bg-neutral-900 dark:bg-white" aria-hidden="true"></span>
             {/if}
-            <svg class="w-[18px] h-[18px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d={item.path} />
-            </svg>
-            {#if !isCollapsed}
-              <span class="truncate">{item.label}</span>
-            {/if}
+            <div class="w-[20px] h-[20px] flex items-center justify-center shrink-0">
+              <svg class="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d={item.path} />
+              </svg>
+            </div>
+            <span class="truncate whitespace-nowrap transition-all duration-150 {isCollapsed ? 'opacity-0 w-0 pointer-events-none hidden' : 'opacity-100 min-w-0'}">
+              {item.label}
+            </span>
           </a>
         {/each}
       </nav>
@@ -821,6 +824,21 @@
     </main>
   </div>
 </div>
+
+<!-- Floating Action Button: Hana AI in bottom right corner -->
+{#if !aiChat.open}
+  <button
+    type="button"
+    onclick={() => handleAiToggle()}
+    class="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-100 border border-neutral-700/80 shadow-2xl shadow-black/60 hover:scale-105 active:scale-95 transition-all text-xs font-semibold cursor-pointer group"
+    title="Hana AI (DevOps Co-Pilot)"
+    aria-label="Open Hana AI"
+  >
+    <span class="text-rose-500 group-hover:rotate-12 transition-transform text-sm">🌸</span>
+    <span>Hana AI</span>
+    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+  </button>
+{/if}
 
 {#if tabMenu}
   {@const menuTab = sessionTabs.find((item) => item.id === tabMenu?.tabId)}
