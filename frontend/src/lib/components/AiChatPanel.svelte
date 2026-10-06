@@ -1,8 +1,5 @@
 <script lang="ts">
-  // Conversational AI assistant. Unlike Prompt Studio's one-shot form, this one is expected to
-  // ask before it acts: the backend prompt keeps `ready` false and `steps` empty until the
-  // assistant has clarified versions, distro, sudo and anything destructive, so the commands
-  // only appear once you have actually agreed to them.
+  // Conversational AI assistant (Floating Smart Card layout).
   import { onMount } from 'svelte';
   import {
     aiChat,
@@ -35,7 +32,19 @@
     exitCode?: number;
   }
 
-  let messages = $state<AiChatMessage[]>([]);
+  let isMinimized = $state(false);
+  let isFullHeight = $state(false);
+  let showConfirmClear = $state(false);
+  let aiDisabledWarning = $state(false);
+
+  const initialGreeting = 'Halo! Saya Hana AI, asisten DevOps & Terminal CATerm. Pilih target host dan tanyakan perintah server atau otomatisasi infrastruktur Anda.';
+
+  let messages = $state<AiChatMessage[]>([
+    {
+      role: 'assistant',
+      content: initialGreeting
+    }
+  ]);
   let draft = $state('');
   let isSending = $state(false);
   let errorMsg = $state('');
@@ -56,21 +65,20 @@
   const activeSession = $derived(getActiveSession());
 
   onMount(async () => {
-  	try {
-  		hosts = await listHosts();
-  		// Default to currently active session's host if one exists
-  		const activeTabs = getTabs();
-  		const view = getSessionView();
-  		const activeTab = activeTabs.find((t) => t.id === view.selectedTabId) || activeTabs[0];
-  		if (activeTab?.host?.id) {
-  			targetHostId = activeTab.host.id;
-  		} else if (hosts.length > 0) {
-  			targetHostId = LOCAL_HOST_ID;
-  		}
-  	} catch {
-  		hosts = [];
-  		targetHostId = LOCAL_HOST_ID;
-  	}
+    try {
+      hosts = await listHosts();
+      const activeTabs = getTabs();
+      const view = getSessionView();
+      const activeTab = activeTabs.find((t) => t.id === view.selectedTabId) || activeTabs[0];
+      if (activeTab?.host?.id) {
+        targetHostId = activeTab.host.id;
+      } else if (hosts.length > 0) {
+        targetHostId = LOCAL_HOST_ID;
+      }
+    } catch {
+      hosts = [];
+      targetHostId = LOCAL_HOST_ID;
+    }
   });
 
   function scrollToBottom() {
@@ -88,7 +96,7 @@
     if (!text || isSending) return;
 
     errorMsg = '';
-    // Steps from an earlier turn no longer describe what is being discussed.
+    aiDisabledWarning = false;
     proposedSteps = [];
     acceptedSteps = [];
     runs = [];
@@ -120,12 +128,10 @@
             const lines = rawCode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
             for (const line of lines) {
               stepsToPropose.push({
-                title: `Eksekusi baris ${stepIdx}`,
+                title: `Jalankan: ${line.slice(0, 40)}${line.length > 40 ? '...' : ''}`,
+                description: `Perintah diekstrak dari respon AI (Langkah ${stepIdx})`,
                 command: line,
-                description: '',
-                is_sudo: line.startsWith('sudo '),
-                is_danger: /rm\s+-rf|dd\s+if=|mkfs|reboot|shutdown/.test(line),
-                action_type: 'command'
+                risk: 'low'
               });
               stepIdx++;
             }
@@ -139,104 +145,96 @@
         runs = stepsToPropose.map(() => ({ status: 'pending', output: '' }));
       }
     } catch (err) {
-      errorMsg = errorText(err);
+      const errStr = errorText(err);
+      if (errStr.includes('disabled') || errStr.includes('AiMode::Off') || errStr.includes('AI module is disabled')) {
+        aiDisabledWarning = true;
+        messages = [
+          ...messages,
+          {
+            role: 'assistant',
+            content: '⚠️ Modul AI saat ini berstatus nonaktif. Silakan pilih penyedia AI (OpenAI / Ollama / Custom API) di menu Pengaturan.'
+          }
+        ];
+      } else {
+        errorMsg = errStr;
+        messages = [
+          ...messages,
+          {
+            role: 'assistant',
+            content: `Maaf, terjadi kendala: ${errStr}`
+          }
+        ];
+      }
     } finally {
       isSending = false;
       scrollToBottom();
     }
   }
 
+  function confirmClearChat() {
+    messages = [
+      {
+        role: 'assistant',
+        content: initialGreeting
+      }
+    ];
+    proposedSteps = [];
+    acceptedSteps = [];
+    runs = [];
+    showConfirmClear = false;
+    aiDisabledWarning = false;
+    showToast('Riwayat percakapan berhasil dibersihkan', 'success');
+  }
+
   function handleKeydown(event: KeyboardEvent) {
-    // Enter sends, Shift+Enter makes a new line — the usual chat convention.
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === 'Escape') {
+      if (showConfirmClear) {
+        showConfirmClear = false;
+      } else {
+        onClose();
+      }
+    } else if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       void send();
     }
   }
 
-  function resetConversation() {
-    messages = [];
-    proposedSteps = [];
-    acceptedSteps = [];
-    runs = [];
-    errorMsg = '';
-  }
-
-  async function executeStepItem(step: AiPlanStep, i: number, effectiveExecMode: string) {
-    // 1. Native In-App Actions
-    if (step.action_type === 'caterm_action' || step.command?.startsWith('caterm:')) {
-      const action = (step.action_name || step.command?.replace('caterm:', '') || '').toLowerCase().trim();
-      const params = step.action_params || {};
-
+  async function executeStepItem(step: AiPlanStep, i: number, effectiveExecMode: ExecMode) {
+    if (step.action_type === 'caterm_action') {
+      runs[i] = { status: 'running', output: '' };
       try {
-        // STRICT SAFETY GUARDRAILS
-        if (action.includes('mass') || action.includes('bulk_delete') || action.includes('delete_all') || action.includes('purge') || action.includes('drop_all')) {
-          throw new Error('Dilarang melakukan penghapusan masal (Mass deletion dilarang oleh guardrail keamanan CATerm).');
-        }
-        if (action.includes('sftp') || action.includes('transfer_file') || action.includes('download_remote') || action.includes('upload_remote')) {
-          throw new Error('Dilarang melakukan SFTP langsung via AI. Gunakan menu SFTP visual.');
-        }
-        if (action.includes('billing') || action.includes('subscription') || action.includes('cancel_pro') || action.includes('reset_license')) {
-          throw new Error('Dilarang memodifikasi atau menghapus data langganan/billing via AI.');
-        }
+        const action = (step.action_name || '').toLowerCase();
+        const params = step.action_params || {};
 
-        if (action === 'update_profile') {
-          const profile = getProfile();
-          const newName = params.name || profile.name;
-          const newAvatar = params.avatar || profile.avatar;
-          saveProfile({ name: newName, avatar: newAvatar });
-          runs[i] = { status: 'ok', output: `Profil berhasil diperbarui: ${newName}` };
-          showToast(`Profil diperbarui: ${newName}`, 'success');
-          return true;
-        }
-
-        if (action === 'save_host' || action === 'add_host') {
+        if (action === 'create_host' || action === 'save_host' || action === 'add_host') {
+          const label = params.label || params.name || params.host || 'New Host';
+          const hostname = params.hostname || params.host || params.ip || '127.0.0.1';
+          const port = Number(params.port) || 22;
+          const username = params.username || params.user || 'root';
+          const authMethod = params.auth_method || params.authMethod || 'Password';
+          const groupName = params.group || params.group_name || params.groupName || '';
+          
           await saveHost({
             id: params.id,
-            label: params.label || 'New Host',
-            address: params.address || '127.0.0.1',
-            port: params.port || 22,
-            username: params.username || 'root',
-            protocol: params.protocol || 'ssh',
-            authMethod: params.authMethod || (params.auth_type === 'key' ? 'key' : 'password'),
-            secret: params.password || params.secret,
-            tags: params.tags || [],
-            os: params.os || 'linux'
+            label,
+            hostname,
+            port,
+            username,
+            auth_method: authMethod === 'Key' ? { Key: { key_path: params.key_path || '' } } : { Password: {} },
+            group_name: groupName || undefined,
+            tags: params.tags || []
           });
-          hosts = await listHosts();
           window.dispatchEvent(new CustomEvent('caterm:hosts-updated'));
-          runs[i] = { status: 'ok', output: `Host ${params.label} (${params.address}) berhasil disimpan!` };
-          showToast(`Host ${params.label} disimpan!`, 'success');
+          runs[i] = { status: 'ok', output: `Host "${label}" (${username}@${hostname}:${port}) berhasil disimpan!` };
+          showToast(`Host "${label}" disimpan!`, 'success');
           return true;
         }
 
         if (action === 'delete_host' && params.id) {
           await deleteHost(params.id);
-          hosts = await listHosts();
           window.dispatchEvent(new CustomEvent('caterm:hosts-updated'));
           runs[i] = { status: 'ok', output: `Host berhasil dihapus!` };
           showToast(`Host dihapus!`, 'success');
-          return true;
-        }
-
-        if (action === 'save_group' || action === 'add_group' || action === 'create_group') {
-          await saveGroup({
-            id: params.id,
-            name: params.name || params.label || 'New Group',
-            color: params.color || '#3b82f6',
-            hostIds: params.host_ids || params.hostIds || []
-          });
-          window.dispatchEvent(new CustomEvent('caterm:groups-updated'));
-          runs[i] = { status: 'ok', output: `Group "${params.name || params.label}" berhasil disimpan!` };
-          showToast(`Group disimpan!`, 'success');
-          return true;
-        }
-
-        if (action === 'delete_group' && params.id) {
-          await deleteGroup(params.id);
-          window.dispatchEvent(new CustomEvent('caterm:groups-updated'));
-          runs[i] = { status: 'ok', output: `Group berhasil dihapus!` };
-          showToast(`Group dihapus!`, 'success');
           return true;
         }
 
@@ -266,99 +264,10 @@
           return true;
         }
 
-        if (action === 'create_totp' || action === 'save_totp') {
-          await invoke('save_totp_entry', {
-            input: {
-              id: params.id,
-              label: params.label || params.title || '2FA Account',
-              issuer: params.issuer,
-              secret: params.secret || params.key
-            }
-          });
-          window.dispatchEvent(new CustomEvent('caterm:totp-updated'));
-          runs[i] = { status: 'ok', output: `2FA Token "${params.label || params.title}" berhasil disimpan!` };
-          showToast(`2FA Token disimpan!`, 'success');
+        if (action === 'navigate' && params.route) {
+          goto(params.route);
+          runs[i] = { status: 'ok', output: `Navigasi ke ${params.route}` };
           return true;
-        }
-
-        if (action === 'delete_totp' && params.id) {
-          await invoke('delete_totp_entry', { id: params.id });
-          window.dispatchEvent(new CustomEvent('caterm:totp-updated'));
-          runs[i] = { status: 'ok', output: `2FA Token berhasil dihapus!` };
-          showToast(`2FA Token dihapus!`, 'success');
-          return true;
-        }
-
-        if (action === 'save_tunnel' || action === 'create_tunnel') {
-          await invoke('save_tunnel', {
-            input: {
-              id: params.id,
-              label: params.label || 'New Tunnel',
-              hostId: params.host_id || params.hostId,
-              tunnelType: params.tunnel_type || params.tunnelType || 'local',
-              localPort: params.local_port || params.localPort || 8080,
-              remoteHost: params.remote_host || params.remoteHost || 'localhost',
-              remotePort: params.remote_port || params.remotePort || 80
-            }
-          });
-          window.dispatchEvent(new CustomEvent('caterm:tunnels-updated'));
-          runs[i] = { status: 'ok', output: `Tunnel Port Forwarding berhasil disimpan!` };
-          showToast(`Port Forwarding Tunnel disimpan!`, 'success');
-          return true;
-        }
-
-        if (action === 'delete_tunnel' && params.id) {
-          await invoke('delete_tunnel', { id: params.id });
-          window.dispatchEvent(new CustomEvent('caterm:tunnels-updated'));
-          runs[i] = { status: 'ok', output: `Tunnel berhasil dihapus!` };
-          showToast(`Tunnel dihapus!`, 'success');
-          return true;
-        }
-
-        if (action === 'create_investigation' || action === 'save_investigation') {
-          await invoke('save_investigation', {
-            input: {
-              id: params.id,
-              title: params.title || 'Investigation Note',
-              hostId: params.host_id || params.hostId,
-              query: params.query || '',
-              category: params.category || 'incident'
-            }
-          });
-          window.dispatchEvent(new CustomEvent('caterm:investigations-updated'));
-          runs[i] = { status: 'ok', output: `Investigation berhasil disimpan!` };
-          showToast(`Investigation disimpan!`, 'success');
-          return true;
-        }
-
-        if (action === 'delete_investigation' && params.id) {
-          await invoke('delete_investigation', { id: params.id });
-          window.dispatchEvent(new CustomEvent('caterm:investigations-updated'));
-          runs[i] = { status: 'ok', output: `Investigation berhasil dihapus!` };
-          showToast(`Investigation dihapus!`, 'success');
-          return true;
-        }
-
-        if (action === 'save_team' || action === 'create_team') {
-          await invoke('save_team', {
-            input: {
-              id: params.id,
-              name: params.name || 'New Team',
-              description: params.description || ''
-            }
-          });
-          window.dispatchEvent(new CustomEvent('caterm:teams-updated'));
-          runs[i] = { status: 'ok', output: `Team "${params.name}" berhasil disimpan!` };
-          showToast(`Team disimpan!`, 'success');
-          return true;
-        }
-
-        if (action === 'navigate') {
-          if (params.route) {
-            goto(params.route);
-            runs[i] = { status: 'ok', output: `Navigasi ke ${params.route}` };
-            return true;
-          }
         }
       } catch (err) {
         runs[i] = { status: 'failed', output: errorText(err) };
@@ -367,7 +276,6 @@
       }
     }
 
-    // 2. Terminal Mode Injection
     if (effectiveExecMode === 'terminal') {
       runs[i] = { status: 'running', output: '' };
       injectIntoActiveSession(step.command);
@@ -375,7 +283,6 @@
       return true;
     }
 
-    // 3. Background SSH / Localhost Execution
     runs[i] = { status: 'running', output: '' };
     try {
       const result = await aiExecuteStep(targetHostId || LOCAL_HOST_ID, step);
@@ -400,300 +307,293 @@
   }
 
   async function runPlan() {
-    if (isExecuting || proposedSteps.length === 0) return;
-
-    let effectiveExecMode = execMode;
-    if (effectiveExecMode === 'terminal' && !activeSession) {
-      effectiveExecMode = 'ssh';
-    }
-
+    if (isExecuting) return;
     isExecuting = true;
     try {
       for (let i = 0; i < proposedSteps.length; i++) {
         if (!acceptedSteps[i]) continue;
-        const ok = await executeStepItem(proposedSteps[i], i, effectiveExecMode);
-        if (!ok) break;
-        if (effectiveExecMode === 'terminal') {
-          await new Promise((resolve) => setTimeout(resolve, 600));
-        }
+        const step = proposedSteps[i];
+        const success = await executeStepItem(step, i, execMode);
+        if (!success) break;
       }
     } finally {
       isExecuting = false;
-      scrollToBottom();
     }
-  }
-
-  async function sendSingleStep(i: number) {
-    const step = proposedSteps[i];
-    if (!step) return;
-
-    let effectiveExecMode = execMode;
-    if (effectiveExecMode === 'terminal' && !activeSession) {
-      effectiveExecMode = 'ssh';
-    }
-
-    await executeStepItem(step, i, effectiveExecMode);
   }
 
   const acceptedCount = $derived(acceptedSteps.filter(Boolean).length);
 </script>
 
-<!-- A docked column on desktop, a full-screen sheet on phones where 26rem would leave the page
-     with nothing. Sits in the same slot as the SFTP panel; only one of the two is ever open. -->
-<aside
-  class="fixed inset-0 z-50 sm:static sm:z-auto sm:w-[26rem] sm:shrink-0 h-full bg-white dark:bg-neutral-950 border-l border-neutral-200 dark:border-neutral-800 shadow-2xl sm:shadow-none flex flex-col"
-  aria-label={t('aiChat.title')}
->
-  <header class="p-3 border-b border-neutral-200 dark:border-neutral-800 flex items-center justify-between gap-2 shrink-0">
-    <div class="flex items-center gap-2 min-w-0">
-      <div class="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center text-violet-600 dark:text-violet-400 shrink-0">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
+<svelte:window onkeydown={handleKeydown} />
+
+{#if isMinimized}
+  <!-- Floating collapsed bubble pill in bottom right corner -->
+  <div class="fixed bottom-5 right-5 z-50 animate-in fade-in duration-150">
+    <button
+      onclick={() => (isMinimized = false)}
+      class="flex items-center gap-2 px-3.5 py-2 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-xl shadow-rose-600/30 font-medium text-xs border border-rose-400/30 transition-transform hover:scale-105 cursor-pointer"
+    >
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span>Hana AI Aktif</span>
+      <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+      </svg>
+    </button>
+  </div>
+{:else}
+  <!-- Floating Smart Card Overlay (Non-Destructive) in bottom right corner -->
+  <aside
+    class="fixed z-50 flex flex-col bg-neutral-900/95 backdrop-blur-xl border border-neutral-700/80 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden transition-all duration-200 {isFullHeight
+      ? 'inset-y-3 right-3 w-[440px]'
+      : 'bottom-5 right-5 w-[420px] h-[560px] max-h-[85vh]'}"
+    aria-label={t('aiChat.title')}
+  >
+    <!-- Header -->
+    <header class="px-4 py-3 border-b border-neutral-800/80 bg-neutral-950/70 flex items-center justify-between select-none shrink-0">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50 shrink-0"></div>
+        <div class="min-w-0">
+          <h2 class="text-xs font-bold text-white tracking-wide truncate">Hana AI (DevOps Copilot)</h2>
+        </div>
       </div>
-      <div class="min-w-0">
-        <h2 class="text-sm font-bold text-neutral-900 dark:text-white truncate">{t('aiChat.title')}</h2>
-        <p class="text-[11px] text-neutral-500 truncate">{t('aiChat.tagline')}</p>
-      </div>
-    </div>
-    <div class="flex items-center gap-1 shrink-0">
-      {#if messages.length > 0}
+
+      <div class="flex items-center gap-1 shrink-0">
+        <!-- Clear Chat button -->
         <button
-          onclick={resetConversation}
-          class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-          title={t('aiChat.newConversation')}
-          aria-label={t('aiChat.newConversation')}
+          type="button"
+          onclick={() => (showConfirmClear = true)}
+          class="p-1 text-neutral-400 hover:text-amber-400 rounded-lg hover:bg-neutral-800 transition-colors"
+          title="Bersihkan riwayat percakapan"
+          aria-label="Bersihkan Chat"
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
         </button>
-      {/if}
-      <button
-        onclick={onClose}
-        class="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-        aria-label={t('aiChat.close')}
-      >
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  </header>
 
-  <!-- Target + execution mode -->
-  <div class="p-3 border-b border-neutral-200 dark:border-neutral-800 space-y-2 shrink-0">
-    <div class="flex items-center gap-2">
-      <label for="ai-chat-host" class="text-[11px] font-semibold text-neutral-500 shrink-0">{t('aiChat.host')}</label>
-      <select
-      	id="ai-chat-host"
-      	bind:value={targetHostId}
-      	class="flex-1 min-w-0 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2 py-1 text-xs text-neutral-900 dark:text-white focus:outline-none focus:border-violet-500 cursor-pointer"
-      >
-      	<option value={LOCAL_HOST_ID}>🖥️ {t('session.localTerminal')} (localhost)</option>
-      	{#each hosts as host (host.id)}
-      		<option value={host.id}>{host.label} ({host.username}@{host.address})</option>
-      	{/each}
-      </select>
-    </div>
+        <!-- Minimize button -->
+        <button
+          type="button"
+          onclick={() => (isMinimized = true)}
+          class="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+          title="Kecilkan ke pojok"
+          aria-label="Kecilkan"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
 
-    <div class="flex items-center gap-2">
-      <span class="text-[11px] font-semibold text-neutral-500 shrink-0">{t('aiChat.executeVia')}</span>
-      <div class="flex items-center gap-0.5 p-0.5 rounded-lg border border-neutral-200 dark:border-neutral-800">
+        <!-- Expand / Restore button -->
         <button
-          onclick={() => (execMode = 'ssh')}
-          class="px-2 py-0.5 rounded text-[11px] font-medium transition-colors {execMode === 'ssh' ? 'bg-violet-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
-          title={t('aiChat.sshExecTitle')}
+          type="button"
+          onclick={() => (isFullHeight = !isFullHeight)}
+          class="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
+          title={isFullHeight ? "Mode Kartu Mengambang" : "Mode Layar Penuh"}
+          aria-label="Ubah Ukuran"
         >
-          {t('aiChat.sshExec')}
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {#if isFullHeight}
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            {:else}
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" />
+            {/if}
+          </svg>
         </button>
+
+        <!-- Close button -->
         <button
-          onclick={() => (execMode = 'terminal')}
-          class="px-2 py-0.5 rounded text-[11px] font-medium transition-colors {execMode === 'terminal' ? 'bg-violet-600 text-white' : 'text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
-          title={t('aiChat.terminalTitle')}
+          type="button"
+          onclick={onClose}
+          class="p-1 text-neutral-400 hover:text-rose-400 rounded-lg hover:bg-neutral-800 transition-colors"
+          title="Tutup Hana AI"
+          aria-label="Tutup"
         >
-          {t('aiChat.activeTerminal')}
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
         </button>
+      </div>
+    </header>
+
+    <!-- Clear Chat Confirmation Overlay -->
+    {#if showConfirmClear}
+      <div class="p-4 bg-amber-500/10 border-b border-amber-500/20 text-xs animate-in fade-in duration-150">
+        <p class="font-semibold text-amber-300 mb-1">Bersihkan riwayat percakapan?</p>
+        <p class="text-neutral-400 mb-3 text-[11px]">Tindakan ini akan mengosongkan seluruh log pesan terminal AI.</p>
+        <div class="flex justify-end gap-2">
+          <button
+            type="button"
+            onclick={() => (showConfirmClear = false)}
+            class="px-2.5 py-1 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs transition-colors"
+          >
+            Batal
+          </button>
+          <button
+            type="button"
+            onclick={confirmClearChat}
+            class="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold transition-colors"
+          >
+            Ya, Bersihkan
+          </button>
+        </div>
+      </div>
+    {/if}
+
+    <!-- Terminal Controls: Target Host & Execution Mode -->
+    <div class="px-3.5 py-2.5 border-b border-neutral-800/80 bg-neutral-950/40 flex items-center gap-2.5 shrink-0 text-xs">
+      <div class="flex-1 flex items-center gap-1.5 min-w-0">
+        <span class="text-[10px] font-semibold text-neutral-400 shrink-0">Host:</span>
+        <select
+          bind:value={targetHostId}
+          class="flex-1 min-w-0 bg-neutral-900 border border-neutral-700/70 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none focus:border-rose-500 cursor-pointer truncate"
+        >
+          <option value={LOCAL_HOST_ID}>🖥️ Local Terminal (localhost)</option>
+          {#each hosts as host (host.id)}
+            <option value={host.id}>🌐 {host.label} ({host.username}@{host.hostname})</option>
+          {/each}
+        </select>
+      </div>
+
+      <div class="flex items-center gap-1.5 shrink-0">
+        <span class="text-[10px] font-semibold text-neutral-400">Via:</span>
+        <div class="inline-flex rounded-lg bg-neutral-900 p-0.5 border border-neutral-800">
+          <button
+            type="button"
+            onclick={() => (execMode = 'ssh')}
+            class="px-2 py-0.5 rounded text-[10px] font-medium transition-colors {execMode === 'ssh'
+              ? 'bg-rose-600 text-white shadow-sm'
+              : 'text-neutral-400 hover:text-white'}"
+          >
+            SSH
+          </button>
+          <button
+            type="button"
+            onclick={() => (execMode = 'terminal')}
+            class="px-2 py-0.5 rounded text-[10px] font-medium transition-colors {execMode === 'terminal'
+              ? 'bg-rose-600 text-white shadow-sm'
+              : 'text-neutral-400 hover:text-white'}"
+          >
+            Terminal
+          </button>
+        </div>
       </div>
     </div>
 
-    {#if execMode === 'terminal'}
-      <p class="text-[11px] {activeSession ? 'text-neutral-500' : 'text-amber-600 dark:text-amber-400'}">
-        {activeSession
-          ? t('aiChat.willType', { label: activeSession.label })
-          : t('aiChat.noActivePane')}
-      </p>
-    {/if}
-  </div>
+    <!-- Messages Container -->
+    <div bind:this={scroller} class="flex-1 overflow-y-auto p-4 space-y-3 text-xs leading-relaxed">
+      {#each messages as msg}
+        <div class="flex flex-col {msg.role === 'user' ? 'items-end' : 'items-start'}">
+          <div
+            class="max-w-[90%] rounded-2xl px-3.5 py-2.5 {msg.role === 'user'
+              ? 'bg-rose-600 text-white rounded-br-none shadow-md shadow-rose-600/20'
+              : 'bg-neutral-800/90 text-neutral-200 rounded-bl-none border border-neutral-700/60'}"
+          >
+            {cleanMessageContent(msg.content)}
+          </div>
+        </div>
+      {/each}
 
-  <!-- Conversation -->
-  <div bind:this={scroller} class="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
-    {#if messages.length === 0}
-      <div class="text-center py-8 space-y-3">
-        <p class="text-sm text-neutral-500 dark:text-neutral-400">
-          {t('aiChat.emptyPrompt')}
-        </p>
-        <div class="flex flex-wrap gap-1.5 justify-center">
-          {#each [t('aiChat.suggestDocker'), t('aiChat.suggestNode'), t('aiChat.suggestHardening')] as suggestion}
+      <!-- Step Approval Section -->
+      {#if proposedSteps.length > 0}
+        <div class="p-3 bg-neutral-950/80 border border-neutral-700/80 rounded-xl space-y-2 mt-2">
+          <div class="flex items-center justify-between text-[11px] font-semibold text-neutral-300">
+            <span>Rencana Eksekusi ({proposedSteps.length} langkah)</span>
             <button
-              onclick={() => {
-                draft = suggestion;
-                void send();
-              }}
-              class="px-2.5 py-1 rounded-full text-[11px] border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+              onclick={runPlan}
+              disabled={isExecuting || acceptedCount === 0}
+              class="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-sm"
             >
-              {suggestion}
+              {isExecuting ? 'Mengeksekusi...' : `Eksekusi (${acceptedCount})`}
             </button>
-          {/each}
-        </div>
-        <p class="text-[11px] text-neutral-400 dark:text-neutral-500 max-w-xs mx-auto">
-          {t('aiChat.asksFirst')}
-        </p>
-      </div>
-    {/if}
+          </div>
 
-    {#each messages as message, i (i)}
-      <div class="flex {message.role === 'user' ? 'justify-end' : 'justify-start'}">
-        <div
-          class="max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words {message.role === 'user'
-            ? 'bg-violet-600 text-white'
-            : 'bg-neutral-100 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800'}"
-        >
-          {cleanMessageContent(message.content)}
-        </div>
-      </div>
-    {/each}
-
-    {#if isSending}
-      <div class="flex justify-start">
-        <div class="rounded-xl px-3 py-2 text-xs bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-500">
-          {t('aiChat.thinking')}
-        </div>
-      </div>
-    {/if}
-
-    {#if errorMsg}
-      <div class="rounded-lg px-3 py-2 text-xs bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-300">
-        <p class="font-semibold mb-0.5">{t('aiChat.connectFailed')}</p>
-        <p class="break-words">{errorMsg}</p>
-        <a href="/settings" class="underline mt-1 inline-block">{t('aiChat.checkSettings')}</a>
-      </div>
-    {/if}
-
-    <!-- Proposal: only present once the assistant says it is ready -->
-    {#if proposedSteps.length > 0}
-      <div class="rounded-xl border border-violet-300 dark:border-violet-900 bg-violet-50 dark:bg-violet-950/30 p-3 space-y-2">
-        <div class="flex items-center justify-between gap-2">
-          <h3 class="text-xs font-bold text-violet-800 dark:text-violet-300">
-            {t('aiChat.planTitle', { count: proposedSteps.length })}
-          </h3>
-          <span class="text-[11px] text-violet-700 dark:text-violet-400">{t('aiChat.selected', { count: acceptedCount })}</span>
-        </div>
-
-        <ul class="space-y-1.5">
-          {#each proposedSteps as step, i (i)}
-            <li class="rounded-lg bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-2">
-              <label class="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  bind:checked={acceptedSteps[i]}
-                  disabled={isExecuting}
-                  class="mt-0.5 accent-violet-600 shrink-0"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-[11px] font-semibold text-neutral-800 dark:text-neutral-200">
-                      {i + 1}. {step.title}
-                    </span>
-                    {#if step.is_danger || step.is_sudo}
-                      <span class="px-1 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-400">
-                        {step.is_danger ? t('aiChat.risk') : t('aiChat.sudo')}
-                      </span>
+          <div class="space-y-1.5">
+            {#each proposedSteps as step, i}
+              <div class="p-2 rounded-lg bg-neutral-900 border border-neutral-800 text-[11px] space-y-1">
+                <div class="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    bind:checked={acceptedSteps[i]}
+                    class="mt-0.5 rounded border-neutral-700 text-rose-600 focus:ring-0"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <div class="font-medium text-neutral-200">{step.title}</div>
+                    {#if step.command}
+                      <code class="block mt-1 p-1 bg-black/60 rounded text-[10px] text-rose-300 font-mono break-all">
+                        {step.command}
+                      </code>
                     {/if}
-                  </span>
-                  <code class="block mt-1 text-[11px] font-mono text-sky-700 dark:text-sky-400 break-all">
-                    {step.command}
-                  </code>
-                  {#if step.description}
-                    <span class="block mt-0.5 text-[11px] text-neutral-500">{step.description}</span>
-                  {/if}
-                </span>
-
-                <button
-                  type="button"
-                  onclick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    void sendSingleStep(i);
-                  }}
-                  disabled={isExecuting}
-                  class="p-1 rounded text-neutral-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
-                  title={runs[i]?.status === 'ok' ? 'Resend to terminal' : 'Send to terminal'}
-                  aria-label="Send step"
-                >
-                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </button>
-              </label>
-
-              {#if runs[i] && runs[i].status !== 'pending'}
-                <div class="mt-1.5 pl-6">
-                  <span
-                    class="text-[10px] font-semibold uppercase {runs[i].status === 'ok'
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : runs[i].status === 'failed'
-                        ? 'text-rose-600 dark:text-rose-400'
-                        : 'text-amber-600 dark:text-amber-400'}"
-                  >
-                    {runs[i].status === 'running' ? t('aiChat.running') : runs[i].status === 'ok' ? t('aiChat.statusOk') : t('aiChat.statusFailed')}
-                    {#if runs[i].exitCode !== undefined}· {t('aiChat.exit', { code: runs[i].exitCode ?? '' })}{/if}
-                  </span>
-                  {#if runs[i].output}
-                    <pre class="mt-1 p-1.5 rounded bg-neutral-100 dark:bg-neutral-950 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-transparent text-[10px] font-mono whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{runs[i].output}</pre>
-                  {/if}
+                    {#if runs[i]?.output}
+                      <div class="mt-1 text-[10px] {runs[i].status === 'ok' ? 'text-emerald-400' : 'text-rose-400'} font-mono bg-neutral-950 p-1 rounded">
+                        {runs[i].output}
+                      </div>
+                    {/if}
+                  </div>
                 </div>
-              {/if}
-            </li>
-          {/each}
-        </ul>
+              </div>
+            {/each}
+          </div>
+        </div>
+      {/if}
 
-        <button
-          onclick={runPlan}
-          disabled={isExecuting || acceptedCount === 0}
-          class="w-full px-3 py-2 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white transition-colors"
-        >
-          {isExecuting
-            ? t('aiChat.executing')
-            : execMode === 'ssh'
-              ? t('aiChat.runOnHost', { count: acceptedCount, host: targetHost?.label ?? t('aiChat.hostFallback') })
-              : t('aiChat.sendToTerminal', { count: acceptedCount })}
-        </button>
-      </div>
-    {/if}
-  </div>
+      <!-- AI Disabled Warning -->
+      {#if aiDisabledWarning}
+        <div class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex flex-col gap-2">
+          <div class="flex items-center gap-2 text-rose-400 font-semibold text-xs">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Konfigurasi AI Provider</span>
+          </div>
+          <p class="text-[11px] text-neutral-400">Pilih mode "BYO" dan masukkan API Key / URL endpoint AI Anda.</p>
+          <button
+            type="button"
+            onclick={() => {
+              onClose();
+              goto('/settings?tab=ai');
+            }}
+            class="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs shadow-md shadow-rose-600/20 transition-all text-center"
+          >
+            Buka Pengaturan AI
+          </button>
+        </div>
+      {/if}
 
-  <!-- Composer -->
-  <div class="p-3 border-t border-neutral-200 dark:border-neutral-800 shrink-0">
-    <div class="flex items-end gap-2">
-      <textarea
-        bind:value={draft}
-        onkeydown={handleKeydown}
-        rows="2"
-        placeholder={t('aiChat.composerPlaceholder')}
-        aria-label={t('aiChat.composerLabel')}
-        class="flex-1 resize-none bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg px-2.5 py-2 text-xs text-neutral-900 dark:text-white placeholder-neutral-400 focus:outline-none focus:border-violet-500"
-      ></textarea>
-      <button
-        onclick={send}
-        disabled={isSending || draft.trim().length === 0}
-        class="px-3 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white transition-colors shrink-0"
-        aria-label={t('aiChat.send')}
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-        </svg>
-      </button>
+      {#if isSending}
+        <div class="flex items-center gap-2 text-neutral-400 text-xs py-2">
+          <svg class="w-3.5 h-3.5 animate-spin text-rose-400" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <span>Menghubungi Hana AI...</span>
+        </div>
+      {/if}
     </div>
-  </div>
-</aside>
+
+    <!-- Input Composer -->
+    <div class="p-3 border-t border-neutral-800/80 bg-neutral-950/80 shrink-0">
+      <form
+        onsubmit={(e) => {
+          e.preventDefault();
+          void send();
+        }}
+        class="flex gap-2"
+      >
+        <input
+          type="text"
+          bind:value={draft}
+          placeholder="Tanyakan perintah Linux, troubleshoot, atau script..."
+          class="flex-1 px-3.5 py-2 bg-neutral-900 border border-neutral-700/70 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 transition-colors"
+        />
+        <button
+          type="submit"
+          disabled={isSending || !draft.trim()}
+          class="px-3.5 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white text-xs font-semibold rounded-xl transition-all shadow-md shadow-rose-600/20 shrink-0"
+        >
+          Kirim
+        </button>
+      </form>
+    </div>
+  </aside>
+{/if}

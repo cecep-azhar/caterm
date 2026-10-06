@@ -419,16 +419,18 @@
 	>
 		{#snippet actions()}
 			<button
+				type="button"
 				onclick={() => openSession('local')}
-				class="w-10 h-10 flex items-center justify-center rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors"
+				class="h-9 w-9 flex items-center justify-center rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shadow-2xs shrink-0"
 				title={t('hosts.localTerminal')}
 				aria-label={t('hosts.localTerminal')}
 			>
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2" stroke-width="1.8" /><path stroke-linecap="round" stroke-width="1.8" d="M8 20h8M12 16v4" /></svg>
 			</button>
 			<button
+				type="button"
 				onclick={openAddModal}
-				class="h-10 px-4 flex items-center gap-2 rounded-lg text-sm font-medium bg-neutral-900 text-white hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200 transition-colors"
+				class="h-9 px-4 flex items-center gap-1.5 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-md shadow-sky-600/20 transition-all shrink-0 active:scale-95"
 			>
 				<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v14m7-7H5" /></svg>
 				{t('hosts.addHost')}

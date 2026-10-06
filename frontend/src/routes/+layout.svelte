@@ -344,11 +344,6 @@
   }
 
   function handleAiToggle() {
-    if (aiChat.open) {
-      closeAiChat();
-      return;
-    }
-    setShowFiles(false);
     toggleAiChat();
   }
 
@@ -785,11 +780,10 @@
       </div>
     </aside>
 
-    <!-- Content panel. The AI panel is a docked column beside the page rather than an overlay,
-         so it behaves like the Files panel: the content narrows instead of being covered. Both
-         never show at once — see handleAiToggle. -->
+    <!-- Content panel. The AI panel is a floating smart card rather than a docked column,
+         so it overlays cleanly without squeezing terminal or editor workspaces. -->
     <main class="flex-1 min-w-0 flex overflow-hidden relative bg-white dark:bg-[#161616] border-t border-neutral-200 dark:border-neutral-800 md:border-l md:rounded-tl-xl transition-colors duration-150">
-      <!-- Session Viewport: fleksibel agar menyisakan ruang untuk AI panel -->
+      <!-- Session Viewport -->
       <div class="flex-1 min-w-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 absolute inset-0 invisible'}">
         <SessionViewport />
       </div>
@@ -799,9 +793,9 @@
         {@render children()}
       </div>
 
-      <div class={['contents', !aiChat.open && 'hidden'].filter(Boolean).join(' ')}>
+      {#if aiChat.open}
         <AiChatPanel onClose={closeAiChat} />
-      </div>
+      {/if}
 
       {#if feedbackPrompt.show}
         <!-- Feedback popup modal: auto-prompted after the 3rd closed session, or opened from the
