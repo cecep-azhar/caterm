@@ -320,6 +320,32 @@
     return { live: false, text: used ? t('hosts.usedAgo', { time: relativeTime(used) }) : t('hosts.neverConnected') };
   }
 
+  let revealAddressMap = $state<Record<string, boolean>>({});
+
+  function isRevealed(hostId: string): boolean {
+    return !!revealAddressMap[hostId];
+  }
+
+  function toggleReveal(hostId: string, e: MouseEvent) {
+    e.stopPropagation();
+    revealAddressMap[hostId] = !revealAddressMap[hostId];
+  }
+
+  function formatMaskedAddress(host: HostRecord): string {
+    if (isRevealed(host.id)) {
+      return `${host.username}@${host.address}${host.port !== 22 ? `:${host.port}` : ''}`;
+    }
+    const u = 'xxxx';
+    const parts = host.address.split('.');
+    let maskedHost = 'xxx';
+    if (parts.length === 4) {
+      maskedHost = `${parts[0]}.xxx.xxx.${parts[3]}`;
+    } else if (host.address.includes('.')) {
+      maskedHost = `xxx.${host.address.split('.').slice(1).join('.')}`;
+    }
+    return `${u}@${maskedHost}`;
+  }
+
   function hostAddress(host: HostRecord): string {
     return `${host.username}@${host.address}${host.port !== 22 ? `:${host.port}` : ''}`;
   }
@@ -540,7 +566,31 @@
                   </span>
                 {/each}
               </div>
-              <p class="text-xs font-mono text-neutral-500 dark:text-neutral-400 truncate" title="{host.username}@{host.address}:{host.port}">{hostAddress(host)}</p>
+              <div class="flex items-center gap-1.5 min-w-0 mt-0.5">
+                <p class="text-xs font-mono text-neutral-500 dark:text-neutral-400 truncate" title="{host.username}@{host.address}:{host.port}">
+                  {formatMaskedAddress(host)}
+                </p>
+                <button
+                  type="button"
+                  onclick={(e) => toggleReveal(host.id, e)}
+                  class="p-0.5 rounded text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors shrink-0"
+                  title={isRevealed(host.id) ? "Hide User & IP" : "Show User & IP"}
+                  aria-label={isRevealed(host.id) ? "Hide User & IP" : "Show User & IP"}
+                >
+                  {#if isRevealed(host.id)}
+                    <!-- Eye Open Icon -->
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  {:else}
+                    <!-- Eye Closed / Slashed Icon -->
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                    </svg>
+                  {/if}
+                </button>
+              </div>
             </div>
             <button
               onclick={() => toggleFavorite(host.id)}

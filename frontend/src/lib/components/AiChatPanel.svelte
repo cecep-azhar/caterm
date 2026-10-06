@@ -14,6 +14,11 @@
   import { getTabs, localTerminalHost, LOCAL_HOST_ID } from '$lib/stores/sessionTabs.svelte';
   import { getSessionView } from '$lib/stores/sessionView.svelte';
   import { getActiveSession, injectIntoActiveSession } from '$lib/stores/activeSession.svelte';
+  import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
+  import { saveHost } from '$lib/api/hosts';
+  import { saveSnippet } from '$lib/api/snippets';
+  import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { errorText } from '$lib/errors';
   import { t } from '$lib/i18n/index.svelte';
@@ -82,7 +87,12 @@
     acceptedSteps = [];
     runs = [];
 
-    messages = [...messages, { role: 'user', content: text }];
+    const currentRoute = page.url.pathname;
+    const currentTab = page.url.searchParams.get('tab') || '';
+    const profile = getProfile();
+    const uiContext = `[Active UI Context: Route="${currentRoute}", Tab="${currentTab}", CurrentProfileName="${profile.name}", HostCount=${hosts.length}]`;
+
+    messages = [...messages, { role: 'user', content: `${text}\n${uiContext}` }];
     draft = '';
     isSending = true;
     scrollToBottom();
@@ -119,53 +129,115 @@
     errorMsg = '';
   }
 
+  async function executeStepItem(step: AiPlanStep, i: number, effectiveExecMode: string) {
+    // 1. Native In-App Actions
+    if (step.action_type === 'caterm_action' || step.command?.startsWith('caterm:')) {
+      const action = step.action_name || step.command?.replace('caterm:', '');
+      const params = step.action_params || {};
+
+      try {
+        if (action === 'update_profile') {
+          const profile = getProfile();
+          const newName = params.name || profile.name;
+          const newAvatar = params.avatar || profile.avatar;
+          saveProfile({ name: newName, avatar: newAvatar });
+          runs[i] = { status: 'ok', output: `Profil berhasil diperbarui: ${newName}` };
+          showToast(`Profil diperbarui: ${newName}`, 'success');
+          return true;
+        }
+
+        if (action === 'save_host' || action === 'add_host') {
+          await saveHost({
+            label: params.label || 'New Host',
+            address: params.address || '127.0.0.1',
+            port: params.port || 22,
+            username: params.username || 'root',
+            protocol: params.protocol || 'ssh',
+            authMethod: params.authMethod || (params.auth_type === 'key' ? 'key' : 'password'),
+            secret: params.password || params.secret,
+            tags: params.tags || [],
+            os: params.os || 'linux'
+          });
+          hosts = await listHosts();
+          runs[i] = { status: 'ok', output: `Host ${params.label} (${params.address}) berhasil disimpan ke CATerm!` };
+          showToast(`Host ${params.label} disimpan!`, 'success');
+          return true;
+        }
+
+        if (action === 'create_snippet') {
+          await saveSnippet({
+            label: params.label || params.title || 'New Snippet',
+            command: params.command || '',
+            description: params.description || '',
+            tags: params.tags || []
+          });
+          runs[i] = { status: 'ok', output: `Snippet "${params.label || params.title}" berhasil disimpan!` };
+          showToast(`Snippet disimpan!`, 'success');
+          return true;
+        }
+
+        if (action === 'navigate') {
+          if (params.route) {
+            goto(params.route);
+            runs[i] = { status: 'ok', output: `Navigasi ke ${params.route}` };
+            return true;
+          }
+        }
+      } catch (err) {
+        runs[i] = { status: 'failed', output: errorText(err) };
+        showToast(`Aksi gagal: ${errorText(err)}`, 'error');
+        return false;
+      }
+    }
+
+    // 2. Terminal Mode Injection
+    if (effectiveExecMode === 'terminal') {
+      runs[i] = { status: 'running', output: '' };
+      injectIntoActiveSession(step.command);
+      runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
+      return true;
+    }
+
+    // 3. Background SSH / Localhost Execution
+    runs[i] = { status: 'running', output: '' };
+    try {
+      const result = await aiExecuteStep(targetHostId || LOCAL_HOST_ID, step);
+      const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
+      runs[i] = {
+        status: result.success ? 'ok' : 'failed',
+        output: output || t('aiChat.noOutput'),
+        exitCode: result.exit_code
+      };
+      if (!result.success) {
+        showToast(t('aiChat.stepFailed', { step: i + 1, code: result.exit_code ?? '?' }), 'error');
+        return false;
+      }
+      return true;
+    } catch (err) {
+      runs[i] = {
+        status: 'failed',
+        output: errorText(err)
+      };
+      return false;
+    }
+  }
+
   async function runPlan() {
     if (isExecuting || proposedSteps.length === 0) return;
 
-    // If terminal mode is picked but there is no active terminal pane, fallback to background exec
     let effectiveExecMode = execMode;
     if (effectiveExecMode === 'terminal' && !activeSession) {
       effectiveExecMode = 'ssh';
-    }
-
-    if (effectiveExecMode === 'ssh' && !targetHostId) {
-      targetHostId = LOCAL_HOST_ID;
     }
 
     isExecuting = true;
     try {
       for (let i = 0; i < proposedSteps.length; i++) {
         if (!acceptedSteps[i]) continue;
-        const step = proposedSteps[i];
-
+        const ok = await executeStepItem(proposedSteps[i], i, effectiveExecMode);
+        if (!ok) break;
         if (effectiveExecMode === 'terminal') {
-          runs[i] = { status: 'running', output: '' };
-          injectIntoActiveSession(step.command);
-          runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
-          // Jeda agar terminal sempat memproses command sebelum command berikutnya dikirim
           await new Promise((resolve) => setTimeout(resolve, 600));
-          continue;
-        }
-
-        runs[i] = { status: 'running', output: '' };
-        try {
-          const result = await aiExecuteStep(targetHostId, step);
-          const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-          runs[i] = {
-            status: result.success ? 'ok' : 'failed',
-            output: output || t('aiChat.noOutput'),
-            exitCode: result.exit_code
-          };
-          if (!result.success) {
-            showToast(t('aiChat.stepFailed', { step: i + 1, code: result.exit_code ?? '?' }), 'error');
-            break;
-          }
-        } catch (err) {
-          runs[i] = {
-            status: 'failed',
-            output: errorText(err)
-          };
-          break;
         }
       }
     } finally {
@@ -183,34 +255,7 @@
       effectiveExecMode = 'ssh';
     }
 
-    if (effectiveExecMode === 'terminal') {
-      injectIntoActiveSession(step.command);
-      runs[i] = { status: 'ok', output: t('aiChat.sentToTerminal') };
-      return;
-    }
-
-    if (!targetHostId) {
-      targetHostId = LOCAL_HOST_ID;
-    }
-
-    runs[i] = { status: 'running', output: '' };
-    try {
-      const result = await aiExecuteStep(targetHostId, step);
-      const output = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-      runs[i] = {
-        status: result.success ? 'ok' : 'failed',
-        output: output || t('aiChat.noOutput'),
-        exitCode: result.exit_code
-      };
-      if (!result.success) {
-        showToast(t('aiChat.stepFailed', { step: i + 1, code: result.exit_code ?? '?' }), 'error');
-      }
-    } catch (err) {
-      runs[i] = {
-        status: 'failed',
-        output: errorText(err)
-      };
-    }
+    await executeStepItem(step, i, effectiveExecMode);
   }
 
   const acceptedCount = $derived(acceptedSteps.filter(Boolean).length);

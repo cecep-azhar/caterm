@@ -724,8 +724,8 @@
       class="hidden md:flex flex-col shrink-0 will-change-[width] {isCollapsed ? 'w-16' : 'w-60'}"
       aria-label={t('shell.sidebar')}
     >
-      <!-- Brand + collapse -->
-      <div class="flex items-center pt-3 pb-4 {isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-2'}">
+      <!-- Brand + collapse (Fixed h-14 container height to prevent any vertical shift) -->
+      <div class="h-14 flex items-center shrink-0 {isCollapsed ? 'justify-center px-2' : 'justify-between pl-4 pr-3'}">
         {#if isCollapsed}
           <button
             type="button"
@@ -756,10 +756,7 @@
         {/if}
       </div>
 
-      {#if !isCollapsed}
-        <p class="px-5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-500">{t('shell.workspace')}</p>
-      {/if}
-      <nav class="flex-1 min-h-0 overflow-y-auto scrollbar-none px-2 space-y-0.5 text-sm">
+      <nav class="flex-1 min-h-0 overflow-y-auto scrollbar-none px-2 space-y-0.5 text-sm pt-1">
         {#each navItems as item}
           <a
             href={item.href}

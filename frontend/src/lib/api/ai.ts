@@ -8,6 +8,9 @@ export interface AiPlanStep {
   description: string;
   is_sudo?: boolean;
   is_danger?: boolean;
+  action_type?: string;
+  action_name?: string;
+  action_params?: any;
 }
 
 export interface AiExecutionPlan {
