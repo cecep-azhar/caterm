@@ -44,6 +44,8 @@
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import { getPalette, openPalette, closePalette } from '$lib/stores/commandPalette.svelte';
   import AmbientGlow from '$lib/components/AmbientGlow.svelte';
+  import BottomNav from '$lib/components/BottomNav.svelte';
+  import AllMenusSheet from '$lib/components/AllMenusSheet.svelte';
   import { getAmbientStore } from '$lib/stores/ambient.svelte';
   import { getPro } from '$lib/stores/pro.svelte';
   import { appCommandFor, type AppCommand } from '$lib/shortcuts';
@@ -83,19 +85,19 @@
 
   const cardBorderClass = $derived.by(() => {
     if (!ambient.config.enabled || !ambient.config.cardGlowEnabled || !pro.isPro) {
-      return 'border-t border-neutral-200 dark:border-neutral-800 md:border-l';
+      return 'border border-neutral-200 dark:border-neutral-800 md:border-b-0 md:border-r-0';
     }
 
     if (ambient.config.cardGlowStyle === 'neon-border') {
-      return 'border-t border-sky-400 dark:border-sky-400 md:border-l shadow-[inset_0_0_8px_rgba(56,189,248,0.15)]';
+      return 'border border-sky-400 dark:border-sky-400 md:border-b-0 md:border-r-0 shadow-[inset_0_0_8px_rgba(56,189,248,0.15)]';
     }
 
     if (ambient.config.cardGlowStyle === 'chroma-beam') {
-      return 'border-t border-sky-400/50 dark:border-sky-400/40 md:border-l';
+      return 'border border-sky-400/50 dark:border-sky-400/40 md:border-b-0 md:border-r-0';
     }
 
     // diffused-halo
-    return 'border-t border-sky-400/30 dark:border-sky-400/25 md:border-l';
+    return 'border border-sky-400/30 dark:border-sky-400/25 md:border-b-0 md:border-r-0';
   });
 
   // Reviewed once per launch, after the previous run's panic hook (if any fired) had a chance
@@ -373,6 +375,7 @@
   let isCollapsed = $state(false);
   let prevTabsCount = $state(0);
   let mobileDrawerOpen = $state(false);
+  let allMenusSheetOpen = $state(false);
 
   // Auto-collapse the sidebar while sessions are open. (Memory is handled natively now: the
   // shell sets WebView2's memory target to Low whenever CATerm is in the background.)
@@ -502,6 +505,7 @@
   onkeydown={(e) => {
     if (e.key !== 'Escape') return;
     mobileDrawerOpen = false;
+    allMenusSheetOpen = false;
     tabMenu = null;
     closeAiChat();
   }}
@@ -803,10 +807,10 @@
     </aside>
 
     <!-- Content panel with Outer Ambient Halo Underglow -->
-    <div class="flex-1 min-w-0 flex relative overflow-visible">
+    <div class="flex-1 min-w-0 flex relative overflow-visible p-2 md:p-0">
       <AmbientGlow defaultAccent="#ef4444" />
 
-      <main class="flex-1 min-w-0 flex overflow-hidden relative z-10 bg-white dark:bg-[#161616] {cardBorderClass} md:rounded-tl-xl transition-colors duration-150">
+      <main class="flex-1 min-w-0 flex overflow-hidden relative z-10 bg-white dark:bg-[#161616] {cardBorderClass} rounded-2xl md:rounded-none md:rounded-tl-xl transition-colors duration-150">
         <!-- Session Viewport -->
         <div class="flex-1 min-w-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 absolute inset-0 invisible'}">
           <SessionViewport />
@@ -846,7 +850,7 @@
   <button
     type="button"
     onclick={() => handleAiToggle()}
-    class="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-100 border border-neutral-700/80 shadow-2xl shadow-black/60 hover:scale-105 active:scale-95 transition-all text-xs font-semibold cursor-pointer group"
+    class="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-100 border border-neutral-700/80 shadow-2xl shadow-black/60 hover:scale-105 active:scale-95 transition-all text-xs font-semibold cursor-pointer group"
     title="Hana AI (DevOps Co-Pilot)"
     aria-label="Open Hana AI"
   >
@@ -857,6 +861,10 @@
     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
   </button>
 {/if}
+
+<!-- Mobile Bottom Navigation Bar & All Menus Grid Sheet -->
+<BottomNav onOpenAll={() => (allMenusSheetOpen = true)} />
+<AllMenusSheet bind:open={allMenusSheetOpen} onClose={() => (allMenusSheetOpen = false)} />
 
 {#if tabMenu}
   {@const menuTab = sessionTabs.find((item) => item.id === tabMenu?.tabId)}
