@@ -607,6 +607,15 @@ fn connect_local() -> Result<SshSession, CatermError> {
     // as a real terminal emulator would.
     cmd.env("TERM", "xterm-256color");
 
+    // Clean up stale or non-existent SSL_CERT_FILE so CLI agents (Hermes, curl, python)
+    // spawned in local terminal don't fail certificate verification.
+    #[cfg(not(windows))]
+    if let Ok(cert) = std::env::var("SSL_CERT_FILE") {
+        if !std::path::Path::new(&cert).exists() {
+            cmd.env_remove("SSL_CERT_FILE");
+        }
+    }
+
     let child = pty_pair
         .slave
         .spawn_command(cmd)
