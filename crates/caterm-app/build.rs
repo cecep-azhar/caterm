@@ -126,6 +126,7 @@ const COMMANDS: &[&str] = &[
     "pro_login",
     "pro_commit_pending",
     "pro_sync",
+    "pro_sync_vault",
     "pro_start_trial",
     "pro_account",
     "pro_revoke_device",

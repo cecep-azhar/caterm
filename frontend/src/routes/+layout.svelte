@@ -27,6 +27,7 @@
   import { startMonitoring, stopMonitoring, monitorState } from '$lib/stores/monitorStore.svelte';
   import FeedbackModal from '$lib/components/FeedbackModal.svelte';
   import CrashReportModal from '$lib/components/CrashReportModal.svelte';
+  import AboutModal from '$lib/components/AboutModal.svelte';
   import { getPendingCrashReport, type ScrubbedCrashReport } from '$lib/api/crash';
   import ProfileMenu from '$lib/components/ProfileMenu.svelte';
   import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
@@ -82,6 +83,7 @@
   const ambient = getAmbientStore();
   const pro = getPro();
   const isDarkTheme = $derived(theme.name === 'dark');
+  let showAboutModal = $state(false);
 
   const cardBorderClass = $derived.by(() => {
     if (!ambient.config.enabled || !ambient.config.cardGlowEnabled || !pro.isPro) {
@@ -736,7 +738,7 @@
       </div>
 
       <div class="p-2 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
-        <ProfileMenu onLock={lockApp} onSignOut={signOut} onNavigate={() => (mobileDrawerOpen = false)} />
+        <ProfileMenu onLock={lockApp} onSignOut={signOut} onNavigate={() => (mobileDrawerOpen = false)} onOpenAbout={() => (showAboutModal = true)} />
       </div>
     </aside>
 
@@ -802,15 +804,15 @@
       </nav>
 
       <div class="p-2">
-        <ProfileMenu collapsed={isCollapsed} onLock={lockApp} onSignOut={signOut} />
+        <ProfileMenu collapsed={isCollapsed} onLock={lockApp} onSignOut={signOut} onOpenAbout={() => (showAboutModal = true)} />
       </div>
     </aside>
 
     <!-- Content panel with Outer Ambient Halo Underglow -->
-    <div class="flex-1 min-w-0 flex relative overflow-visible p-2 md:p-0">
+    <div class="flex-1 min-w-0 flex relative overflow-visible pl-2 pt-2 pr-0 pb-0 md:p-0">
       <AmbientGlow defaultAccent="#ef4444" />
 
-      <main class="flex-1 min-w-0 flex overflow-hidden relative z-10 bg-white dark:bg-[#161616] {cardBorderClass} rounded-2xl md:rounded-none md:rounded-tl-xl transition-colors duration-150">
+      <main class="flex-1 min-w-0 flex overflow-hidden relative z-10 bg-white dark:bg-[#161616] {cardBorderClass} rounded-none rounded-tl-2xl md:rounded-none md:rounded-tl-xl transition-colors duration-150">
         <!-- Session Viewport -->
         <div class="flex-1 min-w-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 absolute inset-0 invisible'}">
           <SessionViewport />
@@ -840,6 +842,10 @@
             onClose={() => (pendingCrashReport = null)}
           />
         {/if}
+
+        {#if showAboutModal}
+          <AboutModal onClose={() => (showAboutModal = false)} />
+        {/if}
       </main>
     </div>
   </div>
@@ -850,7 +856,7 @@
   <button
     type="button"
     onclick={() => handleAiToggle()}
-    class="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-100 border border-neutral-700/80 shadow-2xl shadow-black/60 hover:scale-105 active:scale-95 transition-all text-xs font-semibold cursor-pointer group"
+    class="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] right-3.5 md:bottom-5 md:right-5 z-40 flex items-center gap-2 px-3.5 py-2 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-neutral-100 border border-neutral-700/80 shadow-2xl shadow-black/60 hover:scale-105 active:scale-95 transition-all text-xs font-semibold cursor-pointer group"
     title="Hana AI (DevOps Co-Pilot)"
     aria-label="Open Hana AI"
   >

@@ -19,7 +19,7 @@
   import { t, intlLocale } from '$lib/i18n/index.svelte';
   import ProLoginForm from '$lib/components/ProLoginForm.svelte';
   import { getPro, refreshProStatus, checkProServer, syncPro, setProStatus } from '$lib/stores/pro.svelte';
-  import { proStartTrial, proAccount, proRevokeDevice, proLogout, type ProDevice, type DeviceLimit, type SyncOutcome } from '$lib/api/pro';
+  import { proStartTrial, proAccount, proRevokeDevice, proLogout, proSyncVault, type ProDevice, type DeviceLimit, type SyncOutcome } from '$lib/api/pro';
   import { proErrorMessage } from '$lib/pro/errors';
   import ProTeamPanel from '$lib/components/ProTeamPanel.svelte';
   import { SHORTCUT_GROUPS } from '$lib/shortcuts';
@@ -97,7 +97,20 @@
   async function runProSync() {
     proBusy = true;
     try {
-      handleOutcome(await syncPro(), t('pro.account.synced'));
+      const outcome = await syncPro();
+      let vaultSynced = false;
+      try {
+        vaultSynced = await proSyncVault();
+      } catch (e) {
+        console.warn('Vault sync skipped or failed:', e);
+      }
+      if (outcome?.deviceLimit) {
+        deviceLimit = outcome.deviceLimit;
+      } else if (vaultSynced) {
+        showToast('Sinkronisasi Cloud Berhasil! Host & pengaturan tersinkronisasi aman.', 'success');
+      } else {
+        handleOutcome(outcome, t('pro.account.synced'));
+      }
     } catch (err) {
       showToast(proErrorMessage(err), 'error');
     } finally {
@@ -430,11 +443,15 @@
   {#if activeTab === 'profile'}
     <div class="{CARD} space-y-6">
       <div class="flex items-center gap-4">
-        <ProfileAvatar avatar={profileAvatar} name={profileName} size={56} pro={profile.plan === 'pro'} />
+        <ProfileAvatar avatar={profileAvatar} name={profileName} size={56} pro={pro.isPro || profile.plan === 'pro'} />
         <div class="min-w-0">
           <div class="flex items-center gap-2">
             <h2 class="text-lg font-semibold text-neutral-900 dark:text-white truncate">{profileName.trim() || profile.name}</h2>
-            <span class="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 uppercase">{profile.plan === 'pro' ? t('profileMenu.planPro') : t('profileMenu.planFree')}</span>
+            {#if pro.isPro || profile.plan === 'pro'}
+              <span class="text-[10px] font-bold tracking-wider px-1.5 py-0.5 rounded border border-amber-400/50 dark:border-amber-400/40 bg-amber-400/10 text-amber-500 dark:text-amber-400 uppercase shadow-xs">PRO</span>
+            {:else}
+              <span class="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded border border-neutral-300 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 uppercase">{t('profileMenu.planFree')}</span>
+            {/if}
           </div>
           <p class="{MUTED} text-sm">{t('settings.profile.localNote')}</p>
         </div>

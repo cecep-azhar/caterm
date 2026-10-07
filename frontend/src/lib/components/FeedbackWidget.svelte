@@ -52,14 +52,19 @@
       errorMessage = 'Please select a rating between 1 and 5 stars.';
       return;
     }
+    const trimmed = content.trim();
+    if (trimmed.length > 0 && trimmed.length < 5) {
+      errorMessage = 'Minimal 5 karakter';
+      return;
+    }
 
     isSubmitting = true;
     errorMessage = '';
 
     try {
       // Backend enforces non-empty content
-      const effectiveContent = content.trim().length > 0
-        ? content.trim()
+      const effectiveContent = trimmed.length > 0
+        ? trimmed
         : `${rating} stars (no notes)`;
 
       await submitFeedback(rating, effectiveContent, name, profession);
@@ -233,7 +238,7 @@
           class="w-full px-3 py-2 bg-neutral-50 dark:bg-neutral-950 border border-neutral-300 dark:border-neutral-800 rounded-md text-sm text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:border-sky-500 resize-y"
         ></textarea>
         <div class="flex justify-between items-center text-xs text-neutral-500 dark:text-neutral-400">
-          <span>Maximum 2000 characters</span>
+          <span>Minimal 5 karakter · Maximum 2000 characters</span>
           <span>{content.length} / 2000</span>
         </div>
       </div>

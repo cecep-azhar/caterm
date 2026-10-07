@@ -419,7 +419,8 @@ pub async fn save_snippet(
 }
 
 #[tauri::command]
-pub async fn list_totp_entries() -> Result<Vec<caterm_core::totp_store::TotpEntryRecord>, CatermError> {
+pub async fn list_totp_entries()
+-> Result<Vec<caterm_core::totp_store::TotpEntryRecord>, CatermError> {
     run_blocking(caterm_core::totp_store::list_totp_entries).await
 }
 
@@ -443,8 +444,8 @@ pub async fn generate_current_totp(
 }
 
 #[tauri::command]
-pub async fn list_scheduled_tasks(
-) -> Result<Vec<caterm_core::scheduler::task::ScheduledTaskRecord>, CatermError> {
+pub async fn list_scheduled_tasks()
+-> Result<Vec<caterm_core::scheduler::task::ScheduledTaskRecord>, CatermError> {
     run_blocking(caterm_core::scheduler::store::list_tasks).await
 }
 
@@ -800,6 +801,11 @@ pub async fn pro_sync() -> Result<caterm_core::pro::SyncOutcome, CatermError> {
 }
 
 #[tauri::command]
+pub async fn pro_sync_vault() -> Result<bool, CatermError> {
+    run_blocking(caterm_core::pro::sync_vault).await
+}
+
+#[tauri::command]
 pub async fn pro_start_trial() -> Result<caterm_core::pro::SyncOutcome, CatermError> {
     run_blocking(caterm_core::pro::start_trial).await
 }
@@ -872,5 +878,8 @@ pub async fn submit_feedback(
     name: Option<String>,
     profession: Option<String>,
 ) -> Result<(), CatermError> {
-    run_blocking(move || feedback::submit_feedback(rating, &content, name.as_deref(), profession.as_deref())).await
+    run_blocking(move || {
+        feedback::submit_feedback(rating, &content, name.as_deref(), profession.as_deref())
+    })
+    .await
 }

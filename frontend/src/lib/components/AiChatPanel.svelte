@@ -343,9 +343,9 @@
 {:else}
   <!-- Floating Smart Card Overlay (Non-Destructive) in bottom right corner -->
   <aside
-    class="fixed z-50 flex flex-col bg-neutral-900/95 backdrop-blur-xl border border-neutral-700/80 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden transition-all duration-200 {isFullHeight
-      ? 'top-[calc(3.5rem+env(safe-area-inset-top,0px))] bottom-3 right-3 w-[440px]'
-      : 'bottom-5 right-5 w-[420px] h-[560px] max-h-[calc(100vh-4.5rem-env(safe-area-inset-top,0px))]'}"
+    class="fixed z-50 flex flex-col bg-neutral-900/95 backdrop-blur-xl border border-neutral-700/80 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden transition-all duration-200 inset-x-2 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] top-[calc(3.5rem+env(safe-area-inset-top,0px))] w-auto max-w-none md:inset-x-auto {isFullHeight
+      ? 'md:top-[calc(3.5rem+env(safe-area-inset-top,0px))] md:bottom-3 md:right-3 md:w-[440px]'
+      : 'md:top-auto md:bottom-5 md:right-5 md:w-[420px] md:h-[560px] md:max-h-[calc(100vh-4.5rem-env(safe-area-inset-top,0px))]'}"
     aria-label={t('aiChat.title')}
   >
     <!-- Header -->

@@ -126,9 +126,13 @@ pub(crate) fn save_group_in(
     };
     let id = id.unwrap_or_else(generate_id);
 
-    let categories = input.categories.unwrap_or_else(|| vec!["hosts".to_string()]);
+    let categories = input
+        .categories
+        .unwrap_or_else(|| vec!["hosts".to_string()]);
     let categories_json = serde_json::to_string(&categories).map_err(|e| {
-        CatermError::Db(DbError::Generic(format!("gagal serialisasi categories: {e}")))
+        CatermError::Db(DbError::Generic(format!(
+            "gagal serialisasi categories: {e}"
+        )))
     })?;
 
     let host_ids_json = serde_json::to_string(&input.host_ids).map_err(|e| {

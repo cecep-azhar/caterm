@@ -796,6 +796,8 @@ const en = {
     sending: 'Sending...',
     send: 'Send Feedback',
     errRating: 'Please select a rating between 1 and 5 stars.',
+    minChars: 'Minimum 5 characters',
+    errContentLength: 'Feedback must be at least 5 characters.',
     thanks: 'Thank you! Feedback submitted successfully.'
   },
   crash: {
@@ -1260,7 +1262,10 @@ const en = {
     setGroup: 'Set Group',
     removeGroup: 'Remove from Group',
     closeGroup: 'Close Group "{{group}}"',
-    closeSession: 'Close session'
+    closeSession: 'Close session',
+    session: 'Session',
+    allMenus: 'All',
+    bottomNav: 'Bottom Navigation'
   },
   sftp: {
     title: 'Files (SFTP)',

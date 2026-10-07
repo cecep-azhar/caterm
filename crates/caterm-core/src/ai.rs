@@ -26,7 +26,11 @@ pub struct AiPlanStep {
     pub action_type: Option<String>,
     #[serde(default, alias = "actionName", skip_serializing_if = "Option::is_none")]
     pub action_name: Option<String>,
-    #[serde(default, alias = "actionParams", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        alias = "actionParams",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub action_params: Option<serde_json::Value>,
 }
 
@@ -428,13 +432,7 @@ fn parse_plan_steps(parsed: &serde_json::Value) -> Vec<AiPlanStep> {
             .or_else(|| item.get("action_params"))
             .cloned();
 
-        let mut plan_step = AiPlanStep::new(
-            step_num,
-            title,
-            command,
-            description,
-            is_dangerous,
-        );
+        let mut plan_step = AiPlanStep::new(step_num, title, command, description, is_dangerous);
         if action_type.is_some() {
             plan_step.action_type = action_type;
         }
@@ -1063,7 +1061,10 @@ fn parse_chat_reply(content: &str) -> AiChatReply {
         .unwrap_or_else(|| content.trim())
         .to_string();
 
-    let ready = parsed.get("ready").and_then(|r| r.as_bool()).unwrap_or(false);
+    let ready = parsed
+        .get("ready")
+        .and_then(|r| r.as_bool())
+        .unwrap_or(false);
     let steps = if ready {
         parse_plan_steps(&parsed)
     } else {

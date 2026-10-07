@@ -797,6 +797,8 @@ const id: Dictionary = {
     sending: 'Mengirim...',
     send: 'Kirim Masukan',
     errRating: 'Pilih penilaian antara 1 dan 5 bintang.',
+    minChars: 'Minimal 5 karakter',
+    errContentLength: 'Masukan harus berisi minimal 5 karakter.',
     thanks: 'Terima kasih! Masukan berhasil dikirim.'
   },
   crash: {
@@ -1261,7 +1263,10 @@ const id: Dictionary = {
     setGroup: 'Atur Grup',
     removeGroup: 'Hapus dari Grup',
     closeGroup: 'Tutup Grup "{{group}}"',
-    closeSession: 'Tutup sesi'
+    closeSession: 'Tutup sesi',
+    session: 'Sesi',
+    allMenus: 'Semua',
+    bottomNav: 'Navigasi Bawah'
   },
   sftp: {
     title: 'Berkas (SFTP)',

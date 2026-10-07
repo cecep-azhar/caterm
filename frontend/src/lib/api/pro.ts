@@ -134,6 +134,7 @@ export const proForgotPassword = (email: string, locale: string) => invoke<void>
 export const proLogin = (email: string, password: string) => invoke<ProAccount>('pro_login', { email, password });
 export const proCommitPending = () => invoke<boolean>('pro_commit_pending');
 export const proSync = () => invoke<SyncOutcome>('pro_sync');
+export const proSyncVault = () => invoke<boolean>('pro_sync_vault');
 export const proStartTrial = () => invoke<SyncOutcome>('pro_start_trial');
 export const proAccount = () => invoke<AccountDetails>('pro_account');
 export const proRevokeDevice = (deviceId: string) => invoke<void>('pro_revoke_device', { deviceId });

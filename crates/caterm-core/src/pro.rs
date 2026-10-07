@@ -971,6 +971,102 @@ pub fn team_leave() -> Result<ProTeamView, CatermError> {
     team_call("POST", "/team/leave", None)
 }
 
+// ---- Cloud Vault Sync ------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudVault {
+    pub encrypted_blob: String,
+    pub version: i64,
+    pub checksum: String,
+    pub updated_at: i64,
+}
+
+pub fn push_cloud_vault(encrypted_blob: &str, checksum: &str) -> Result<(), CatermError> {
+    let conn = open_db()?;
+    let body = json!({
+        "encrypted_blob": encrypted_blob,
+        "checksum": checksum,
+        "version": 1,
+    });
+    let (status, value) = authed(&conn, "PUT", "/vault", Some(&body))?;
+    if !(200..300).contains(&status) {
+        return Err(api_error(status, &value));
+    }
+    Ok(())
+}
+
+pub fn pull_cloud_vault() -> Result<Option<CloudVault>, CatermError> {
+    let conn = open_db()?;
+    let (status, value) = authed(&conn, "GET", "/vault", None)?;
+    if status == 404 {
+        return Ok(None);
+    }
+    if !(200..300).contains(&status) {
+        return Err(api_error(status, &value));
+    }
+    let vault: CloudVault = serde_json::from_value(value).map_err(|_| pro_err("BAD_RESPONSE"))?;
+    Ok(Some(vault))
+}
+
+/// Integrates local and cloud zero-knowledge vault sync.
+pub fn sync_vault() -> Result<bool, CatermError> {
+    let st = status()?;
+    if !st.signed_in {
+        return Ok(false);
+    }
+
+    let has_cloud_sync = match &st.entitlement {
+        Entitlement::Valid { features, .. } => features.iter().any(|f| f == "cloud_sync"),
+        _ => false,
+    };
+    if !has_cloud_sync {
+        return Ok(false);
+    }
+
+    let dek = crate::vault::get_active_dek()?;
+    let local_blob = crate::backup::export_encrypted_backup_with_dek(&dek)?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(local_blob.as_bytes());
+    let local_checksum = hex::encode(hasher.finalize());
+
+    let remote = pull_cloud_vault()?;
+
+    match remote {
+        Some(cloud) => {
+            if cloud.checksum == local_checksum {
+                // In sync
+                Ok(true)
+            } else {
+                // Cloud exists with different content: import cloud backup into local
+                if let Ok(count) = crate::backup::import_encrypted_backup_with_dek(&cloud.encrypted_blob, &dek) {
+                    if count > 0 {
+                        // Re-export merged local state and upload if needed
+                        if let Ok(merged_blob) = crate::backup::export_encrypted_backup_with_dek(&dek) {
+                            let mut merged_hasher = Sha256::new();
+                            merged_hasher.update(merged_blob.as_bytes());
+                            let merged_sum = hex::encode(merged_hasher.finalize());
+                            if merged_sum != cloud.checksum {
+                                push_cloud_vault(&merged_blob, &merged_sum)?;
+                            }
+                        }
+                    }
+                    Ok(true)
+                } else {
+                    // Fallback: upload local blob to cloud if cloud blob couldn't be decrypted with this DEK
+                    push_cloud_vault(&local_blob, &local_checksum)?;
+                    Ok(true)
+                }
+            }
+        }
+        None => {
+            // Cloud is empty: upload local blob
+            push_cloud_vault(&local_blob, &local_checksum)?;
+            Ok(true)
+        }
+    }
+}
+
 /// Signs out on this device: revokes the refresh token on the server (best effort — being
 /// offline must not keep someone signed in) and forgets the local session and licence.
 pub fn logout() -> Result<(), CatermError> {

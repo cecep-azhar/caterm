@@ -63,6 +63,89 @@ pub fn export_encrypted_backup(passphrase: &str) -> Result<String, CatermError> 
     Ok(encrypted_b64)
 }
 
+pub fn export_encrypted_backup_with_dek(dek: &[u8; 32]) -> Result<String, CatermError> {
+    let hosts = store::list_hosts()?;
+    let groups = groups::list_groups()?;
+    let snippets = snippets::list_snippets()?;
+    let keys = keys::list_keys()?;
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+
+    let payload = VaultBackupPayload {
+        version: "2.0.10".to_string(),
+        timestamp: now,
+        hosts,
+        groups,
+        snippets,
+        keys,
+    };
+
+    let json_bytes = serde_json::to_vec(&payload)
+        .map_err(|e| CatermError::Vault(VaultError::Generic(e.to_string())))?;
+
+    crate::secret::encrypt_bytes(dek, &json_bytes)
+}
+
+pub fn import_encrypted_backup_with_dek(
+    encrypted_b64: &str,
+    dek: &[u8; 32],
+) -> Result<usize, CatermError> {
+    let decrypted_bytes = crate::secret::decrypt_bytes(dek, encrypted_b64)?;
+    let payload: VaultBackupPayload = serde_json::from_slice(&decrypted_bytes).map_err(|e| {
+        CatermError::Vault(VaultError::Generic(format!("Corrupt backup file: {}", e)))
+    })?;
+
+    let mut imported_count = 0;
+
+    for host in payload.hosts {
+        store::save_host(HostInput {
+            id: Some(host.id),
+            label: host.label,
+            address: host.address,
+            port: host.port,
+            username: host.username,
+            auth_method: host.auth_method,
+            tags: host.tags,
+            os: host.os,
+            protocol: Some(host.protocol),
+            secret: None,
+        })?;
+        imported_count += 1;
+    }
+
+    for group in payload.groups {
+        groups::save_group(GroupInput {
+            id: Some(group.id),
+            name: group.name,
+            color: group.color,
+            host_ids: group.host_ids,
+            categories: Some(group.categories),
+        })?;
+        imported_count += 1;
+    }
+
+    for snippet in payload.snippets {
+        snippets::save_snippet(SnippetInput {
+            id: Some(snippet.id),
+            label: snippet.label,
+            description: snippet.description,
+            command: snippet.command,
+            tags: snippet.tags,
+        })?;
+        imported_count += 1;
+    }
+
+    for key in payload.keys {
+        keys::import_key(&key.name, &key.public_key, None)?;
+        imported_count += 1;
+    }
+
+    Ok(imported_count)
+}
+
 pub fn import_encrypted_backup(
     encrypted_b64: &str,
     passphrase: &str,

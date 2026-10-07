@@ -106,6 +106,7 @@
     "allow-pro-login",
     "allow-pro-commit-pending",
     "allow-pro-sync",
+    "allow-pro-sync-vault",
     "allow-pro-start-trial",
     "allow-pro-account",
     "allow-pro-revoke-device",

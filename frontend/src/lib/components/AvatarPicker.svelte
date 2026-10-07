@@ -1,10 +1,13 @@
 <script lang="ts">
   import { t } from '$lib/i18n/index.svelte';
   import ProfileAvatar, { AVATARS } from './ProfileAvatar.svelte';
+  import { getPro } from '$lib/stores/pro.svelte';
+  import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { onMount } from 'svelte';
 
   let { value = $bindable('rocket'), size = 48, centered = true }: { value: string; size?: number; centered?: boolean } = $props();
 
+  const pro = getPro();
   let isOpen = $state(false);
   let containerRef = $state<HTMLDivElement | null>(null);
 
@@ -13,8 +16,12 @@
     isOpen = !isOpen;
   }
 
-  function selectAvatar(id: string, e: MouseEvent) {
+  function selectAvatar(id: string, isProAvatar: boolean, e: MouseEvent) {
     e.stopPropagation();
+    if (isProAvatar && !pro.isPro) {
+      showToast('Avatar ini eksklusif untuk member Pro', 'warning');
+      return;
+    }
     value = id;
     isOpen = false;
   }
@@ -86,9 +93,9 @@
             role="radio"
             aria-checked={value === option.id}
             aria-label={option.label}
-            title={option.pro ? `${option.label} (Pro Exclusive)` : option.label}
-            onclick={(e) => selectAvatar(option.id, e)}
-            class="relative justify-self-center flex items-center justify-center rounded-full p-1 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 transition-all cursor-pointer {value === option.id ? 'ring-sky-500 scale-110 shadow-sm' : 'ring-transparent hover:ring-neutral-300 dark:hover:ring-neutral-700 hover:scale-105'}"
+            title={option.pro ? (pro.isPro ? `${option.label} (Pro Exclusive)` : `${option.label} - Avatar ini eksklusif untuk member Pro`) : option.label}
+            onclick={(e) => selectAvatar(option.id, !!option.pro, e)}
+            class="relative justify-self-center flex items-center justify-center rounded-full p-1 ring-2 ring-offset-2 ring-offset-white dark:ring-offset-neutral-900 transition-all cursor-pointer {option.pro && !pro.isPro ? 'opacity-60 hover:opacity-100' : ''} {value === option.id ? 'ring-sky-500 scale-110 shadow-sm' : 'ring-transparent hover:ring-neutral-300 dark:hover:ring-neutral-700 hover:scale-105'}"
           >
             <ProfileAvatar avatar={option.id} size={32} />
             {#if option.pro}

@@ -56,6 +56,18 @@ pub fn submit_feedback(
     let status = resp.status().as_u16();
     if !(200..300).contains(&status) {
         let body = resp.body_mut().read_to_string().unwrap_or_default();
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
+            if let Some(msg) = val
+                .get("error")
+                .and_then(|e| e.get("message"))
+                .and_then(|m| m.as_str())
+            {
+                return Err(CatermError::Io(IoError::Generic(msg.to_string())));
+            }
+            if let Some(msg) = val.get("message").and_then(|m| m.as_str()) {
+                return Err(CatermError::Io(IoError::Generic(msg.to_string())));
+            }
+        }
         return Err(CatermError::Io(IoError::Generic(format!(
             "Feedback proxy rejected request (HTTP {status}): {body}"
         ))));

@@ -35,23 +35,83 @@ fn resolve_path(p: &str) -> PathBuf {
 }
 
 fn dirs_home() -> Option<PathBuf> {
-    std::env::var_os("HOME")
+    let p = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)
+        .map(PathBuf::from);
+
+    // On Android, HOME is often unset or points to root "/". Fall back to safe user locations.
+    match p {
+        Some(ref dir) if dir.as_os_str().is_empty() || dir == Path::new("/") => {
+            let android_candidates = [
+                "/sdcard/Download",
+                "/sdcard",
+                "/storage/emulated/0/Download",
+                "/storage/emulated/0",
+            ];
+            for cand in android_candidates {
+                let pb = PathBuf::from(cand);
+                if pb.exists() {
+                    return Some(pb);
+                }
+            }
+            std::env::current_dir()
+                .ok()
+                .or_else(|| Some(PathBuf::from(".")))
+        }
+        Some(dir) => Some(dir),
+        None => {
+            let android_candidates = [
+                "/sdcard/Download",
+                "/sdcard",
+                "/storage/emulated/0/Download",
+                "/storage/emulated/0",
+            ];
+            for cand in android_candidates {
+                let pb = PathBuf::from(cand);
+                if pb.exists() {
+                    return Some(pb);
+                }
+            }
+            std::env::current_dir()
+                .ok()
+                .or_else(|| Some(PathBuf::from(".")))
+        }
+    }
 }
 
 pub fn local_list_dir(path: &str) -> Result<Vec<LocalFileEntry>, CatermError> {
     let resolved = resolve_path(path);
-    let canonical = resolved
-        .canonicalize()
-        .map_err(|e| io_err(format!("Cannot resolve path '{}': {e}", resolved.display())))?;
+    let canonical = match resolved.canonicalize() {
+        Ok(c) => c,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                return Err(io_err(format!(
+                    "Akses ditolak ke direktori '{}' (Permission Denied). Periksa izin penyimpanan perangkat.",
+                    resolved.display()
+                )));
+            }
+            return Err(io_err(format!(
+                "Cannot resolve path '{}': {e}",
+                resolved.display()
+            )));
+        }
+    };
 
-    let read_dir = fs::read_dir(&canonical).map_err(|e| {
-        io_err(format!(
-            "Failed to read directory '{}': {e}",
-            canonical.display()
-        ))
-    })?;
+    let read_dir = match fs::read_dir(&canonical) {
+        Ok(rd) => rd,
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::PermissionDenied {
+                return Err(io_err(format!(
+                    "Akses ditolak saat membaca isi direktori '{}' (Permission Denied).",
+                    canonical.display()
+                )));
+            }
+            return Err(io_err(format!(
+                "Failed to read directory '{}': {e}",
+                canonical.display()
+            )));
+        }
+    };
 
     let mut entries = Vec::new();
     for entry in read_dir.flatten() {

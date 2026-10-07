@@ -145,9 +145,13 @@ pub fn run_with_start(start: std::time::Instant) {
                         .find(|p| std::path::Path::new(p).exists());
 
                         if let Some(valid) = valid_ca {
-                            unsafe { std::env::set_var("SSL_CERT_FILE", valid); }
+                            unsafe {
+                                std::env::set_var("SSL_CERT_FILE", valid);
+                            }
                         } else {
-                            unsafe { std::env::remove_var("SSL_CERT_FILE"); }
+                            unsafe {
+                                std::env::remove_var("SSL_CERT_FILE");
+                            }
                         }
                     }
                 }
@@ -275,6 +279,7 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::pro_login,
             commands::pro_commit_pending,
             commands::pro_sync,
+            commands::pro_sync_vault,
             commands::pro_start_trial,
             commands::pro_account,
             commands::pro_revoke_device,

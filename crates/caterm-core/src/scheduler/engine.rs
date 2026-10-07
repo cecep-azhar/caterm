@@ -18,37 +18,52 @@ pub fn calculate_next_run(
     let expr = schedule_expr.trim();
 
     if expr.is_empty() {
-        return Err(crate::error::ValidationError::Generic("Schedule expression cannot be empty".to_string()).into());
+        return Err(crate::error::ValidationError::Generic(
+            "Schedule expression cannot be empty".to_string(),
+        )
+        .into());
     }
 
     // 1. Interval: "every <N><unit>"
     if let Some(rest) = expr.strip_prefix("every ") {
         let trimmed = rest.trim();
         if let Some(num_str) = trimmed.strip_suffix('h') {
-            let hours: i64 = num_str
-                .trim()
-                .parse()
-                .map_err(|_| crate::error::ValidationError::Generic(format!("Invalid hours in schedule: '{expr}'")))?;
+            let hours: i64 = num_str.trim().parse().map_err(|_| {
+                crate::error::ValidationError::Generic(format!(
+                    "Invalid hours in schedule: '{expr}'"
+                ))
+            })?;
             if hours <= 0 {
-                return Err(crate::error::ValidationError::Generic("Interval hours must be > 0".to_string()).into());
+                return Err(crate::error::ValidationError::Generic(
+                    "Interval hours must be > 0".to_string(),
+                )
+                .into());
             }
             return Ok(now + Duration::hours(hours));
         } else if let Some(num_str) = trimmed.strip_suffix('m') {
-            let minutes: i64 = num_str
-                .trim()
-                .parse()
-                .map_err(|_| crate::error::ValidationError::Generic(format!("Invalid minutes in schedule: '{expr}'")))?;
+            let minutes: i64 = num_str.trim().parse().map_err(|_| {
+                crate::error::ValidationError::Generic(format!(
+                    "Invalid minutes in schedule: '{expr}'"
+                ))
+            })?;
             if minutes <= 0 {
-                return Err(crate::error::ValidationError::Generic("Interval minutes must be > 0".to_string()).into());
+                return Err(crate::error::ValidationError::Generic(
+                    "Interval minutes must be > 0".to_string(),
+                )
+                .into());
             }
             return Ok(now + Duration::minutes(minutes));
         } else if let Some(num_str) = trimmed.strip_suffix('d') {
-            let days: i64 = num_str
-                .trim()
-                .parse()
-                .map_err(|_| crate::error::ValidationError::Generic(format!("Invalid days in schedule: '{expr}'")))?;
+            let days: i64 = num_str.trim().parse().map_err(|_| {
+                crate::error::ValidationError::Generic(format!(
+                    "Invalid days in schedule: '{expr}'"
+                ))
+            })?;
             if days <= 0 {
-                return Err(crate::error::ValidationError::Generic("Interval days must be > 0".to_string()).into());
+                return Err(crate::error::ValidationError::Generic(
+                    "Interval days must be > 0".to_string(),
+                )
+                .into());
             }
             return Ok(now + Duration::days(days));
         }
@@ -56,8 +71,11 @@ pub fn calculate_next_run(
 
     // 2. Specific daily time: "at HH:MM"
     if let Some(time_str) = expr.strip_prefix("at ") {
-        let time = NaiveTime::from_str(time_str.trim())
-            .map_err(|_| crate::error::ValidationError::Generic(format!("Invalid time format in schedule (expected HH:MM): '{expr}'")))?;
+        let time = NaiveTime::from_str(time_str.trim()).map_err(|_| {
+            crate::error::ValidationError::Generic(format!(
+                "Invalid time format in schedule (expected HH:MM): '{expr}'"
+            ))
+        })?;
 
         let local_now = Local::now();
         let mut target_local_date = local_now.date_naive();
@@ -65,7 +83,11 @@ pub fn calculate_next_run(
         let target_local_dt = Local
             .from_local_datetime(&target_naive_dt)
             .single()
-            .ok_or_else(|| crate::error::ValidationError::Generic("Ambiguous or invalid local time".to_string()))?;
+            .ok_or_else(|| {
+                crate::error::ValidationError::Generic(
+                    "Ambiguous or invalid local time".to_string(),
+                )
+            })?;
 
         let target_utc = target_local_dt.with_timezone(&Utc);
         if target_utc <= now {
@@ -75,7 +97,11 @@ pub fn calculate_next_run(
             let next_local = Local
                 .from_local_datetime(&next_dt)
                 .single()
-                .ok_or_else(|| crate::error::ValidationError::Generic("Ambiguous or invalid local time".to_string()))?;
+                .ok_or_else(|| {
+                    crate::error::ValidationError::Generic(
+                        "Ambiguous or invalid local time".to_string(),
+                    )
+                })?;
             return Ok(next_local.with_timezone(&Utc));
         } else {
             return Ok(target_utc);
@@ -88,7 +114,10 @@ pub fn calculate_next_run(
         return Ok(next);
     }
 
-    Err(crate::error::ValidationError::Generic(format!("Unsupported schedule expression format: '{expr}'")).into())
+    Err(crate::error::ValidationError::Generic(format!(
+        "Unsupported schedule expression format: '{expr}'"
+    ))
+    .into())
 }
 
 /// A lightweight 5-part cron evaluator for standard expressions like "0 2 * * *"

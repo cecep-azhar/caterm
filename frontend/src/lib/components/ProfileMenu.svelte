@@ -2,7 +2,6 @@
   import { t } from '$lib/i18n/index.svelte';
   import { goto } from '$app/navigation';
   import ProfileAvatar from './ProfileAvatar.svelte';
-  import AboutModal from './AboutModal.svelte';
   import { getProfile } from '$lib/stores/profile.svelte';
   import { getFeedbackPromptState } from '$lib/stores/feedbackStore.svelte';
 
@@ -10,20 +9,21 @@
     collapsed = false,
     onLock,
     onSignOut,
-    onNavigate
+    onNavigate,
+    onOpenAbout
   }: {
     collapsed?: boolean;
     onLock: () => void;
     onSignOut: () => void;
     /** Called after any menu action, e.g. so the mobile drawer can close itself. */
     onNavigate?: () => void;
+    onOpenAbout?: () => void;
   } = $props();
 
   const profile = getProfile();
   const feedbackPrompt = getFeedbackPromptState();
 
   let open = $state(false);
-  let showAbout = $state(false);
   let root: HTMLDivElement | undefined = $state();
 
   function run(action: () => void) {
@@ -75,7 +75,7 @@
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 2.8l7.8 4.6v9.2L12 21.2l-7.8-4.6V7.4z" /><circle cx="12" cy="12" r="3" stroke-width="1.8" /></svg>
           {t('nav.settings')}
         </button>
-        <button type="button" role="menuitem" onclick={() => run(() => (showAbout = true))} class={itemClass}>
+        <button type="button" role="menuitem" onclick={() => run(() => onOpenAbout?.())} class={itemClass}>
           <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="1.8" /><path stroke-linecap="round" stroke-width="1.8" d="M12 11v5M12 8h.01" /></svg>
           {t('profileMenu.about')}
         </button>
@@ -137,7 +137,3 @@
     {/if}
   </button>
 </div>
-
-{#if showAbout}
-  <AboutModal onClose={() => (showAbout = false)} />
-{/if}

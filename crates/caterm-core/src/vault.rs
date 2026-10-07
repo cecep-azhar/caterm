@@ -239,7 +239,9 @@ pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
 
             if matched_alt {
                 // Re-key canary with the password user just entered so it works seamlessly
-                if let Ok(encrypted_canary) = crate::secret::encrypt_bytes(&derived_key, CANARY_PLAINTEXT) {
+                if let Ok(encrypted_canary) =
+                    crate::secret::encrypt_bytes(&derived_key, CANARY_PLAINTEXT)
+                {
                     let _ = std::fs::write(&canary_path, encrypted_canary);
                 }
             } else {
