@@ -43,6 +43,7 @@
   import { navItems as getNavItems, settingsNavItem } from '$lib/navItems';
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import { getPalette, openPalette, closePalette } from '$lib/stores/commandPalette.svelte';
+  import AmbientGlow from '$lib/components/AmbientGlow.svelte';
   import { appCommandFor, type AppCommand } from '$lib/shortcuts';
 
   // Seconds since the last monitor poll; the label is derived so it re-renders the moment the
@@ -780,39 +781,42 @@
       </div>
     </aside>
 
-    <!-- Content panel. The AI panel is a floating smart card rather than a docked column,
-         so it overlays cleanly without squeezing terminal or editor workspaces. -->
-    <main class="flex-1 min-w-0 flex overflow-hidden relative bg-white dark:bg-[#161616] border-t border-neutral-200 dark:border-neutral-800 md:border-l md:rounded-tl-xl transition-colors duration-150">
-      <!-- Session Viewport -->
-      <div class="flex-1 min-w-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 absolute inset-0 invisible'}">
-        <SessionViewport />
-      </div>
+    <!-- Content panel with Outer Ambient Halo Underglow -->
+    <div class="flex-1 min-w-0 flex relative overflow-hidden">
+      <AmbientGlow defaultAccent="#ef4444" />
 
-      <!-- Other pages routed via SvelteKit children -->
-      <div class="flex-1 min-w-0 overflow-auto text-neutral-900 dark:text-neutral-100 relative px-4 py-6 md:px-10 md:py-10 [@media(max-height:500px)]:py-4 bg-[linear-gradient(to_right,#0000000a_1px,transparent_1px),linear-gradient(to_bottom,#0000000a_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:56px_56px] {page.url.pathname.startsWith('/session') ? 'hidden' : 'z-20'}">
-        {@render children()}
-      </div>
+      <main class="flex-1 min-w-0 flex overflow-hidden relative z-10 bg-white dark:bg-[#161616] border-t border-neutral-200 dark:border-neutral-800 md:border-l md:rounded-tl-xl transition-colors duration-150">
+        <!-- Session Viewport -->
+        <div class="flex-1 min-w-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 absolute inset-0 invisible'}">
+          <SessionViewport />
+        </div>
 
-      {#if aiChat.open}
-        <AiChatPanel onClose={closeAiChat} />
-      {/if}
+        <!-- Other pages routed via SvelteKit children -->
+        <div class="flex-1 min-w-0 overflow-auto text-neutral-900 dark:text-neutral-100 relative px-4 py-6 md:px-10 md:py-10 [@media(max-height:500px)]:py-4 bg-[linear-gradient(to_right,#0000000a_1px,transparent_1px),linear-gradient(to_bottom,#0000000a_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:56px_56px] {page.url.pathname.startsWith('/session') ? 'hidden' : 'z-20'}">
+          {@render children()}
+        </div>
 
-      {#if feedbackPrompt.show}
-        <!-- Feedback popup modal: auto-prompted after the 3rd closed session, or opened from the
-             profile menu (Report bug). Modal popup like AboutModal. -->
-        <FeedbackModal
-          onClose={() => feedbackPrompt.close()}
-          onSubmitted={() => feedbackPrompt.markSubmitted()}
-        />
-      {/if}
+        {#if aiChat.open}
+          <AiChatPanel onClose={closeAiChat} />
+        {/if}
 
-      {#if pendingCrashReport}
-        <CrashReportModal
-          report={pendingCrashReport}
-          onClose={() => (pendingCrashReport = null)}
-        />
-      {/if}
-    </main>
+        {#if feedbackPrompt.show}
+          <!-- Feedback popup modal: auto-prompted after the 3rd closed session, or opened from the
+               profile menu (Report bug). Modal popup like AboutModal. -->
+          <FeedbackModal
+            onClose={() => feedbackPrompt.close()}
+            onSubmitted={() => feedbackPrompt.markSubmitted()}
+          />
+        {/if}
+
+        {#if pendingCrashReport}
+          <CrashReportModal
+            report={pendingCrashReport}
+            onClose={() => (pendingCrashReport = null)}
+          />
+        {/if}
+      </main>
+    </div>
   </div>
 </div>
 
