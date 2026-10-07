@@ -344,8 +344,8 @@
   <!-- Floating Smart Card Overlay (Non-Destructive) in bottom right corner -->
   <aside
     class="fixed z-50 flex flex-col bg-neutral-900/95 backdrop-blur-xl border border-neutral-700/80 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden transition-all duration-200 {isFullHeight
-      ? 'inset-y-3 right-3 w-[440px]'
-      : 'bottom-5 right-5 w-[420px] h-[560px] max-h-[85vh]'}"
+      ? 'top-[calc(3.5rem+env(safe-area-inset-top,0px))] bottom-3 right-3 w-[440px]'
+      : 'bottom-5 right-5 w-[420px] h-[560px] max-h-[calc(100vh-4.5rem-env(safe-area-inset-top,0px))]'}"
     aria-label={t('aiChat.title')}
   >
     <!-- Header -->

@@ -44,6 +44,8 @@
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import { getPalette, openPalette, closePalette } from '$lib/stores/commandPalette.svelte';
   import AmbientGlow from '$lib/components/AmbientGlow.svelte';
+  import { getAmbientStore } from '$lib/stores/ambient.svelte';
+  import { getPro } from '$lib/stores/pro.svelte';
   import { appCommandFor, type AppCommand } from '$lib/shortcuts';
 
   // Seconds since the last monitor poll; the label is derived so it re-renders the moment the
@@ -75,7 +77,26 @@
   const theme = getTheme();
   const aiChat = getAiChatState();
   const feedbackPrompt = getFeedbackPromptState();
+  const ambient = getAmbientStore();
+  const pro = getPro();
   const isDarkTheme = $derived(theme.name === 'dark');
+
+  const cardBorderClass = $derived.by(() => {
+    if (!ambient.config.enabled || !ambient.config.cardGlowEnabled || !pro.isPro) {
+      return 'border-t border-neutral-200 dark:border-neutral-800 md:border-l';
+    }
+
+    if (ambient.config.cardGlowStyle === 'neon-border') {
+      return 'border-t border-sky-400 dark:border-sky-400 md:border-l shadow-[inset_0_0_8px_rgba(56,189,248,0.15)]';
+    }
+
+    if (ambient.config.cardGlowStyle === 'chroma-beam') {
+      return 'border-t border-sky-400/50 dark:border-sky-400/40 md:border-l';
+    }
+
+    // diffused-halo
+    return 'border-t border-sky-400/30 dark:border-sky-400/25 md:border-l';
+  });
 
   // Reviewed once per launch, after the previous run's panic hook (if any fired) had a chance
   // to finish writing its dump. Null unless there is something pending — see
@@ -782,10 +803,10 @@
     </aside>
 
     <!-- Content panel with Outer Ambient Halo Underglow -->
-    <div class="flex-1 min-w-0 flex relative overflow-hidden">
+    <div class="flex-1 min-w-0 flex relative overflow-visible">
       <AmbientGlow defaultAccent="#ef4444" />
 
-      <main class="flex-1 min-w-0 flex overflow-hidden relative z-10 bg-white dark:bg-[#161616] border-t border-neutral-200 dark:border-neutral-800 md:border-l md:rounded-tl-xl transition-colors duration-150">
+      <main class="flex-1 min-w-0 flex overflow-hidden relative z-10 bg-white dark:bg-[#161616] {cardBorderClass} md:rounded-tl-xl transition-colors duration-150">
         <!-- Session Viewport -->
         <div class="flex-1 min-w-0 flex {page.url.pathname.startsWith('/session') ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 pointer-events-none -z-10 absolute inset-0 invisible'}">
           <SessionViewport />
