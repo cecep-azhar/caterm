@@ -14,6 +14,20 @@
     return defaultAccent;
   });
 
+  const secondaryColor = $derived(ambient.config.secondaryAccent || '#10b981');
+  const isBicolor = $derived(
+    ambient.config.bicolorEnabled && (ambient.config.mode === 'app-accent' || ambient.config.mode === 'solid')
+  );
+
+  // Effective opacity boosted during typing
+  const currentOpacity = $derived.by(() => {
+    const base = ambient.config.intensity;
+    if (ambient.isTypingActive && ambient.config.typingReactive) {
+      return Math.min(1.0, base + 0.35);
+    }
+    return base;
+  });
+
   // Calculate underglow box shadow & gradient styles
   const isGradientMode = $derived(
     ambient.config.mode === 'rgb-cycle' || ambient.config.mode === 'aurora'
@@ -21,7 +35,7 @@
 
   const glowBoxShadow = $derived.by(() => {
     if (!ambient.config.enabled || !ambient.config.cardGlowEnabled || !pro.isPro) return 'none';
-    if (isGradientMode) return 'none';
+    if (isGradientMode || isBicolor) return 'none';
 
     const blur = ambient.config.blurRadius;
     const spread = Math.round(blur / 4);
@@ -40,8 +54,8 @@
 
 {#if ambient.config.enabled && ambient.config.cardGlowEnabled && pro.isPro}
   <div
-    class="pointer-events-none absolute -inset-[2px] rounded-none rounded-tl-2xl md:rounded-none md:rounded-tl-xl z-0 overflow-visible transition-opacity duration-300 will-change-[filter,opacity]"
-    style:opacity={ambient.config.intensity}
+    class="pointer-events-none absolute -inset-[2px] rounded-none rounded-tl-2xl md:rounded-none md:rounded-tl-xl z-0 overflow-visible transition-opacity duration-150 will-change-[filter,opacity]"
+    style:opacity={currentOpacity}
     aria-hidden="true"
   >
     {#if ambient.config.cardGlowStyle === 'chroma-beam'}
@@ -52,6 +66,8 @@
           style:animation-duration={animationDuration}
           style:background={isGradientMode
             ? 'conic-gradient(from 0deg, transparent 0deg, transparent 200deg, #ff0055 240deg, #33cc33 280deg, #0099ff 320deg, #cc00ff 360deg)'
+            : isBicolor
+            ? `conic-gradient(from 0deg, transparent 0deg, transparent 200deg, ${secondaryColor}88 260deg, ${secondaryColor} 300deg, ${activeColor} 360deg)`
             : `conic-gradient(from 0deg, transparent 0deg, transparent 240deg, ${activeColor}88 300deg, ${activeColor} 360deg)`}
         ></div>
         <!-- Inner mask to let the border beam glow outward while matching the main card corner -->
@@ -63,6 +79,14 @@
         class="w-full h-full rounded-none rounded-tl-2xl md:rounded-none md:rounded-tl-xl will-change-[filter,transform] {ambient.config.mode === 'rgb-cycle' ? 'ambient-rgb-cycle' : 'ambient-aurora-wave'} {ambient.config.effect === 'breathing' ? 'ambient-breathe' : ''}"
         style:animation-duration={animationDuration}
         style:filter="blur({ambient.config.blurRadius}px)"
+      ></div>
+    {:else if isBicolor}
+      <!-- Bicolor Dual-Axis Gradient: Primary color top/right, Secondary color left/bottom -->
+      <div
+        class="w-full h-full rounded-none rounded-tl-2xl md:rounded-none md:rounded-tl-xl will-change-[filter,opacity] {ambient.config.effect === 'breathing' ? 'ambient-breathe' : ''} {ambient.config.effect === 'wave' ? 'ambient-pulse-slow' : ''}"
+        style:background="radial-gradient(ellipse at 80% 20%, {activeColor} 0%, transparent 65%), radial-gradient(ellipse at 20% 80%, {secondaryColor} 0%, transparent 65%), conic-gradient(from 180deg at 30% 30%, {secondaryColor} 0deg, {activeColor} 180deg, {secondaryColor} 360deg)"
+        style:filter="blur({ambient.config.blurRadius}px)"
+        style:animation-duration={animationDuration}
       ></div>
     {:else}
       <!-- Diffused Halo / Neon: Static single accent with breathing animation -->

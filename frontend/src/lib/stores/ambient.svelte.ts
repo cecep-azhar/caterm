@@ -18,6 +18,9 @@ export interface AmbientConfig {
   avatarGlowEffect: AvatarGlowEffect;
   cardGlowEnabled: boolean;
   cardGlowStyle: CardGlowStyle;
+  typingReactive: boolean;
+  bicolorEnabled: boolean;
+  secondaryAccent: string;
 }
 
 const STORAGE_KEY = 'caterm-ambient-lighting-v1';
@@ -33,7 +36,10 @@ const DEFAULT_CONFIG: AmbientConfig = {
   avatarGlowEnabled: true,
   avatarGlowEffect: 'comet-beam',
   cardGlowEnabled: true,
-  cardGlowStyle: 'diffused-halo'
+  cardGlowStyle: 'diffused-halo',
+  typingReactive: true,
+  bicolorEnabled: false,
+  secondaryAccent: '#10b981'
 };
 
 function loadStoredConfig(): AmbientConfig {
@@ -49,6 +55,8 @@ function loadStoredConfig(): AmbientConfig {
 
 class AmbientStore {
   config = $state<AmbientConfig>(loadStoredConfig());
+  isTypingActive = $state(false);
+  private typingTimeout: ReturnType<typeof setTimeout> | null = null;
 
   save() {
     if (typeof localStorage !== 'undefined') {
@@ -111,6 +119,30 @@ class AmbientStore {
   setCardGlowStyle(val: CardGlowStyle) {
     this.config.cardGlowStyle = val;
     this.save();
+  }
+
+  setTypingReactive(val: boolean) {
+    this.config.typingReactive = val;
+    this.save();
+  }
+
+  setBicolorEnabled(val: boolean) {
+    this.config.bicolorEnabled = val;
+    this.save();
+  }
+
+  setSecondaryAccent(val: string) {
+    this.config.secondaryAccent = val;
+    this.save();
+  }
+
+  triggerTypingBloom() {
+    if (!this.config.enabled || !this.config.typingReactive) return;
+    this.isTypingActive = true;
+    if (this.typingTimeout) clearTimeout(this.typingTimeout);
+    this.typingTimeout = setTimeout(() => {
+      this.isTypingActive = false;
+    }, 150);
   }
 
   reset() {

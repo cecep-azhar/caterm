@@ -25,6 +25,7 @@
   import { terminalKeyAction } from '$lib/shortcuts';
   import { getTerminalPrefs, stepTerminalFontSize, setTerminalFontSize, DEFAULT_FONT_SIZE } from '$lib/stores/terminalPrefs.svelte';
   import { copyText } from '$lib/utils/clipboard';
+import { getAmbientStore } from '$lib/stores/ambient.svelte';
 
   let {
     host,
@@ -54,6 +55,7 @@
   const paneLabel = $derived(label ?? host.label);
   const theme = getTheme();
   const terminalPrefs = getTerminalPrefs();
+  const ambient = getAmbientStore();
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
   let terminalContainer: HTMLDivElement;
   let rootContainer: HTMLDivElement | undefined = $state();
@@ -260,6 +262,10 @@
     fitAddon = fit;
     terminal.loadAddon(fit);
     terminal.open(terminalContainer);
+
+    terminal.onKey(() => {
+      ambient.triggerTypingBloom();
+    });
 
     // Hardware-accelerated terminal renderer with graceful fallbacks: WebGL -> Canvas -> DOM
     try {

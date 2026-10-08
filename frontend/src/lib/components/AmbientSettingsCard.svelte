@@ -258,6 +258,119 @@
         </div>
       </div>
 
+      <!-- Advanced Pro Controls: Typing-Reactive Bloom & Bicolor Gradient Axis -->
+      <div class="space-y-4 pt-4 border-t border-neutral-200 dark:border-neutral-800">
+        <!-- Typing-Reactive Bloom Toggle -->
+        <div class="flex items-center justify-between">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                Typing-Reactive Glow (Efek Ketikan)
+              </span>
+              <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase">
+                Bloom Reaktif
+              </span>
+            </div>
+            <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
+              Memicu pendaran cahaya bloom dinamis saat mengetik di terminal secara halus.
+            </p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-neutral-500 dark:text-neutral-400">
+              {ambient.config.typingReactive ? 'Aktif' : 'Nonaktif'}
+            </span>
+            <button
+              type="button"
+              role="switch"
+              aria-label="Toggle Typing Reactive Glow"
+              aria-checked={ambient.config.typingReactive}
+              onclick={() => ambient.setTypingReactive(!ambient.config.typingReactive)}
+              class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none {ambient.config.typingReactive ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'}"
+            >
+              <span
+                class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {ambient.config.typingReactive ? 'translate-x-4' : 'translate-x-0'}"
+              ></span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Bicolor Dual-Axis Gradient Toggle -->
+        <div class="space-y-3 pt-2">
+          <div class="flex items-center justify-between">
+            <div class="space-y-0.5">
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                  Bicolor Dual-Axis Gradient
+                </span>
+                <span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 uppercase">
+                  Dual Axis
+                </span>
+              </div>
+              <p class="text-[11px] text-neutral-500 dark:text-neutral-400">
+                Pendaran dual-radial/conic gradient memadukan warna primer di baris atas/kanan dan warna sekunder di sisi kiri.
+              </p>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-neutral-500 dark:text-neutral-400">
+                {ambient.config.bicolorEnabled ? 'Aktif' : 'Nonaktif'}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Toggle Bicolor Dual-Axis Gradient"
+                aria-checked={ambient.config.bicolorEnabled}
+                onclick={() => ambient.setBicolorEnabled(!ambient.config.bicolorEnabled)}
+                class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none {ambient.config.bicolorEnabled ? 'bg-sky-600' : 'bg-neutral-300 dark:bg-neutral-700'}"
+              >
+                <span
+                  class="pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out {ambient.config.bicolorEnabled ? 'translate-x-4' : 'translate-x-0'}"
+                ></span>
+              </button>
+            </div>
+          </div>
+
+          {#if ambient.config.bicolorEnabled}
+            <div class="p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-2.5">
+              <span class="block text-xs font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">
+                Warna Sekunder (Secondary Accent)
+              </span>
+              <div class="flex flex-wrap items-center gap-2">
+                {#each PRESET_COLORS as preset}
+                  <button
+                    type="button"
+                    title={preset.name}
+                    onclick={() => ambient.setSecondaryAccent(preset.hex)}
+                    class="w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 flex items-center justify-center {ambient.config.secondaryAccent === preset.hex ? 'border-white ring-2 ring-emerald-500 scale-110' : 'border-black/20'}"
+                    style:background-color={preset.hex}
+                  >
+                    {#if ambient.config.secondaryAccent === preset.hex}
+                      <svg class="w-3 h-3 text-white drop-shadow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    {/if}
+                  </button>
+                {/each}
+
+                <div class="flex items-center gap-2 ml-auto">
+                  <span class="text-xs text-neutral-400 font-mono">Hex:</span>
+                  <input
+                    type="color"
+                    value={ambient.config.secondaryAccent}
+                    oninput={(e) => ambient.setSecondaryAccent((e.target as HTMLInputElement).value)}
+                    class="w-7 h-7 rounded-lg border border-neutral-300 dark:border-neutral-700 cursor-pointer bg-transparent"
+                  />
+                  <span class="text-xs font-mono px-2 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800">
+                    {ambient.config.secondaryAccent}
+                  </span>
+                </div>
+              </div>
+            </div>
+          {/if}
+        </div>
+      </div>
+
       <!-- 4. Avatar Profile Halo Effect (PRO) -->
       <div class="space-y-3 pt-4 border-t border-neutral-200 dark:border-neutral-800">
         <div class="flex items-center justify-between">
