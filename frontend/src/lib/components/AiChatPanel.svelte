@@ -10,7 +10,7 @@
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { getTabs, localTerminalHost, LOCAL_HOST_ID } from '$lib/stores/sessionTabs.svelte';
   import { getSessionView } from '$lib/stores/sessionView.svelte';
-  import { getActiveSession, injectIntoActiveSession } from '$lib/stores/activeSession.svelte';
+  import { getActiveSession, getAllActiveSessions, injectIntoActiveSession, injectIntoAllSessions } from '$lib/stores/activeSession.svelte';
   import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
   import { saveHost, deleteHost } from '$lib/api/hosts';
   import { saveSnippet, deleteSnippet } from '$lib/api/snippets';
@@ -104,7 +104,9 @@
     const currentRoute = page.url.pathname;
     const currentTab = page.url.searchParams.get('tab') || '';
     const profile = getProfile();
-    const uiContext = `[Active UI Context: Route="${currentRoute}", Tab="${currentTab}", CurrentProfileName="${profile.name}", HostCount=${hosts.length}]`;
+    const activeTabs = getTabs();
+    const openHostsInfo = activeTabs.map(t => `${t.host.label}(${t.host.address})`).join(', ');
+    const uiContext = `[Active UI Context: Route="${currentRoute}", Tab="${currentTab}", CurrentProfileName="${profile.name}", HostCount=${hosts.length}, OpenPanesCount=${activeTabs.length}, OpenPanes=[${openHostsInfo}], Capabilities=["caterm_action:broadcast_execute(command)", "caterm_action:create_host", "caterm_action:create_snippet", "caterm_action:network_security_audit"]]`;
 
     messages = [...messages, { role: 'user', content: `${text}\n${uiContext}` }];
     draft = '';
@@ -118,26 +120,41 @@
       let stepsToPropose = reply.steps || [];
 
       // Fallback: If assistant replied with code blocks but didn't output structured steps, extract them!
-      if (stepsToPropose.length === 0) {
-        const codeBlockRegex = /```(?:bash|sh|shell)?\n([\s\S]*?)```/g;
-        let match;
-        let stepIdx = 1;
-        while ((match = codeBlockRegex.exec(reply.reply)) !== null) {
-          const rawCode = match[1].trim();
-          if (rawCode) {
-            const lines = rawCode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
-            for (const line of lines) {
+    if (stepsToPropose.length === 0) {
+      const codeBlockRegex = /```(?:bash|sh|shell)?\n([\s\S]*?)```/g;
+      let match;
+      let stepIdx = 1;
+      const lowerDraft = text.toLowerCase();
+      const isBroadcastIntent = lowerDraft.includes('semua') || lowerDraft.includes('all') || lowerDraft.includes('serentak') || lowerDraft.includes('broadcast');
+
+      while ((match = codeBlockRegex.exec(reply.reply)) !== null) {
+        const rawCode = match[1].trim();
+        if (rawCode) {
+          const lines = rawCode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+          for (const line of lines) {
+            if (isBroadcastIntent && activeTabs.length > 1) {
+              stepsToPropose.push({
+                title: `Broadcast ke ${activeTabs.length} Panes: ${line.slice(0, 35)}${line.length > 35 ? '...' : ''}`,
+                description: `Eksekusi serentak ke seluruh terminal aktif (${activeTabs.length} panes)`,
+                command: line,
+                action_type: 'caterm_action',
+                action_name: 'broadcast_execute',
+                action_params: { command: line },
+                risk: 'medium'
+              });
+            } else {
               stepsToPropose.push({
                 title: `Jalankan: ${line.slice(0, 40)}${line.length > 40 ? '...' : ''}`,
                 description: `Perintah diekstrak dari respon AI (Langkah ${stepIdx})`,
                 command: line,
                 risk: 'low'
               });
-              stepIdx++;
             }
+            stepIdx++;
           }
         }
       }
+    }
 
       if (stepsToPropose.length > 0) {
         proposedSteps = stepsToPropose;
@@ -264,10 +281,79 @@
           return true;
         }
 
+        if (action === 'network_security_audit' || action === 'audit_server' || action === 'security_audit') {
+          const auditHost = params.host_id || params.hostId || targetHostId || LOCAL_HOST_ID;
+          const { runNetworkSecurityAudit } = await import('$lib/api/audit');
+          const auditReport = await runNetworkSecurityAudit(auditHost);
+          const score = auditReport.summaryScore;
+          const exposedCount = auditReport.inboundPorts.filter(p => p.isWildcard && (p.riskLevel === 'CRITICAL' || p.riskLevel === 'HIGH')).length;
+          const leakCount = auditReport.egressResults.filter(e => e.status === 'OPEN_LEAK').length;
+          const outputText = `DevOps Security Audit Selesai:
+- Skor Keamanan: ${score}%
+- Inbound Exposure (0.0.0.0): ${exposedCount} port berisiko
+- Egress Leaks: ${leakCount} port terbuka keluar
+- Latency probe: ${auditReport.latencyProbe.avgLatencyMs.toFixed(1)} ms (${auditReport.latencyProbe.packetLossPct}% loss)
+- Rekomendasi: Periksa tab Investigasi / Audit Hub untuk detail lengkap.`;
+          runs[i] = { status: 'ok', output: outputText };
+          showToast(`Security Audit Selesai! Skor: ${score}%`, score >= 70 ? 'success' : 'error');
+          return true;
+        }
+
         if (action === 'navigate' && params.route) {
           goto(params.route);
           runs[i] = { status: 'ok', output: `Navigasi ke ${params.route}` };
           return true;
+        }
+
+        if (action === 'broadcast_execute' || action === 'broadcast_command' || action === 'run_all') {
+          const cmdToRun = params.command || params.cmd || step.command || '';
+          if (!cmdToRun) {
+            runs[i] = { status: 'failed', output: 'Perintah broadcast kosong.' };
+            return false;
+          }
+          const activeSessions = getAllActiveSessions();
+          if (activeSessions.length === 0) {
+            runs[i] = { status: 'failed', output: 'Tidak ada sesi terminal aktif untuk dibroadcast.' };
+            showToast('Tidak ada sesi terminal aktif', 'error');
+            return false;
+          }
+          const openTabs = getTabs();
+          const resultsMap: Record<string, string> = {};
+          
+          if (effectiveExecMode === 'terminal') {
+            const injectedCount = injectIntoAllSessions(cmdToRun);
+            runs[i] = {
+              status: 'ok',
+              output: `Perintah "${cmdToRun}" berhasil disuntikkan ke ${injectedCount} terminal aktif.`
+            };
+            showToast(`Broadcast terkirim ke ${injectedCount} terminal`, 'success');
+            return true;
+          } else {
+            // SSH / non-interactive execution per host in parallel
+            const targetHostsList = openTabs.length > 0 ? openTabs.map(t => ({ id: t.host.id, label: t.host.label })) : [{ id: targetHostId || LOCAL_HOST_ID, label: targetHost?.label || 'Target' }];
+            const uniqueHosts = Array.from(new Map(targetHostsList.map(h => [h.id, h])).values());
+
+            const execPromises = uniqueHosts.map(async (h) => {
+              try {
+                const res = await aiExecuteStep(h.id, cmdToRun);
+                const out = [res.stdout, res.stderr].filter(Boolean).join('\n').trim();
+                return { host: h.label, output: out || '(no output)', success: res.success, code: res.exit_code };
+              } catch (e) {
+                return { host: h.label, output: errorText(e), success: false, code: -1 };
+              }
+            });
+
+            const resList = await Promise.all(execPromises);
+            const summaryOut = resList.map(r => `[${r.host}] (${r.success ? 'OK' : 'FAIL code ' + r.code}):\n${r.output}`).join('\n\n');
+            const allSuccess = resList.every(r => r.success);
+
+            runs[i] = {
+              status: allSuccess ? 'ok' : 'failed',
+              output: summaryOut
+            };
+            showToast(`Broadcast dieksekusi ke ${resList.length} server!`, allSuccess ? 'success' : 'error');
+            return allSuccess;
+          }
         }
       } catch (err) {
         runs[i] = { status: 'failed', output: errorText(err) };

@@ -14,6 +14,7 @@ export type AppCommand =
   | { type: 'tab'; index: number } // 0-based; -1 = last tab
   | { type: 'cycleTab'; step: 1 | -1 }
   | { type: 'closeTab' }
+  | { type: 'broadcastInput' }
   | { type: 'settings' }
   | { type: 'lock' };
 
@@ -52,6 +53,8 @@ export function appCommandFor(e: KeyboardEvent): AppCommand | null {
         return { type: 'newSession' };
       case 'w':
         return { type: 'closeTab' };
+      case 'b':
+        return { type: 'broadcastInput' };
       case 'l':
         return { type: 'lock' };
       default:
@@ -114,6 +117,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: 'sessions',
     items: [
       { label: 'newSession', keys: [[MOD, 'Shift', 'T']] },
+      { label: 'broadcastInput', keys: [[MOD, 'Shift', 'B']] },
       { label: 'switchToTabRange', keys: [[MOD, '1…8']] },
       { label: 'lastTab', keys: [[MOD, '9']] },
       { label: 'nextTab', keys: [['Ctrl', 'Tab']] },

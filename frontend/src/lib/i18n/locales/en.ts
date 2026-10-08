@@ -125,7 +125,9 @@ const en = {
     emptyTitle: 'No investigations found.',
     deleteConfirm: 'Delete this investigation? This cannot be undone.',
     deleteTitle: 'Delete Investigation',
-    titleRequired: 'A title is required.'
+    titleRequired: 'A title is required.',
+    securityAuditHub: 'Network & Security Audit Hub',
+    runSecurityAudit: 'Audit Network & Security'
   },
   teams: {
     title: 'Teams',
@@ -1008,6 +1010,7 @@ const en = {
       openSettings: 'Open settings',
       lockVault: 'Lock the vault',
       newSession: 'New session (pick a host)',
+      broadcastInput: 'Toggle broadcast input across all open panes',
       switchToTabRange: 'Go to session tab 1–8',
       lastTab: 'Go to the last session tab',
       nextTab: 'Next session tab',
@@ -1225,6 +1228,9 @@ const en = {
     splitHorizontal: 'Split Horizontal (Top / Bottom)',
     splitVertical: 'Split Vertical (Side by Side)',
     splitGrid: 'Grid 2x2 (4 Panes)',
+    broadcastInput: 'Broadcast Input',
+    broadcastInputActive: 'BROADCAST ACTIVE ({{count}} PANES)',
+    broadcastInputTooltip: 'Synchronize input to all open split panes (Ctrl+Shift+B)',
     signedOut: 'Signed out',
     noNotifications: 'No new system notifications.',
     notifications: 'Notifications',

@@ -23,7 +23,9 @@ const view = $state({
   showFiles: false,
   /** Tab id the header controls and the side panel follow; '' means "first open tab".
       Keyed by tab, not host, because the same host can be open in several tabs. */
-  selectedTabId: ''
+  selectedTabId: '',
+  /** Whether keystrokes are synchronized across all open split panes. */
+  broadcastInput: false
 });
 
 export function getSessionView() {
@@ -42,7 +44,21 @@ export function setSelectedTabId(tabId: string) {
   view.selectedTabId = tabId;
 }
 
+export function getBroadcastInput(): boolean {
+  return view.broadcastInput;
+}
+
+export function setBroadcastInput(enabled: boolean) {
+  view.broadcastInput = enabled;
+}
+
+export function toggleBroadcastInput(): boolean {
+  view.broadcastInput = !view.broadcastInput;
+  return view.broadcastInput;
+}
+
 /** Called when the last tab closes so the next session doesn't inherit a stale split. */
 export function resetLayout() {
   view.layout = 1;
+  view.broadcastInput = false;
 }

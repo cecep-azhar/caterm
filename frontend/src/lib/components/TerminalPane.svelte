@@ -17,7 +17,8 @@
   } from '$lib/api/ssh';
   import type { HostRecord } from '$lib/api/hosts';
   import { listSnippets, type SnippetRecord } from '$lib/api/snippets';
-  import { setActiveSession, clearActiveSession } from '$lib/stores/activeSession.svelte';
+  import { setActiveSession, clearActiveSession, registerSessionPane, broadcastWriteToAll } from '$lib/stores/activeSession.svelte';
+  import { getSessionView } from '$lib/stores/sessionView.svelte';
   import { getTheme, terminalTheme } from '$lib/stores/theme.svelte';
   import { LINUX_COMMANDS, commandDescription, type AutocompleteItem } from '$lib/data/terminalCommands';
   import { t } from '$lib/i18n/index.svelte';
@@ -54,6 +55,7 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
 
   const paneLabel = $derived(label ?? host.label);
   const theme = getTheme();
+  const sessionView = getSessionView();
   const terminalPrefs = getTerminalPrefs();
   const ambient = getAmbientStore();
   let status = $state<'connecting' | 'connected' | 'offline'>('connecting');
@@ -215,9 +217,14 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
     void sshWrite(session.sessionId, cmd + '\r').catch(() => {});
   }
 
+  function writeRaw(data: string) {
+    if (!session) return;
+    void sshWrite(session.sessionId, data).catch(() => {});
+  }
+
   function markActive() {
     if (session) {
-      setActiveSession({ sessionId: session.sessionId, label: paneLabel, inject: injectCommand });
+      setActiveSession({ sessionId: session.sessionId, label: paneLabel, inject: injectCommand, write: writeRaw });
     }
   }
 
@@ -346,6 +353,12 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
 
         session = opened;
         status = 'connected';
+        registerSessionPane({
+          sessionId: opened.sessionId,
+          label: paneLabel,
+          inject: injectCommand,
+          write: writeRaw
+        });
         fit.fit();
         void sshResize(opened.sessionId, terminal.cols, terminal.rows).catch((err) =>
           reportFailure(t('terminal.resizeFailed'), err)
@@ -418,6 +431,9 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
       // Send keystroke to the real Rust SSH PTY backend
       if (session) {
         void sshWrite(session.sessionId, data).catch((err) => reportFailure(t('terminal.sendFailed'), err));
+        if (sessionView.broadcastInput) {
+          broadcastWriteToAll(data, session.sessionId);
+        }
       }
 
       if (isAlternateScreen()) {
@@ -519,7 +535,12 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
 			></span>
 			<span class="text-neutral-900 dark:text-white font-medium truncate">{paneLabel}</span>
 			<span class="text-neutral-500 dark:text-neutral-500 hidden sm:inline truncate">({host.address})</span>
-		</div>
+			{#if sessionView.broadcastInput}
+			  <span class="ml-1 px-1.5 py-0.5 rounded text-[9px] font-bold tracking-wider uppercase bg-amber-500/20 text-amber-500 border border-amber-500/40 animate-pulse">
+			    SYNC
+			  </span>
+			{/if}
+			</div>
     <div class="flex items-center gap-2 text-neutral-500 dark:text-neutral-400 shrink-0">
       <!-- Autocomplete toggle button -->
       <button

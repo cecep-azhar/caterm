@@ -4,8 +4,11 @@
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { t, intlLocale } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import NetworkAuditModal from '$lib/components/NetworkAuditModal.svelte';
 
   let isAddModalOpen = $state(false);
+  let isAuditModalOpen = $state(false);
+  let selectedAuditHostId = $state<string | undefined>();
   let backendAvailable = $state(true);
   let investigations = $state<InvestigationRecord[]>([]);
   let availableHosts = $state<HostRecord[]>([]);
@@ -100,6 +103,12 @@
   >
     {#snippet actions()}
       <button
+        onclick={() => { selectedAuditHostId = undefined; isAuditModalOpen = true; }}
+        class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-2 shadow shadow-emerald-600/20">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+        Audit Keamanan Jaringan
+      </button>
+      <button
         onclick={openAddModal}
         class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-sm rounded-lg transition-colors flex items-center gap-2 shadow shadow-sky-600/20">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -143,6 +152,13 @@
     {/if}
   </div>
 </div>
+
+{#if isAuditModalOpen}
+  <NetworkAuditModal 
+    hostId={selectedAuditHostId} 
+    onClose={() => { isAuditModalOpen = false; }} 
+  />
+{/if}
 
 {#if isAddModalOpen}
   <div class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center p-4 z-50">

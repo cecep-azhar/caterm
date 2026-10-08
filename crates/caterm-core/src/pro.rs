@@ -1039,10 +1039,15 @@ pub fn sync_vault() -> Result<bool, CatermError> {
                 Ok(true)
             } else {
                 // Cloud exists with different content: import cloud backup into local
-                if let Ok(count) = crate::backup::import_encrypted_backup_with_dek(&cloud.encrypted_blob, &sync_key) {
+                if let Ok(count) = crate::backup::import_encrypted_backup_with_dek(
+                    &cloud.encrypted_blob,
+                    &sync_key,
+                ) {
                     if count > 0 {
                         // Re-export merged local state and upload if needed
-                        if let Ok(merged_blob) = crate::backup::export_encrypted_backup_with_dek(&sync_key) {
+                        if let Ok(merged_blob) =
+                            crate::backup::export_encrypted_backup_with_dek(&sync_key)
+                        {
                             let mut merged_hasher = Sha256::new();
                             merged_hasher.update(merged_blob.as_bytes());
                             let merged_sum = hex::encode(merged_hasher.finalize());

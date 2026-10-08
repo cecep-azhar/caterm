@@ -254,6 +254,7 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::ssh_resize,
             commands::ssh_disconnect,
             commands::detect_host_os,
+            commands::run_network_security_audit,
             commands::get_ai_settings,
             commands::save_ai_settings,
             commands::ai_generate_plan,

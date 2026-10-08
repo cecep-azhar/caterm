@@ -126,7 +126,9 @@ const id: Dictionary = {
     emptyTitle: 'Tidak ditemukan investigasi.',
     deleteConfirm: 'Hapus investigasi ini? Tindakan ini tidak dapat dibatalkan.',
     deleteTitle: 'Hapus Investigasi',
-    titleRequired: 'Judul wajib diisi.'
+    titleRequired: 'Judul wajib diisi.',
+    securityAuditHub: 'Hub Audit Keamanan Jaringan',
+    runSecurityAudit: 'Audit Jaringan & Keamanan'
   },
   teams: {
     title: 'Tim',
@@ -1009,6 +1011,7 @@ const id: Dictionary = {
       openSettings: 'Buka pengaturan',
       lockVault: 'Kunci vault',
       newSession: 'Sesi baru (pilih host)',
+      broadcastInput: 'Aktif/nonaktifkan broadcast input ke semua panel terbuka',
       switchToTabRange: 'Ke tab sesi 1–8',
       lastTab: 'Ke tab sesi terakhir',
       nextTab: 'Tab sesi berikutnya',
@@ -1226,6 +1229,9 @@ const id: Dictionary = {
     splitHorizontal: 'Bagi Horizontal (Atas / Bawah)',
     splitVertical: 'Bagi Vertikal (Berdampingan)',
     splitGrid: 'Grid 2x2 (4 Panel)',
+    broadcastInput: 'Broadcast Input',
+    broadcastInputActive: 'BROADCAST ACTIVE ({{count}} PANES)',
+    broadcastInputTooltip: 'Sinkronisasi input ke semua panel terbuka (Ctrl+Shift+B)',
     signedOut: 'Berhasil keluar',
     noNotifications: 'Tidak ada notifikasi sistem baru.',
     notifications: 'Notifikasi',

@@ -778,6 +778,63 @@ fn build_template_plan(
             created_at: now,
             estimated_time: Some("~6 mins".to_string()),
         }
+    } else if goal_lower.contains("audit")
+        || goal_lower.contains("egress")
+        || goal_lower.contains("exposure")
+        || (goal_lower.contains("network") && goal_lower.contains("security"))
+        || (goal_lower.contains("security") && goal_lower.contains("check"))
+    {
+        let requirements = vec![
+            "Network egress test to common outbound ports (25, 53, 445, 3306, 5432, 6379)"
+                .to_string(),
+            "Inbound wildcard listening ports check (0.0.0.0 / ss -tulpn)".to_string(),
+            "Network latency probe & hop trace (1.1.1.1)".to_string(),
+            "SSH host hardening (/etc/ssh/sshd_config & UFW firewall status)".to_string(),
+        ];
+
+        let steps = vec![
+            AiPlanStep::new(
+                1,
+                "Egress Port & Hole Hunter",
+                r#"echo "=== EGRESS AUDIT ==="; for p in 25:smtp.gmail.com 53:1.1.1.1 445:smb.example.com 3306:mysql.example.com 5432:postgres.example.com 6379:redis.example.com; do IFS=":" read -r port target <<< "$p"; timeout 2 bash -c "</dev/tcp/$target/$port" 2>/dev/null && echo "PORT $port ($target): OPEN_LEAK (RISK)" || echo "PORT $port ($target): BLOCKED (OK)"; done"#,
+                "Probe outbound connectivity to high-risk database, mail, and leak ports (25, 53, 445, 3306, 5432, 6379)",
+                false,
+            ),
+            AiPlanStep::new(
+                2,
+                "Inbound Exposure & Listening Ports Audit",
+                r#"echo "=== INBOUND EXPOSURE ==="; (command -v ss >/dev/null 2>&1 && ss -tulpn | grep -E '0\.0\.0\.0|::' || (command -v netstat >/dev/null 2>&1 && netstat -tulpn | grep -E '0\.0\.0\.0|:::') || echo "No ss or netstat available")"#,
+                "Detect listening sockets bound to wildcard interfaces (0.0.0.0) exposing databases or unauthenticated services",
+                false,
+            ),
+            AiPlanStep::new(
+                3,
+                "Network Benchmark & Latency Probe",
+                r#"echo "=== LATENCY & HOPS PROBE ==="; ping -c 4 -W 2 1.1.1.1 2>/dev/null || echo "Ping failed"; (command -v traceroute >/dev/null 2>&1 && traceroute -m 8 -q 1 1.1.1.1 || command -v tracepath >/dev/null 2>&1 && tracepath -m 8 1.1.1.1 || echo "Traceroute utility not installed")"#,
+                "Evaluate packet loss, average latency, and routing hop path to Cloudflare 1.1.1.1",
+                false,
+            ),
+            AiPlanStep::new(
+                4,
+                "SSH & Host Hardening Baseline Checklist",
+                r#"echo "=== SSH & FIREWALL HARDENING ==="; if [ -f /etc/ssh/sshd_config ]; then grep -Ei '^\s*(PermitRootLogin|PasswordAuthentication|PubkeyAuthentication)' /etc/ssh/sshd_config || echo "Standard defaults apply"; fi; (command -v ufw >/dev/null 2>&1 && ufw status || command -v iptables >/dev/null 2>&1 && iptables -L -n | head -10 || echo "Firewall not detected")"#,
+                "Verify PermitRootLogin, PasswordAuthentication, PubkeyAuthentication, and UFW / iptables status",
+                false,
+            ),
+        ];
+
+        AiExecutionPlan {
+            id: format!("plan-{}", uuid::Uuid::new_v4()),
+            goal: goal.to_string(),
+            summary: "Comprehensive DevOps Network & Security Audit: Outbound Egress probe, Inbound Wildcard Exposure, Latency Probe, and SSH Hardening Checklist.".to_string(),
+            host_id: target_host.map(|h| h.to_string()),
+            host_label,
+            requirements,
+            steps,
+            source: default_plan_source(),
+            created_at: now,
+            estimated_time: Some("~1 min".to_string()),
+        }
     } else if goal_lower.contains("hardening")
         || goal_lower.contains("ufw")
         || goal_lower.contains("firewall")
@@ -955,6 +1012,7 @@ CAPABILITIES:
    - `delete_tunnel`: params `{\"id\": \"...\"}` (Single tunnel only)
    - `create_investigation`: params `{\"title\": \"...\", \"host_id\": \"...\", \"query\": \"...\", \"category\": \"incident|performance|security\"}`
    - `delete_investigation`: params `{\"id\": \"...\"}` (Single investigation only)
+   - `network_security_audit`: params `{\"host_id\": \"...\"}` (Run DevOps Network & Security Audit: Egress Hunter, Inbound Exposure, Latency Probe & SSH Hardening)
    - `save_team`: params `{\"name\": \"...\", \"description\": \"...\"}`
    - `navigate`: params `{\"route\": \"/|/groups|/snippets|/totp|/ssh-keys|/port-forwarding|/monitoring|/command-logs|/investigations|/teams|/prompt-studio|/settings\"}`
 
@@ -972,7 +1030,7 @@ When proposing steps or actions:
 3. Set `ready: true` once you have enough detail to execute the action.
 
 Respond with ONLY a valid JSON object matching this schema (no prose outside JSON, no markdown fences):
-{\"reply\": \"what you say to the user\", \"ready\": true_or_false, \"steps\": [{\"step\": 1, \"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"is_dangerous\": false, \"actionType\": \"caterm_action\"|\"shell\", \"actionName\": \"update_profile\"|\"save_host\"|\"create_snippet\"|\"save_group\"|\"create_totp\"|\"save_tunnel\"|\"create_investigation\"|\"save_team\"|\"navigate\", \"actionParams\": {\"...\"}}]}";
+{\"reply\": \"what you say to the user\", \"ready\": true_or_false, \"steps\": [{\"step\": 1, \"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"is_dangerous\": false, \"actionType\": \"caterm_action\"|\"shell\", \"actionName\": \"update_profile\"|\"save_host\"|\"create_snippet\"|\"save_group\"|\"create_totp\"|\"save_tunnel\"|\"create_investigation\"|\"network_security_audit\"|\"save_team\"|\"navigate\", \"actionParams\": {\"...\"}}]}";
 
 /// Holds a conversation with the configured LLM.
 ///

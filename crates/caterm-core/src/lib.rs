@@ -34,6 +34,7 @@ pub mod investigations;
 pub mod keys;
 pub mod local_fs;
 pub mod monitor;
+pub mod network_audit;
 pub mod paths;
 pub mod prefs;
 pub mod pro;

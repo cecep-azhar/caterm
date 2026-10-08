@@ -16,6 +16,7 @@
     setLayout,
     setSelectedTabId,
     setShowFiles,
+    toggleBroadcastInput,
     type PaneLayout
   } from '$lib/stores/sessionView.svelte';
   import {
@@ -480,6 +481,15 @@
         closeSessionTab(sessionTabs[currentTabIndex()].id);
         return true;
       }
+      case 'broadcastInput': {
+        if (!onSession || sessionTabs.length < 2) return false;
+        const active = toggleBroadcastInput();
+        showToast(
+          active ? `Broadcast Input Aktif (${sessionTabs.length} panes)` : 'Broadcast Input Dinonaktifkan',
+          active ? 'info' : 'default'
+        );
+        return true;
+      }
     }
   }
 
@@ -654,11 +664,19 @@
         layout={view.layout}
         showFiles={view.showFiles}
         aiOpen={aiChat.open}
+        broadcastInput={view.broadcastInput}
         sessionCount={sessionTabs.length}
         {splitOptions}
         onSetLayout={(l) => setLayout(l as any)}
         onToggleFiles={handleFilesToggle}
         onToggleAi={handleAiToggle}
+        onToggleBroadcast={() => {
+          const active = toggleBroadcastInput();
+          showToast(
+            active ? `Broadcast Input Aktif (${sessionTabs.length} panes)` : 'Broadcast Input Dinonaktifkan',
+            active ? 'info' : 'default'
+          );
+        }}
       />
 
       <!-- 4. Notification Bell -->

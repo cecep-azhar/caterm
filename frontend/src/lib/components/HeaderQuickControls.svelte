@@ -7,22 +7,26 @@
     layout: number;
     showFiles: boolean;
     aiOpen: boolean;
+    broadcastInput?: boolean;
     sessionCount: number;
     splitOptions: Array<{ value: number; title: string; minTabs: number; path?: string }>;
     onSetLayout: (layout: number) => void;
     onToggleFiles: () => void;
     onToggleAi: () => void;
+    onToggleBroadcast?: () => void;
   }
 
   let {
     layout,
     showFiles,
     aiOpen,
+    broadcastInput = false,
     sessionCount,
     splitOptions,
     onSetLayout,
     onToggleFiles,
-    onToggleAi
+    onToggleAi,
+    onToggleBroadcast
   }: Props = $props();
 
   let isOpen = $state(false);
@@ -94,7 +98,7 @@
         </div>
       {/if}
 
-      <!-- Quick Panes (Files SFTP & AI Assistant) -->
+      <!-- Quick Panes (Files SFTP & AI Assistant & Broadcast) -->
       <div>
         <span class="block text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500 mb-1.5">
           {t('shell.panels') || 'Quick Panels'}
@@ -123,6 +127,25 @@
             </svg>
             <span class="font-medium text-xs truncate">{aiOpen ? 'Hana: ON' : 'Hana AI'}</span>
           </button>
+
+          {#if sessionCount > 1}
+            <button
+              type="button"
+              onclick={() => { onToggleBroadcast?.(); isOpen = false; }}
+              class="col-span-2 flex items-center justify-between p-2 rounded-lg border transition-colors {broadcastInput ? 'bg-amber-500/15 border-amber-500/40 text-amber-600 dark:text-amber-400' : 'bg-neutral-50 dark:bg-neutral-950 border-neutral-200 dark:border-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800/60'}"
+              title={t('shell.broadcastInputTooltip')}
+            >
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                <span class="font-medium text-xs truncate">{t('shell.broadcastInput')}</span>
+              </div>
+              <span class="text-[10px] px-1.5 py-0.5 rounded font-mono font-bold {broadcastInput ? 'bg-amber-500 text-neutral-950' : 'bg-neutral-200 dark:bg-neutral-800 text-neutral-500'}">
+                {broadcastInput ? 'ON' : 'Ctrl+Shift+B'}
+              </span>
+            </button>
+          {/if}
         </div>
       </div>
 

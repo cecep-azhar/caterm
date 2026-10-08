@@ -4,8 +4,8 @@
 //! `caterm-core` for the guard that enforces this.
 
 use caterm_core::{
-    CatermError, ai, audit, backup, feedback, groups, investigations, keys, monitor, prefs, sftp,
-    snippets, ssh, store, sync, teams, tunnels, vault, vfs,
+    CatermError, ai, audit, backup, feedback, groups, investigations, keys, monitor, network_audit,
+    prefs, sftp, snippets, ssh, store, sync, teams, tunnels, vault, vfs,
 };
 
 async fn run_blocking<F, R>(f: F) -> Result<R, CatermError>
@@ -550,6 +550,13 @@ pub async fn ssh_disconnect(session_id: String) -> Result<(), CatermError> {
 #[tauri::command]
 pub async fn detect_host_os(host_id: String) -> Result<String, CatermError> {
     run_blocking(move || ssh::detect_host_os(&host_id)).await
+}
+
+#[tauri::command]
+pub async fn run_network_security_audit(
+    host_id: String,
+) -> Result<network_audit::AuditReport, CatermError> {
+    run_blocking(move || network_audit::run_network_security_audit(&host_id)).await
 }
 
 #[tauri::command]

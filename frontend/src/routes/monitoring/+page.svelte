@@ -5,9 +5,12 @@
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { t } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
+  import NetworkAuditModal from '$lib/components/NetworkAuditModal.svelte';
 
   let hosts = $state<HostRecord[]>([]);
   let errorMsg = $state('');
+  let isAuditModalOpen = $state(false);
+  let selectedAuditHostId = $state<string | undefined>();
   let isLoading = $derived(monitorState.isPolling && monitorState.metrics.length === 0);
   let metrics = $derived(monitorState.metrics);
 
@@ -36,7 +39,16 @@
     accent="pink"
     title={t('monitoring.title')}
     subtitle={t('monitoring.subtitle')}
-  />
+  >
+    {#snippet actions()}
+      <button
+        onclick={() => { selectedAuditHostId = undefined; isAuditModalOpen = true; }}
+        class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs rounded-lg transition-colors flex items-center gap-1.5 shadow shadow-emerald-600/20">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+        Network & Security Audit
+      </button>
+    {/snippet}
+  </PageHeader>
 
   {#if errorMsg}
     <div class="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm">
@@ -101,9 +113,26 @@
                 <div class="h-full bg-amber-500 rounded-full transition-all duration-500" style="width: {diskPct}%"></div>
               </div>
             </div>
+
+            <div class="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex justify-end">
+              <button 
+                onclick={() => { selectedAuditHostId = m.host_id; isAuditModalOpen = true; }}
+                class="px-2.5 py-1 text-xs text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded transition flex items-center gap-1 font-medium"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                Audit Keamanan Host
+              </button>
+            </div>
           </div>
         </div>
       {/each}
     </div>
   {/if}
 </div>
+
+{#if isAuditModalOpen}
+  <NetworkAuditModal 
+    hostId={selectedAuditHostId} 
+    onClose={() => { isAuditModalOpen = false; }} 
+  />
+{/if}

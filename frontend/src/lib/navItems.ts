@@ -37,6 +37,11 @@ export function navItems(): NavItem[] {
       path: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'
     },
     {
+      href: '/investigations',
+      label: t('nav.investigations'),
+      path: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
+    },
+    {
       href: '/tasks',
       label: t('nav.tasks'),
       path: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z'
@@ -50,11 +55,6 @@ export function navItems(): NavItem[] {
       href: '/command-logs',
       label: t('nav.commandLogs'),
       path: 'M4 6h16M4 12h16M4 18h16'
-    },
-    {
-      href: '/investigations',
-      label: t('nav.investigations'),
-      path: 'M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z'
     },
     {
       href: '/ssh-keys',

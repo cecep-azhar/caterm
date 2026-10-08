@@ -108,6 +108,10 @@
   function close(tabId: string) {
     closeSessionTab(tabId);
   }
+
+  const broadcastPaneCount = $derived(
+    effectiveLayout === 1 ? 1 : Math.min(tabs.length, effectiveLayout === 2 || effectiveLayout === 3 ? 2 : 4)
+  );
 </script>
 
 <div class="h-full w-full flex flex-col bg-neutral-100 dark:bg-neutral-950 overflow-hidden">
@@ -123,6 +127,26 @@
     {:else}
       <div class="flex h-full gap-1 sm:gap-1.5 overflow-hidden">
         <div class="flex-1 min-w-0 h-full overflow-hidden flex flex-col">
+          <!-- Broadcast Indicator Banner if Broadcast is Active -->
+          {#if view.broadcastInput && broadcastPaneCount > 1}
+            <div class="mb-1 px-3 py-1 bg-amber-500/15 border border-amber-500/40 rounded-md flex items-center justify-between text-xs font-mono text-amber-600 dark:text-amber-400 shrink-0 select-none">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
+                <span class="font-bold tracking-wider uppercase text-[11px]">
+                  {t('shell.broadcastInputActive', { count: broadcastPaneCount }) || `BROADCAST ACTIVE (${broadcastPaneCount} PANES)`}
+                </span>
+                <span class="text-[10px] text-neutral-500 hidden sm:inline">— Setiap ketikan dikirim serentak ke semua pane</span>
+              </div>
+              <button
+                type="button"
+                onclick={() => (view.broadcastInput = false)}
+                class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-700 dark:text-amber-300 font-sans font-medium transition-colors"
+              >
+                Nonaktifkan (Ctrl+Shift+B)
+              </button>
+            </div>
+          {/if}
+
           {#if tabs.length > 1 && !isWideViewport}
             <div class="flex items-center gap-1 overflow-x-auto pb-1.5 mb-1 scrollbar-none shrink-0">
               {#each tabs as tab (tab.id)}
