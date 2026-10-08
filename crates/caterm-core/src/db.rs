@@ -329,6 +329,21 @@ fn migrate_ai_routing_and_memory(conn: &Connection) -> Result<(), CatermError> {
             last_accessed_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
         );
 
+        CREATE TABLE IF NOT EXISTS ai_custom_skills (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            category TEXT NOT NULL,
+            triggers_json TEXT NOT NULL,
+            preferred_model_id TEXT,
+            system_instructions TEXT NOT NULL,
+            allowed_tools_json TEXT NOT NULL,
+            is_builtin INTEGER NOT NULL DEFAULT 0,
+            is_enabled INTEGER NOT NULL DEFAULT 1,
+            created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+        );
+
         CREATE VIRTUAL TABLE IF NOT EXISTS ai_habits_fts USING fts5(
             id UNINDEXED,
             category,
@@ -374,7 +389,13 @@ fn migrate_ai_routing_and_memory(conn: &Connection) -> Result<(), CatermError> {
         if let Ok((old_key, old_url, old_model)) = conn.query_row(
             "SELECT api_key, base_url, model FROM ai_settings WHERE id = 'default'",
             [],
-            |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?)),
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                ))
+            },
         ) {
             if !old_key.is_empty() {
                 let _ = conn.execute(
@@ -419,6 +440,46 @@ fn migrate_ai_routing_and_memory(conn: &Connection) -> Result<(), CatermError> {
              ('security_review', 'byo-anthropic', 'claude-3-7-sonnet-20250219', 'byo-openai', 'gpt-4o', 0.1, 4096, 'default-devops');"
         )
         .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal seed routing matrix: {e}"))))?;
+    }
+
+    // Seed default custom skills if none exist
+    let skills_count: i64 = conn
+        .query_row("SELECT count(*) FROM ai_custom_skills", [], |r| r.get(0))
+        .unwrap_or(0);
+    if skills_count == 0 {
+        for skill in crate::ai::skills::builtin_skills() {
+            let triggers_json =
+                serde_json::to_string(&skill.triggers).unwrap_or_else(|_| "[]".to_string());
+            let tools_json =
+                serde_json::to_string(&skill.allowed_tools).unwrap_or_else(|_| "[]".to_string());
+            conn.execute(
+                "INSERT OR IGNORE INTO ai_custom_skills (
+                    id, name, title, description, category, triggers_json,
+                    preferred_model_id, system_instructions, allowed_tools_json,
+                    is_builtin, is_enabled, created_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                rusqlite::params![
+                    skill.id,
+                    skill.name,
+                    skill.title,
+                    skill.description,
+                    skill.category,
+                    triggers_json,
+                    skill.preferred_model_id,
+                    skill.system_instructions,
+                    tools_json,
+                    if skill.is_builtin { 1 } else { 0 },
+                    if skill.is_enabled { 1 } else { 0 },
+                    skill.created_at,
+                ],
+            )
+            .map_err(|e| {
+                CatermError::Db(DbError::Generic(format!(
+                    "gagal seed skill {}: {e}",
+                    skill.name
+                )))
+            })?;
+        }
     }
 
     Ok(())

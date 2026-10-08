@@ -5,8 +5,10 @@ use regex::Regex;
 use std::sync::LazyLock;
 
 static RE_PRIVATE_KEY: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?s)-----BEGIN [A-Z0-9_-]+ PRIVATE KEY-----.*?-----END [A-Z0-9_-]+ PRIVATE KEY-----")
-        .unwrap_or_else(|_| Regex::new("$^").expect("fallback regex"))
+    Regex::new(
+        r"(?s)-----BEGIN [A-Z0-9_-]+ PRIVATE KEY-----.*?-----END [A-Z0-9_-]+ PRIVATE KEY-----",
+    )
+    .unwrap_or_else(|_| Regex::new("$^").expect("fallback regex"))
 });
 
 static RE_BEARER: LazyLock<Regex> = LazyLock::new(|| {

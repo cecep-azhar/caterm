@@ -28,6 +28,17 @@ impl<'a> Dispatcher<'a> {
         user_query: &str,
         terminal_ctx: Option<&TerminalContext>,
     ) -> Result<DispatchResult, CatermError> {
+        self.dispatch_with_skill(task_type, user_query, None, terminal_ctx)
+    }
+
+    /// Dispatch a task with optional explicit skill.
+    pub fn dispatch_with_skill(
+        &self,
+        task_type: TaskType,
+        user_query: &str,
+        skill_name: Option<&str>,
+        terminal_ctx: Option<&TerminalContext>,
+    ) -> Result<DispatchResult, CatermError> {
         // 1. Resolve route rule
         let rule = get_route_rule(self.conn, task_type)?.unwrap_or_else(|| TaskRouteRule {
             task_type,
@@ -40,18 +51,29 @@ impl<'a> Dispatcher<'a> {
             system_persona_id: Some("default-devops".to_string()),
         });
 
-        // 2. Assemble context
+        // 2. Assemble context with potential skill SOP
         let builder = ContextBuilder::new(self.conn);
-        let assembled = builder.build(
+        let assembled = builder.build_with_skill(
             user_query,
             rule.system_persona_id.as_deref(),
+            skill_name,
             terminal_ctx,
             rule.max_tokens,
         )?;
 
+        // If skill specifies a preferred model, use it for primary call
+        let target_primary_model = if let Some(skill) = &assembled.active_skill {
+            skill
+                .preferred_model_id
+                .as_deref()
+                .unwrap_or(&rule.primary_model)
+        } else {
+            &rule.primary_model
+        };
+
         // 3. Resolve primary provider
-        let primary_provider = get_provider(self.conn, &rule.primary_provider_id)?
-            .ok_or_else(|| {
+        let primary_provider =
+            get_provider(self.conn, &rule.primary_provider_id)?.ok_or_else(|| {
                 CatermError::Ai(AiError::Generic(format!(
                     "Primary AI provider '{}' not found in registry",
                     rule.primary_provider_id
@@ -63,7 +85,7 @@ impl<'a> Dispatcher<'a> {
         // 4. Try primary provider
         match Self::execute_provider_call(
             &primary_provider,
-            &rule.primary_model,
+            target_primary_model,
             &assembled.system_prompt,
             &assembled.user_prompt,
             rule.temperature,
@@ -74,17 +96,16 @@ impl<'a> Dispatcher<'a> {
                 content,
                 provider_id: primary_provider.id,
                 provider_type: primary_provider.provider_type,
-                model: rule.primary_model,
+                model: target_primary_model.to_string(),
                 fell_back: false,
                 prompt_tokens: None,
                 completion_tokens: None,
             }),
             Err(primary_err) => {
                 // If fallback provider configured, attempt fallback
-                if let (Some(fb_id), Some(fb_model)) = (
-                    &rule.fallback_provider_id,
-                    &rule.fallback_model,
-                ) {
+                if let (Some(fb_id), Some(fb_model)) =
+                    (&rule.fallback_provider_id, &rule.fallback_model)
+                {
                     if let Ok(Some(fallback_provider)) = get_provider(self.conn, fb_id) {
                         if fallback_provider.is_active {
                             if let Ok(content) = Self::execute_provider_call(
@@ -153,13 +174,9 @@ impl<'a> Dispatcher<'a> {
                 max_tokens,
                 timeout,
             ),
-            ProviderType::CatermHosted => Self::call_caterm_hosted(
-                model,
-                system_prompt,
-                user_prompt,
-                temperature,
-                max_tokens,
-            ),
+            ProviderType::CatermHosted => {
+                Self::call_caterm_hosted(model, system_prompt, user_prompt, temperature, max_tokens)
+            }
         }
     }
 
@@ -212,16 +229,21 @@ impl<'a> Dispatcher<'a> {
             .send_json(&payload)
             .map_err(|e| CatermError::Ai(AiError::Generic(format!("Anthropic error: {e}"))))?;
 
-        let body = res
-            .body_mut()
-            .read_to_string()
-            .map_err(|e| CatermError::Ai(AiError::Generic(format!("Read Anthropic response: {e}"))))?;
+        let body = res.body_mut().read_to_string().map_err(|e| {
+            CatermError::Ai(AiError::Generic(format!("Read Anthropic response: {e}")))
+        })?;
 
         let parsed: Value = serde_json::from_str(&body)
             .map_err(|e| CatermError::Ai(AiError::Generic(format!("Parse Anthropic JSON: {e}"))))?;
 
-        if let Some(err_msg) = parsed.get("error").and_then(|e| e.get("message")).and_then(Value::as_str) {
-            return Err(CatermError::Ai(AiError::Generic(format!("Anthropic API returned error: {err_msg}"))));
+        if let Some(err_msg) = parsed
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(Value::as_str)
+        {
+            return Err(CatermError::Ai(AiError::Generic(format!(
+                "Anthropic API returned error: {err_msg}"
+            ))));
         }
 
         let text = parsed
@@ -294,8 +316,14 @@ impl<'a> Dispatcher<'a> {
         let parsed: Value = serde_json::from_str(&body)
             .map_err(|e| CatermError::Ai(AiError::Generic(format!("Parse OpenAI JSON: {e}"))))?;
 
-        if let Some(err_msg) = parsed.get("error").and_then(|e| e.get("message")).and_then(Value::as_str) {
-            return Err(CatermError::Ai(AiError::Generic(format!("OpenAI API returned error: {err_msg}"))));
+        if let Some(err_msg) = parsed
+            .get("error")
+            .and_then(|e| e.get("message"))
+            .and_then(Value::as_str)
+        {
+            return Err(CatermError::Ai(AiError::Generic(format!(
+                "OpenAI API returned error: {err_msg}"
+            ))));
         }
 
         let content = parsed
@@ -399,7 +427,9 @@ impl<'a> Dispatcher<'a> {
             .and_then(|m| m.get("content"))
             .and_then(Value::as_str)
             .ok_or_else(|| {
-                CatermError::Ai(AiError::Generic("CATerm Pro AI returned invalid response".to_string()))
+                CatermError::Ai(AiError::Generic(
+                    "CATerm Pro AI returned invalid response".to_string(),
+                ))
             })?;
 
         Ok(content.to_string())

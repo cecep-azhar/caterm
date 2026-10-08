@@ -61,7 +61,9 @@ pub fn build_backup_payload() -> Result<VaultBackupPayload, CatermError> {
     build_backup_payload_with_secrets(crate::pro::is_pro())
 }
 
-pub fn build_backup_payload_with_secrets(include_secrets: bool) -> Result<VaultBackupPayload, CatermError> {
+pub fn build_backup_payload_with_secrets(
+    include_secrets: bool,
+) -> Result<VaultBackupPayload, CatermError> {
     let hosts = store::list_hosts().unwrap_or_default();
     let hosts_with_secrets = if include_secrets {
         store::list_hosts_with_secrets()

@@ -1,8 +1,9 @@
 //! 6-Stage System Prompt and Context Injection Pipeline.
 
-use super::db::{get_default_persona, get_persona, search_relevant_habits};
+use super::db::{get_default_persona, get_persona, get_skills, search_relevant_habits};
 use super::models::{SystemPersona, TerminalContext};
 use super::scrubber::PromptScrubber;
+use super::skills::CustomSkill;
 use crate::error::CatermError;
 use rusqlite::Connection;
 
@@ -12,6 +13,7 @@ pub struct AssembledPromptContext {
     pub user_prompt: String,
     pub injected_habits_count: usize,
     pub sanitized_terminal_lines: usize,
+    pub active_skill: Option<CustomSkill>,
 }
 
 pub struct ContextBuilder<'a> {
@@ -36,7 +38,39 @@ impl<'a> ContextBuilder<'a> {
         terminal_ctx: Option<&TerminalContext>,
         max_tokens_budget: u32,
     ) -> Result<AssembledPromptContext, CatermError> {
+        self.build_with_skill(
+            user_query,
+            persona_id,
+            None,
+            terminal_ctx,
+            max_tokens_budget,
+        )
+    }
+
+    /// Assemble full context with optional explicit or trigger-matched skill.
+    pub fn build_with_skill(
+        &self,
+        user_query: &str,
+        persona_id: Option<&str>,
+        explicit_skill_name: Option<&str>,
+        terminal_ctx: Option<&TerminalContext>,
+        max_tokens_budget: u32,
+    ) -> Result<AssembledPromptContext, CatermError> {
         let mut system_sections: Vec<String> = Vec::new();
+
+        // Check for matching skill (explicit or via trigger in query)
+        let skills = get_skills(self.conn)?;
+        let active_skill: Option<CustomSkill> = if let Some(target) = explicit_skill_name {
+            skills.into_iter().find(|s| {
+                s.is_enabled
+                    && (s.name.eq_ignore_ascii_case(target)
+                        || s.name.eq_ignore_ascii_case(target.trim_start_matches('@')))
+            })
+        } else {
+            skills
+                .into_iter()
+                .find(|s| s.is_enabled && s.matches_trigger(user_query))
+        };
 
         // STAGE 1: Persona Base System Prompt
         let persona: Option<SystemPersona> = if let Some(pid) = persona_id {
@@ -60,7 +94,25 @@ impl<'a> ContextBuilder<'a> {
             );
         }
 
-        // STAGE 2: Environment Constraints & Host Metadata
+        // STAGE 2: Active Skill SOP Injection
+        if let Some(skill) = &active_skill {
+            let mut skill_sec = format!(
+                "[ACTIVE CUSTOM SKILL SOP: @{}]\nTitle: {}\nCategory: {}\n{}\n",
+                skill.name,
+                skill.title,
+                skill.category,
+                skill.system_instructions.trim()
+            );
+            if !skill.allowed_tools.is_empty() {
+                skill_sec.push_str(&format!(
+                    "Allowed Tools: {}\n",
+                    skill.allowed_tools.join(", ")
+                ));
+            }
+            system_sections.push(skill_sec);
+        }
+
+        // STAGE 3: Environment Constraints & Host Metadata
         let mut env_lines = Vec::new();
         if let Some(p) = &persona {
             if let Some(c) = &p.environment_constraints {
@@ -93,7 +145,7 @@ impl<'a> ContextBuilder<'a> {
             ));
         }
 
-        // STAGE 3: Semantic Habit Memory Retrieval (FTS5 + Top-K)
+        // STAGE 4: Semantic Habit Memory Retrieval (FTS5 + Top-K)
         let relevant_habits = search_relevant_habits(self.conn, user_query, 5)?;
         let habit_count = relevant_habits.len();
         if !relevant_habits.is_empty() {
@@ -104,7 +156,7 @@ impl<'a> ContextBuilder<'a> {
             system_sections.push(habit_sec);
         }
 
-        // STAGE 4 & 5: Terminal Context Sanitization & Budget Clamping
+        // STAGE 5: Terminal Context Sanitization & Budget Clamping
         let mut sanitized_lines_count = 0;
         let mut user_prompt_body = self.scrubber.scrub(user_query);
 
@@ -113,12 +165,7 @@ impl<'a> ContextBuilder<'a> {
                 // Tail at most 40 lines
                 let line_count = t.tail_lines.len();
                 let start_idx = line_count.saturating_sub(40);
-                let tail: Vec<String> = t
-                    .tail_lines
-                    .iter()
-                    .skip(start_idx)
-                    .cloned()
-                    .collect();
+                let tail: Vec<String> = t.tail_lines.iter().skip(start_idx).cloned().collect();
 
                 let mut scrubbed = self.scrubber.scrub_lines(&tail);
                 sanitized_lines_count = scrubbed.len();
@@ -152,6 +199,7 @@ impl<'a> ContextBuilder<'a> {
             user_prompt: user_prompt_body,
             injected_habits_count: habit_count,
             sanitized_terminal_lines: sanitized_lines_count,
+            active_skill,
         })
     }
 }

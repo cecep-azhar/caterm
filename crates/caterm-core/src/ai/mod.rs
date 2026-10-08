@@ -8,6 +8,7 @@ pub mod dispatcher;
 pub mod habit_learner;
 pub mod models;
 pub mod scrubber;
+pub mod skills;
 
 pub use context_builder::*;
 pub use db::*;
@@ -15,6 +16,7 @@ pub use dispatcher::*;
 pub use habit_learner::*;
 pub use models::*;
 pub use scrubber::*;
+pub use skills::*;
 
 use crate::error::{AiError, CatermError, DbError, SshError, ValidationError};
 use rusqlite::{Connection, params};
@@ -36,7 +38,11 @@ pub fn get_all_providers() -> Result<Vec<AiProviderSummary>, CatermError> {
             base_url: c.base_url,
             default_model: c.default_model,
             is_active: c.is_active,
-            has_api_key: c.api_key.as_ref().map(|k| !k.trim().is_empty()).unwrap_or(false),
+            has_api_key: c
+                .api_key
+                .as_ref()
+                .map(|k| !k.trim().is_empty())
+                .unwrap_or(false),
             created_at: c.created_at,
             updated_at: c.updated_at,
         })
@@ -98,6 +104,21 @@ pub fn delete_habit_memory(id: &str) -> Result<(), CatermError> {
     db::delete_habit(&conn, id)
 }
 
+pub fn get_all_skills() -> Result<Vec<CustomSkill>, CatermError> {
+    let conn = crate::db::open()?;
+    db::get_skills(&conn)
+}
+
+pub fn save_custom_skill(skill: CustomSkill) -> Result<(), CatermError> {
+    let conn = crate::db::open()?;
+    db::save_skill(&conn, &skill)
+}
+
+pub fn delete_custom_skill(id: &str) -> Result<(), CatermError> {
+    let conn = crate::db::open()?;
+    db::delete_skill(&conn, id)
+}
+
 pub fn dispatch_task(
     task_type: TaskType,
     user_query: &str,
@@ -106,6 +127,22 @@ pub fn dispatch_task(
     let conn = crate::db::open()?;
     let dispatcher = Dispatcher::new(&conn);
     dispatcher.dispatch(task_type, user_query, terminal_ctx.as_ref())
+}
+
+pub fn dispatch_task_with_skill(
+    task_type: TaskType,
+    user_query: &str,
+    skill_name: Option<String>,
+    terminal_ctx: Option<TerminalContext>,
+) -> Result<DispatchResult, CatermError> {
+    let conn = crate::db::open()?;
+    let dispatcher = Dispatcher::new(&conn);
+    dispatcher.dispatch_with_skill(
+        task_type,
+        user_query,
+        skill_name.as_deref(),
+        terminal_ctx.as_ref(),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -767,7 +804,9 @@ pub fn chat(
 
     let mut system = CHAT_SYSTEM_PROMPT.to_string();
     if let Some(label) = host_label.filter(|l| !l.trim().is_empty()) {
-        system.push_str(&format!("\n\nThe commands will run on the host the user calls \"{label}\"."));
+        system.push_str(&format!(
+            "\n\nThe commands will run on the host the user calls \"{label}\"."
+        ));
     }
 
     let mut payload_messages = vec![serde_json::json!({ "role": "system", "content": system })];
@@ -1007,11 +1046,35 @@ mod tests {
             .build("how do I restart podman?", None, Some(&term_ctx), 2048)
             .expect("build context");
 
-        assert!(assembled.system_prompt.contains("[SYSTEM CONTEXT: PERSONA]"));
-        assert!(assembled.system_prompt.contains("[ENVIRONMENT CONSTRAINTS]"));
-        assert!(assembled.system_prompt.contains("Prefers podman over docker"));
+        assert!(
+            assembled
+                .system_prompt
+                .contains("[SYSTEM CONTEXT: PERSONA]")
+        );
+        assert!(
+            assembled
+                .system_prompt
+                .contains("[ENVIRONMENT CONSTRAINTS]")
+        );
+        assert!(
+            assembled
+                .system_prompt
+                .contains("Prefers podman over docker")
+        );
         assert!(assembled.user_prompt.contains("[REDACTED_BEARER_TOKEN]"));
         assert!(!assembled.user_prompt.contains("secret123"));
+
+        // Test skill SOP injection with @k8s-triage trigger
+        let assembled_k8s = builder
+            .build("Tolong cek pod crash dengan @k8s-triage", None, None, 2048)
+            .expect("build skill context");
+        assert!(
+            assembled_k8s
+                .system_prompt
+                .contains("[ACTIVE CUSTOM SKILL SOP: @k8s-triage]")
+        );
+        assert!(assembled_k8s.active_skill.is_some());
+        assert_eq!(assembled_k8s.active_skill.unwrap().name, "k8s-triage");
     }
 
     #[test]
@@ -1019,8 +1082,9 @@ mod tests {
         let t = TempDb::new("learner");
         let conn = crate::db::open_encrypted(&t.0, "test-ai-key").expect("db");
 
-        let learned = HabitLearner::observe_command(&conn, "podman-compose up -d", Some(0), Some("server-1"))
-            .expect("observe");
+        let learned =
+            HabitLearner::observe_command(&conn, "podman-compose up -d", Some(0), Some("server-1"))
+                .expect("observe");
         assert!(learned.is_some());
         let h = learned.expect("some habit");
         assert_eq!(h.key_tag, "container_runtime");
@@ -1033,7 +1097,10 @@ mod tests {
         let conn = crate::db::open_encrypted(&t.0, "test-ai-key").expect("db");
 
         let matrix = db::get_routing_matrix(&conn).expect("matrix");
-        assert!(!matrix.is_empty(), "Default routing matrix should be seeded");
+        assert!(
+            !matrix.is_empty(),
+            "Default routing matrix should be seeded"
+        );
 
         let err_diag = db::get_route_rule(&conn, TaskType::ErrorDiagnostic)
             .expect("get rule")
@@ -1042,4 +1109,3 @@ mod tests {
         assert_eq!(err_diag.primary_provider_id, "byo-anthropic");
     }
 }
-

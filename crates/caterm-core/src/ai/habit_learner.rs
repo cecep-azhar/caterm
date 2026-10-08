@@ -27,7 +27,9 @@ impl HabitLearner {
             }
         }
 
-        let learned = if trimmed.contains("podman-compose") || (trimmed.contains("podman") && trimmed.contains("compose")) {
+        let learned = if trimmed.contains("podman-compose")
+            || (trimmed.contains("podman") && trimmed.contains("compose"))
+        {
             Some((
                 "cli_preference",
                 "container_runtime",

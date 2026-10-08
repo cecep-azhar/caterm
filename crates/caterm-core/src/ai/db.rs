@@ -3,6 +3,7 @@
 use super::models::{
     AiProviderConfig, HabitFact, ProviderType, SystemPersona, TaskRouteRule, TaskType,
 };
+use super::skills::CustomSkill;
 use crate::error::{CatermError, DbError};
 use rusqlite::{Connection, params};
 
@@ -85,10 +86,7 @@ pub fn get_provider(conn: &Connection, id: &str) -> Result<Option<AiProviderConf
     }
 }
 
-pub fn save_provider(
-    conn: &Connection,
-    provider: &AiProviderConfig,
-) -> Result<(), CatermError> {
+pub fn save_provider(conn: &Connection, provider: &AiProviderConfig) -> Result<(), CatermError> {
     let headers_json = match &provider.custom_headers {
         Some(h) => serde_json::to_string(h).unwrap_or_else(|_| "{}".to_string()),
         None => "{}".to_string(),
@@ -303,7 +301,11 @@ pub fn get_default_persona(conn: &Connection) -> Result<Option<SystemPersona>, C
                     environment_constraints, is_global_default, created_at, updated_at
              FROM ai_user_personas WHERE is_global_default = 1 LIMIT 1",
         )
-        .map_err(|e| CatermError::Db(DbError::Generic(format!("prepare default persona query: {e}"))))?;
+        .map_err(|e| {
+            CatermError::Db(DbError::Generic(format!(
+                "prepare default persona query: {e}"
+            )))
+        })?;
 
     let mut rows = stmt
         .query_map([], |row| {
@@ -321,7 +323,11 @@ pub fn get_default_persona(conn: &Connection) -> Result<Option<SystemPersona>, C
                 updated_at: row.get(8)?,
             })
         })
-        .map_err(|e| CatermError::Db(DbError::Generic(format!("execute default persona query: {e}"))))?;
+        .map_err(|e| {
+            CatermError::Db(DbError::Generic(format!(
+                "execute default persona query: {e}"
+            )))
+        })?;
 
     match rows.next() {
         Some(Ok(p)) => Ok(Some(p)),
@@ -330,7 +336,8 @@ pub fn get_default_persona(conn: &Connection) -> Result<Option<SystemPersona>, C
 }
 
 pub fn save_persona(conn: &Connection, persona: &SystemPersona) -> Result<(), CatermError> {
-    let rules_json = serde_json::to_string(&persona.custom_rules).unwrap_or_else(|_| "[]".to_string());
+    let rules_json =
+        serde_json::to_string(&persona.custom_rules).unwrap_or_else(|_| "[]".to_string());
 
     if persona.is_global_default {
         let _ = conn.execute("UPDATE ai_user_personas SET is_global_default = 0", []);
@@ -500,7 +507,10 @@ pub fn search_relevant_habits(
     let sanitized_tokens: Vec<String> = query
         .split_whitespace()
         .filter_map(|w| {
-            let cleaned: String = w.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+            let cleaned: String = w
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
             if cleaned.len() >= 2 {
                 Some(format!("\"{cleaned}\"*"))
             } else {
@@ -521,7 +531,11 @@ pub fn search_relevant_habits(
                  ORDER BY is_pinned DESC, confidence_score DESC
                  LIMIT ?1",
             )
-            .map_err(|e| CatermError::Db(DbError::Generic(format!("prepare default habits query: {e}"))))?;
+            .map_err(|e| {
+                CatermError::Db(DbError::Generic(format!(
+                    "prepare default habits query: {e}"
+                )))
+            })?;
 
         let rows = stmt
             .query_map(params![limit as i64], |row| {
@@ -539,7 +553,11 @@ pub fn search_relevant_habits(
                     last_accessed_at: row.get(10)?,
                 })
             })
-            .map_err(|e| CatermError::Db(DbError::Generic(format!("execute default habits query: {e}"))))?;
+            .map_err(|e| {
+                CatermError::Db(DbError::Generic(format!(
+                    "execute default habits query: {e}"
+                )))
+            })?;
 
         let mut results = Vec::new();
         for r in rows {
@@ -639,6 +657,145 @@ pub fn search_relevant_habits(
     Ok(results)
 }
 
+// ---------------------------------------------------------------------------
+// 5. Custom Skills
+// ---------------------------------------------------------------------------
+
+pub fn get_skills(conn: &Connection) -> Result<Vec<CustomSkill>, CatermError> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, title, description, category, triggers_json,
+                    preferred_model_id, system_instructions, allowed_tools_json,
+                    is_builtin, is_enabled, created_at
+             FROM ai_custom_skills ORDER BY is_builtin DESC, name ASC",
+        )
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("prepare skills query: {e}"))))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let triggers_json: String = row.get(5)?;
+            let tools_json: String = row.get(8)?;
+            let triggers: Vec<String> = serde_json::from_str(&triggers_json).unwrap_or_default();
+            let allowed_tools: Vec<String> = serde_json::from_str(&tools_json).unwrap_or_default();
+
+            Ok(CustomSkill {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                title: row.get(2)?,
+                description: row.get(3)?,
+                category: row.get(4)?,
+                triggers,
+                preferred_model_id: row.get(6)?,
+                system_instructions: row.get(7)?,
+                allowed_tools,
+                is_builtin: row.get::<_, i64>(9)? != 0,
+                is_enabled: row.get::<_, i64>(10)? != 0,
+                created_at: row.get(11)?,
+            })
+        })
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("execute skills query: {e}"))))?;
+
+    let mut list = Vec::new();
+    for r in rows {
+        if let Ok(item) = r {
+            list.push(item);
+        }
+    }
+    Ok(list)
+}
+
+pub fn get_skill_by_name(
+    conn: &Connection,
+    name: &str,
+) -> Result<Option<CustomSkill>, CatermError> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, name, title, description, category, triggers_json,
+                    preferred_model_id, system_instructions, allowed_tools_json,
+                    is_builtin, is_enabled, created_at
+             FROM ai_custom_skills WHERE name = ?1",
+        )
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("prepare skill query: {e}"))))?;
+
+    let mut rows = stmt
+        .query_map(params![name], |row| {
+            let triggers_json: String = row.get(5)?;
+            let tools_json: String = row.get(8)?;
+            let triggers: Vec<String> = serde_json::from_str(&triggers_json).unwrap_or_default();
+            let allowed_tools: Vec<String> = serde_json::from_str(&tools_json).unwrap_or_default();
+
+            Ok(CustomSkill {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                title: row.get(2)?,
+                description: row.get(3)?,
+                category: row.get(4)?,
+                triggers,
+                preferred_model_id: row.get(6)?,
+                system_instructions: row.get(7)?,
+                allowed_tools,
+                is_builtin: row.get::<_, i64>(9)? != 0,
+                is_enabled: row.get::<_, i64>(10)? != 0,
+                created_at: row.get(11)?,
+            })
+        })
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("execute skill query: {e}"))))?;
+
+    match rows.next() {
+        Some(Ok(s)) => Ok(Some(s)),
+        _ => Ok(None),
+    }
+}
+
+pub fn save_skill(conn: &Connection, skill: &CustomSkill) -> Result<(), CatermError> {
+    let triggers_json = serde_json::to_string(&skill.triggers).unwrap_or_else(|_| "[]".to_string());
+    let tools_json =
+        serde_json::to_string(&skill.allowed_tools).unwrap_or_else(|_| "[]".to_string());
+
+    conn.execute(
+        "INSERT INTO ai_custom_skills (
+            id, name, title, description, category, triggers_json,
+            preferred_model_id, system_instructions, allowed_tools_json,
+            is_builtin, is_enabled, created_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, strftime('%s', 'now'))
+        ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            title = excluded.title,
+            description = excluded.description,
+            category = excluded.category,
+            triggers_json = excluded.triggers_json,
+            preferred_model_id = excluded.preferred_model_id,
+            system_instructions = excluded.system_instructions,
+            allowed_tools_json = excluded.allowed_tools_json,
+            is_enabled = excluded.is_enabled;",
+        params![
+            skill.id,
+            skill.name,
+            skill.title,
+            skill.description,
+            skill.category,
+            triggers_json,
+            skill.preferred_model_id,
+            skill.system_instructions,
+            tools_json,
+            if skill.is_builtin { 1 } else { 0 },
+            if skill.is_enabled { 1 } else { 0 },
+        ],
+    )
+    .map_err(|e| CatermError::Db(DbError::Generic(format!("save custom skill: {e}"))))?;
+
+    Ok(())
+}
+
+pub fn delete_skill(conn: &Connection, id: &str) -> Result<(), CatermError> {
+    conn.execute(
+        "DELETE FROM ai_custom_skills WHERE id = ?1 AND is_builtin = 0",
+        params![id],
+    )
+    .map_err(|e| CatermError::Db(DbError::Generic(format!("delete custom skill: {e}"))))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -684,6 +841,9 @@ mod tests {
 
         let found = search_relevant_habits(&conn, "podman docker", 5).expect("search");
         assert!(!found.is_empty(), "Should find podman habit via FTS5");
-        assert_eq!(found.first().map(|h| h.key_tag.as_str()), Some("docker_runtime"));
+        assert_eq!(
+            found.first().map(|h| h.key_tag.as_str()),
+            Some("docker_runtime")
+        );
     }
 }

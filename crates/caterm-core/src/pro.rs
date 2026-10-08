@@ -627,7 +627,8 @@ fn authed(
 ) -> Result<(u16, Value), CatermError> {
     let token = access_token(conn)?;
     let caterm_tok = signed_license_token(conn)?;
-    let (status, value) = request_with_token(method, path, Some(&token), caterm_tok.as_deref(), body)?;
+    let (status, value) =
+        request_with_token(method, path, Some(&token), caterm_tok.as_deref(), body)?;
     if status == 401 {
         // Access token rejected (e.g. server secret rotated): refresh once and retry.
         *ACCESS.lock() = None;
@@ -776,10 +777,12 @@ pub fn commit_pending() -> Result<bool, CatermError> {
 
 /// # Infallible: returns false when status check fails or unentitled.
 pub fn is_pro() -> bool {
-    status().map(|s| match s.entitlement {
-        Entitlement::Valid { ref tier, .. } => tier == "pro" || tier == "team",
-        _ => false,
-    }).unwrap_or(false)
+    status()
+        .map(|s| match s.entitlement {
+            Entitlement::Valid { ref tier, .. } => tier == "pro" || tier == "team",
+            _ => false,
+        })
+        .unwrap_or(false)
 }
 
 /// Offline status: what this device is entitled to right now, from the stored signed token.
@@ -822,7 +825,10 @@ pub fn status() -> Result<ProStatus, CatermError> {
             || lic.get("plan").and_then(Value::as_str) == Some("founder_lifetime")
             || lic.get("plan").and_then(Value::as_str) == Some("lifetime")
             || lic.get("source").and_then(Value::as_str) == Some("founder");
-        if is_founder_or_life && (entitlement == Entitlement::None || matches!(entitlement, Entitlement::Invalid { .. })) {
+        if is_founder_or_life
+            && (entitlement == Entitlement::None
+                || matches!(entitlement, Entitlement::Invalid { .. }))
+        {
             entitlement = Entitlement::Valid {
                 expires_at: 2085974400, // 2036+ lifetime
                 tier: "pro".to_string(),
@@ -923,7 +929,11 @@ pub fn activate_license_key(key: &str) -> Result<ProStatus, CatermError> {
         return Err(pro_err("INVALID_LICENSE_KEY_FORMAT"));
     }
 
-    let plan_name = if is_lifetime { "founder_lifetime" } else { "pro_annual" };
+    let plan_name = if is_lifetime {
+        "founder_lifetime"
+    } else {
+        "pro_annual"
+    };
     let account = json!({
         "id": "usr_caterm_founder",
         "email": "cecep.azhtech@gmail.com",
