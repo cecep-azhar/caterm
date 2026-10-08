@@ -27,15 +27,6 @@ function detectInitialLocale(): Locale {
   } catch {
     // Private mode / blocked storage: fall through to detection below.
   }
-  try {
-    // First run only: if the OS/browser is set to Indonesian, greet in Indonesian: after that,
-    // the explicit choice in localStorage above always wins.
-    if (typeof navigator !== 'undefined' && navigator.language?.toLowerCase().startsWith('id')) {
-      return 'id';
-    }
-  } catch {
-    // Ignore — default below.
-  }
   return 'en';
 }
 
