@@ -70,6 +70,8 @@ const id: Dictionary = {
     totp: 'Autentikasi 2FA',
     groups: 'Grup Kerja',
     teams: 'Tim Kolaborasi',
+    security: 'Keamanan Server',
+    devops: 'DevOps Lab',
     diagnostics: 'DevOps & Lab',
     contribution: 'Kontribusi',
     settings: 'Pengaturan'

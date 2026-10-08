@@ -728,6 +728,79 @@ pub async fn ai_chat(
     run_blocking(move || ai::chat(messages, host_label.as_deref(), hosted.unwrap_or(false))).await
 }
 
+#[tauri::command]
+pub async fn ai_get_providers() -> Result<Vec<ai::AiProviderSummary>, CatermError> {
+    run_blocking(ai::get_all_providers).await
+}
+
+#[tauri::command]
+pub async fn ai_save_provider(provider: ai::AiProviderConfig) -> Result<(), CatermError> {
+    run_blocking(move || ai::save_ai_provider(provider)).await
+}
+
+#[tauri::command]
+pub async fn ai_delete_provider(id: String) -> Result<(), CatermError> {
+    run_blocking(move || ai::delete_ai_provider(&id)).await
+}
+
+#[tauri::command]
+pub async fn ai_get_routing_matrix() -> Result<Vec<ai::TaskRouteRule>, CatermError> {
+    run_blocking(ai::get_task_routing_matrix).await
+}
+
+#[tauri::command]
+pub async fn ai_save_routing_rule(rule: ai::TaskRouteRule) -> Result<(), CatermError> {
+    run_blocking(move || ai::save_task_routing_rule(rule)).await
+}
+
+#[tauri::command]
+pub async fn ai_get_personas() -> Result<Vec<ai::SystemPersona>, CatermError> {
+    run_blocking(ai::get_user_personas).await
+}
+
+#[tauri::command]
+pub async fn ai_save_persona(persona: ai::SystemPersona) -> Result<(), CatermError> {
+    run_blocking(move || ai::save_user_persona(persona)).await
+}
+
+#[tauri::command]
+pub async fn ai_delete_persona(id: String) -> Result<(), CatermError> {
+    run_blocking(move || ai::delete_user_persona(&id)).await
+}
+
+#[tauri::command]
+pub async fn ai_get_habits() -> Result<Vec<ai::HabitFact>, CatermError> {
+    run_blocking(ai::get_habit_memories).await
+}
+
+#[tauri::command]
+pub async fn ai_search_habits(
+    query: String,
+    limit: Option<usize>,
+) -> Result<Vec<ai::HabitFact>, CatermError> {
+    run_blocking(move || ai::search_habit_memories(&query, limit.unwrap_or(20))).await
+}
+
+#[tauri::command]
+pub async fn ai_toggle_habit_pin(id: String) -> Result<bool, CatermError> {
+    run_blocking(move || ai::toggle_habit_pin_status(&id)).await
+}
+
+#[tauri::command]
+pub async fn ai_delete_habit(id: String) -> Result<(), CatermError> {
+    run_blocking(move || ai::delete_habit_memory(&id)).await
+}
+
+#[tauri::command]
+pub async fn ai_dispatch_task(
+    task_type: String,
+    query: String,
+    terminal_ctx: Option<ai::TerminalContext>,
+) -> Result<ai::DispatchResult, CatermError> {
+    let tt = ai::TaskType::from_str_opt(&task_type).unwrap_or(ai::TaskType::Chat);
+    run_blocking(move || ai::dispatch_task(tt, &query, terminal_ctx)).await
+}
+
 // ---- Hosted AI (CATerm Pro pooled quota via OmniRoute) -------------------------------------
 
 #[tauri::command]

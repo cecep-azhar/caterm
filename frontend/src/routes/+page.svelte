@@ -670,7 +670,8 @@
               </button>
               {#if openMenuId === host.id}
                 <div role="menu" class="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#141414] shadow-2xl py-1 text-sm">
-                  <a role="menuitem" href="/diagnostics?host={host.id}" class={menuItem}>Lab / Audit</a>
+                  <a role="menuitem" href="/security?host={host.id}" class={menuItem}>Security Audit</a>
+                  <a role="menuitem" href="/devops?host={host.id}" class={menuItem}>DevOps Lab</a>
                   <a role="menuitem" href="/sftp?host={host.id}" class={menuItem}>{t('hosts.filesSftp')}</a>
                   <button role="menuitem" onclick={() => { openMenuId = null; detailHost = host; }} class={menuItem}>{t('common.details')}</button>
                   <button role="menuitem" onclick={() => { openMenuId = null; handleClone(host); }} class={menuItem}>{t('common.clone')}</button>
@@ -684,11 +685,20 @@
             </div>
 
             <a
-              href="/diagnostics?host={host.id}"
-              class="h-8 px-2.5 flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-medium transition-colors"
-              title="DevOps Lab & Audit"
+              href="/security?host={host.id}"
+              class="h-8 px-2 flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-medium transition-colors"
+              title="Security Exposure & Threat Audit"
             >
-              <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.438l-.318.131a6 6 0 01-3.86.438l-2.387-.477a2 2 0 00-1.022.547l-1.89 1.89A2 2 0 002.5 19v1.5a1.5 1.5 0 001.5 1.5h16a1.5 1.5 0 001.5-1.5V19a2 2 0 00-.598-1.414l-1.474-1.474zM12 2v6m0 0a3 3 0 100 6 3 3 0 000-6z"/></svg>
+              <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              <span>Security</span>
+            </a>
+
+            <a
+              href="/devops?host={host.id}"
+              class="h-8 px-2 flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-medium transition-colors"
+              title="DevOps Lab, Bench & QoS"
+            >
+              <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
               <span>Lab</span>
             </a>
 

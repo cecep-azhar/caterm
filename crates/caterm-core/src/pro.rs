@@ -774,6 +774,7 @@ pub fn commit_pending() -> Result<bool, CatermError> {
     Ok(true)
 }
 
+/// # Infallible: returns false when status check fails or unentitled.
 pub fn is_pro() -> bool {
     status().map(|s| match s.entitlement {
         Entitlement::Valid { ref tier, .. } => tier == "pro" || tier == "team",

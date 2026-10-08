@@ -26,7 +26,8 @@
   import { terminalKeyAction } from '$lib/shortcuts';
   import { getTerminalPrefs, stepTerminalFontSize, setTerminalFontSize, DEFAULT_FONT_SIZE } from '$lib/stores/terminalPrefs.svelte';
   import { copyText } from '$lib/utils/clipboard';
-import { getAmbientStore } from '$lib/stores/ambient.svelte';
+  import { getAmbientStore } from '$lib/stores/ambient.svelte';
+  import { aiDispatchTask, type DispatchResult } from '$lib/api/aiRouting';
 
   let {
     host,
@@ -76,6 +77,51 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
   let userSnippets = $state<SnippetRecord[]>([]);
   let suggestions = $state<AutocompleteItem[]>([]);
   let selectedSuggestionIndex = $state(0);
+
+  // AI Diagnostic State
+  let showDiagnosticModal = $state(false);
+  let isDiagnosing = $state(false);
+  let diagnosticResult = $state<DispatchResult | null>(null);
+  let diagnosticError = $state<string | null>(null);
+
+  function getTerminalTailLines(count: number = 40): string[] {
+    if (!term) return [];
+    const buffer = term.buffer.active;
+    const lines: string[] = [];
+    const total = buffer.length;
+    const start = Math.max(0, total - count);
+    for (let i = start; i < total; i++) {
+      const line = buffer.getLine(i);
+      if (line) {
+        lines.push(line.translateToString(true));
+      }
+    }
+    return lines;
+  }
+
+  async function triggerErrorDiagnostic() {
+    showDiagnosticModal = true;
+    isDiagnosing = true;
+    diagnosticResult = null;
+    diagnosticError = null;
+    try {
+      const tailLines = getTerminalTailLines(40);
+      const res = await aiDispatchTask(
+        'error_diagnostic',
+        'Analyze recent terminal output, identify root error or crash, and provide explanation and fix command.',
+        {
+          tail_lines: tailLines,
+          host_label: paneLabel,
+          active_host_id: host.id
+        }
+      );
+      diagnosticResult = res;
+    } catch (err) {
+      diagnosticError = errorMessage(err);
+    } finally {
+      isDiagnosing = false;
+    }
+  }
 
   // Load user snippets on mount
   onMount(() => {
@@ -553,6 +599,19 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
         <span>{t('terminal.autocomplete')}</span>
       </button>
 
+      <!-- AI Error Diagnose button -->
+      <button
+        onclick={triggerErrorDiagnostic}
+        class="px-1.5 py-0.5 rounded text-[10px] font-sans font-semibold transition-colors flex items-center gap-1 bg-purple-500/15 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 border border-purple-500/30 hover:bg-purple-500/25"
+        title="Diagnose Recent Errors with Master AI Router"
+        aria-label="AI Diagnose"
+      >
+        <svg class="w-3 h-3 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <span>Diagnose</span>
+      </button>
+
       {#if onSplitRight}
         <button onclick={onSplitRight} class="hover:text-sky-600 dark:hover:text-sky-400 p-0.5 rounded transition-colors" title={t('terminal.splitRightTitle')} aria-label={t('terminal.splitRight')}>
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2" d="M12 3v18M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
@@ -589,5 +648,69 @@ import { getAmbientStore } from '$lib/stores/ambient.svelte';
       onSelect={applySuggestion}
       onClose={dismissSuggestions}
     />
+  {/if}
+
+  <!-- AI Error Diagnostic Modal Overlay -->
+  {#if showDiagnosticModal}
+    <div class="absolute inset-0 z-40 bg-black/70 backdrop-blur-xs flex flex-col p-4 overflow-hidden">
+      <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-4 flex flex-col max-h-full overflow-hidden shadow-2xl text-neutral-900 dark:text-white space-y-3">
+        <div class="flex items-center justify-between pb-2 border-b border-neutral-200 dark:border-neutral-800">
+          <div class="flex items-center gap-2">
+            <span class="p-1 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </span>
+            <h3 class="text-sm font-semibold">AI Error Diagnostic & Fix</h3>
+            {#if diagnosticResult}
+              <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                {diagnosticResult.model}
+                {#if diagnosticResult.fell_back}
+                  (Failover Active)
+                {/if}
+              </span>
+            {/if}
+          </div>
+          <button
+            onclick={() => (showDiagnosticModal = false)}
+            class="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 font-bold text-lg"
+          >
+            &times;
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto space-y-3 text-xs">
+          {#if isDiagnosing}
+            <div class="flex flex-col items-center justify-center py-12 text-neutral-500 space-y-3">
+              <svg class="w-6 h-6 animate-spin text-purple-500" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              <p>Analyzing terminal output & learned habits via Master AI Router...</p>
+            </div>
+          {:else if diagnosticError}
+            <div class="p-3 rounded bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-300">
+              Diagnostic failed: {diagnosticError}
+            </div>
+          {:else if diagnosticResult}
+            <div class="p-3 rounded bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 space-y-2 whitespace-pre-wrap font-mono text-xs">
+              {diagnosticResult.content}
+            </div>
+          {/if}
+        </div>
+
+        <div class="flex justify-between items-center pt-2 border-t border-neutral-200 dark:border-neutral-800">
+          <span class="text-[10px] text-neutral-400">Zero-knowledge local memory & PII scrubber enabled.</span>
+          <div class="flex gap-2">
+            <button
+              onclick={() => (showDiagnosticModal = false)}
+              class="px-3 py-1.5 rounded border border-neutral-300 dark:border-neutral-700 text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   {/if}
 </div>

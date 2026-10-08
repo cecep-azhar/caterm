@@ -569,12 +569,74 @@
       {/if}
     </div>
   {:else if activeTab === 'ai'}
-    <div class="{CARD} space-y-4">
-      <div>
-        <h2 class="text-lg font-semibold text-neutral-900 dark:text-white">{t('settings.ai.title')}</h2>
-        <p class="{MUTED} text-sm">{t('settings.ai.subtitle')}</p>
+    <div class="space-y-6">
+      <!-- Master AI Architecture Navigation Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <a
+          href="/settings/ai-routing"
+          class="{SUBCARD} hover:border-sky-500/50 hover:bg-sky-500/5 transition-all block group"
+        >
+          <div class="flex items-center gap-2 mb-2">
+            <span class="p-2 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </span>
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-400">
+              Routing Matrix
+            </h3>
+          </div>
+          <p class="{MUTED} text-xs">
+            Multi-provider failover, BYO keys (Anthropic, OpenAI, Ollama), and task-specific model routing.
+          </p>
+        </a>
+
+        <a
+          href="/settings/ai-personas"
+          class="{SUBCARD} hover:border-indigo-500/50 hover:bg-indigo-500/5 transition-all block group"
+        >
+          <div class="flex items-center gap-2 mb-2">
+            <span class="p-2 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </span>
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+              Personas & Rules
+            </h3>
+          </div>
+          <p class="{MUTED} text-xs">
+            System prompts, safety guardrails, environment constraints, and terminal context formatting.
+          </p>
+        </a>
+
+        <a
+          href="/settings/ai-habits"
+          class="{SUBCARD} hover:border-teal-500/50 hover:bg-teal-500/5 transition-all block group"
+        >
+          <div class="flex items-center gap-2 mb-2">
+            <span class="p-2 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </span>
+            <h3 class="text-sm font-semibold text-neutral-900 dark:text-white group-hover:text-teal-600 dark:group-hover:text-teal-400">
+              Habit Memory (FTS5)
+            </h3>
+          </div>
+          <p class="{MUTED} text-xs">
+            Encrypted zero-knowledge memory of CLI habits, container tools, and command preferences.
+          </p>
+        </a>
       </div>
-      <AiSettingsForm />
+
+      <div class="{CARD} space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold text-neutral-900 dark:text-white">{t('settings.ai.title')}</h2>
+          <p class="{MUTED} text-sm">{t('settings.ai.subtitle')}</p>
+        </div>
+        <AiSettingsForm />
+      </div>
     </div>
   {:else if activeTab === 'subscription'}
     <div class="{CARD} space-y-6">
