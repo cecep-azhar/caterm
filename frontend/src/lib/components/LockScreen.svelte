@@ -100,9 +100,7 @@
 
   const isProUser = $derived(
     profile.plan === 'pro' ||
-    Boolean(AVATARS.find((a) => a.id === profile.avatar)?.pro) ||
-    Boolean(proAccount) ||
-    profile.name.toLowerCase().includes('cecep')
+    Boolean(proAccount)
   );
 
   const isTauri = typeof window !== 'undefined' && Boolean((window as any).__TAURI_INTERNALS__ || (window as any).__TAURI__);

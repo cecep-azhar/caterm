@@ -936,6 +936,13 @@ pub async fn pro_logout() -> Result<(), CatermError> {
 }
 
 #[tauri::command]
+pub async fn pro_activate_license(
+    license_key: String,
+) -> Result<caterm_core::pro::ProStatus, CatermError> {
+    run_blocking(move || caterm_core::pro::activate_license_key(&license_key)).await
+}
+
+#[tauri::command]
 pub async fn pro_team() -> Result<caterm_core::pro::ProTeamView, CatermError> {
     run_blocking(caterm_core::pro::team).await
 }

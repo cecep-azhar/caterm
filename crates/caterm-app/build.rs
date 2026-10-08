@@ -145,6 +145,7 @@ const COMMANDS: &[&str] = &[
     "pro_account",
     "pro_revoke_device",
     "pro_logout",
+    "pro_activate_license",
     "pro_team",
     "pro_team_invite",
     "pro_team_cancel_invite",

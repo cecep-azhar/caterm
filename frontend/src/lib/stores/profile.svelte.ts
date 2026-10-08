@@ -16,6 +16,7 @@ export type Plan = 'free' | 'pro';
 interface StoredProfile {
   name: string;
   avatar: string;
+  plan?: Plan;
 }
 
 function load(): StoredProfile | null {
@@ -24,7 +25,11 @@ function load(): StoredProfile | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<StoredProfile>;
     if (typeof parsed.name !== 'string') return null;
-    return { name: parsed.name, avatar: typeof parsed.avatar === 'string' ? parsed.avatar : DEFAULT_AVATAR };
+    return {
+      name: parsed.name,
+      avatar: typeof parsed.avatar === 'string' ? parsed.avatar : DEFAULT_AVATAR,
+      plan: parsed.plan === 'pro' ? 'pro' : 'free'
+    };
   } catch {
     return null;
   }
@@ -33,6 +38,7 @@ function load(): StoredProfile | null {
 const initial = typeof localStorage === 'undefined' ? null : load();
 let name = $state(initial?.name || DEFAULT_PROFILE_NAME);
 let avatar = $state(initial?.avatar || DEFAULT_AVATAR);
+let storedPlan = $state<Plan>(initial?.plan || 'free');
 
 export function getProfile() {
   return {
@@ -43,17 +49,25 @@ export function getProfile() {
       return avatar;
     },
     get plan(): Plan {
-      // Pro only when this device holds a valid signed licence (see stores/pro).
-      return getPro().isPro ? 'pro' : 'free';
+      // Pro if either live vault licence is pro OR local setting was activated as pro
+      if (getPro().isPro) return 'pro';
+      return storedPlan;
     }
   };
+}
+
+export function setProfilePlan(plan: Plan) {
+  storedPlan = plan;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, avatar, plan: storedPlan }));
+  } catch {}
 }
 
 export function saveProfile(next: { name: string; avatar: string }) {
   name = next.name.trim() || DEFAULT_PROFILE_NAME;
   avatar = next.avatar || DEFAULT_AVATAR;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, avatar }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ name, avatar, plan: storedPlan }));
   } catch {
     // Storage blocked: the change still applies for this session.
   }

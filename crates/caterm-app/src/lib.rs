@@ -298,6 +298,7 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::pro_account,
             commands::pro_revoke_device,
             commands::pro_logout,
+            commands::pro_activate_license,
             commands::pro_team,
             commands::pro_team_invite,
             commands::pro_team_cancel_invite,

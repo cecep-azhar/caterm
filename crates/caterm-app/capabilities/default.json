@@ -125,6 +125,7 @@
     "allow-pro-account",
     "allow-pro-revoke-device",
     "allow-pro-logout",
+    "allow-pro-activate-license",
     "allow-pro-team",
     "allow-pro-team-invite",
     "allow-pro-team-cancel-invite",

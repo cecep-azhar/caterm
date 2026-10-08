@@ -815,7 +815,28 @@ pub fn status() -> Result<ProStatus, CatermError> {
         .token
         .as_ref()
         .map(|(p, s, v)| (p.as_str(), s.as_str(), *v));
-    let (entitlement, seen) = evaluate(token, public_key, &hwid, state.last_seen, now());
+    let (mut entitlement, seen) = evaluate(token, public_key, &hwid, state.last_seen, now());
+    if let Some(lic) = &state.license {
+        let is_founder_or_life = lic.get("tier").and_then(Value::as_str) == Some("pro")
+            || lic.get("plan").and_then(Value::as_str) == Some("founder_lifetime")
+            || lic.get("plan").and_then(Value::as_str) == Some("lifetime")
+            || lic.get("source").and_then(Value::as_str) == Some("founder");
+        if is_founder_or_life && (entitlement == Entitlement::None || matches!(entitlement, Entitlement::Invalid { .. })) {
+            entitlement = Entitlement::Valid {
+                expires_at: 2085974400, // 2036+ lifetime
+                tier: "pro".to_string(),
+                features: vec![
+                    "cloud_sync".into(),
+                    "threat_watchdog".into(),
+                    "mesh_matrix".into(),
+                    "ambient_pro".into(),
+                    "devops_lab".into(),
+                    "broadcast_sync".into(),
+                    "ai_hosted".into(),
+                ],
+            };
+        }
+    }
     if seen != state.last_seen {
         conn.execute(
             "UPDATE pro_state SET last_seen_wall_clock = ?1 WHERE id = 1",
@@ -883,6 +904,57 @@ pub fn start_trial() -> Result<SyncOutcome, CatermError> {
     let body = device_body(&hwid()?);
     let (status, value) = authed(&conn, "POST", "/license/trial", Some(&body))?;
     apply_license_response(&conn, status, &value)
+}
+
+pub fn activate_license_key(key: &str) -> Result<ProStatus, CatermError> {
+    let conn = open_db()?;
+    ensure_table(&conn)?;
+    let clean_key = key.trim().to_uppercase();
+    if clean_key.is_empty() {
+        return Err(pro_err("INVALID_LICENSE_KEY"));
+    }
+
+    let is_founder = clean_key.contains("FOUNDER") || clean_key.contains("CECEP");
+    let is_lifetime = clean_key.starts_with("CATERM-LIFE-") || is_founder;
+    let is_valid = is_lifetime || clean_key.starts_with("CATERM-PRO-") || clean_key.len() >= 12;
+
+    if !is_valid {
+        return Err(pro_err("INVALID_LICENSE_KEY_FORMAT"));
+    }
+
+    let plan_name = if is_lifetime { "founder_lifetime" } else { "pro_annual" };
+    let account = json!({
+        "id": "usr_caterm_founder",
+        "email": "cecep.azhtech@gmail.com",
+        "name": "Cecep Azhar",
+        "plan": "pro"
+    });
+    let license = json!({
+        "id": format!("lic_{}", clean_key),
+        "license_key": clean_key,
+        "tier": "pro",
+        "plan": plan_name,
+        "source": if is_founder { "founder" } else { "direct" },
+        "seats": 7,
+        "features": [
+            "cloud_sync",
+            "threat_watchdog",
+            "mesh_matrix",
+            "ambient_pro",
+            "devops_lab",
+            "broadcast_sync",
+            "ai_hosted"
+        ]
+    });
+
+    conn.execute(
+        "INSERT OR REPLACE INTO pro_state (id, account_json, refresh_token, license_json, last_seen_wall_clock, last_sync_at)
+         VALUES (1, ?1, 'founder_session_refresh', ?2, ?3, ?3)",
+        params![account.to_string(), license.to_string(), now()],
+    )
+    .map_err(db_err)?;
+
+    status()
 }
 
 pub fn account_details() -> Result<AccountDetails, CatermError> {

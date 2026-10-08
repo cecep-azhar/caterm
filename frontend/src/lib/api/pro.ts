@@ -139,6 +139,8 @@ export const proStartTrial = () => invoke<SyncOutcome>('pro_start_trial');
 export const proAccount = () => invoke<AccountDetails>('pro_account');
 export const proRevokeDevice = (deviceId: string) => invoke<void>('pro_revoke_device', { deviceId });
 export const proLogout = () => invoke<void>('pro_logout');
+export const proActivateLicense = (licenseKey: string) =>
+  invoke<ProStatus>('pro_activate_license', { licenseKey });
 
 export const proTeam = () => invoke<ProTeamView>('pro_team');
 export const proTeamInvite = (email: string, locale: string) => invoke<ProTeamView>('pro_team_invite', { email, locale });

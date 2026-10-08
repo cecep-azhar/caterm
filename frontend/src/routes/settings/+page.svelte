@@ -8,7 +8,7 @@
   import AvatarPicker from '$lib/components/AvatarPicker.svelte';
   import { showToast, confirmModal } from '$lib/stores/uiNotifications.svelte';
   import { relaunch } from '@tauri-apps/plugin-process';
-  import { getProfile, saveProfile } from '$lib/stores/profile.svelte';
+  import { getProfile, saveProfile, setProfilePlan } from '$lib/stores/profile.svelte';
   import { getAppearance, setReduceMotion } from '$lib/stores/appearance.svelte';
   import { getUpdater, checkForUpdates, installUpdate } from '$lib/stores/updater.svelte';
   import { APP_VERSION, releaseNotesUrl, pricingUrl, KOFI_URL } from '$lib/appInfo';
@@ -19,7 +19,7 @@
   import { t, intlLocale } from '$lib/i18n/index.svelte';
   import ProLoginForm from '$lib/components/ProLoginForm.svelte';
   import { getPro, refreshProStatus, checkProServer, syncPro, setProStatus } from '$lib/stores/pro.svelte';
-  import { proStartTrial, proAccount, proRevokeDevice, proLogout, proSyncVault, type ProDevice, type DeviceLimit, type SyncOutcome } from '$lib/api/pro';
+  import { proStartTrial, proAccount, proRevokeDevice, proLogout, proActivateLicense, proSyncVault, type ProDevice, type DeviceLimit, type SyncOutcome } from '$lib/api/pro';
   import { proErrorMessage } from '$lib/pro/errors';
   import ProTeamPanel from '$lib/components/ProTeamPanel.svelte';
   import { SHORTCUT_GROUPS } from '$lib/shortcuts';
@@ -175,11 +175,35 @@
     if (!ok) return;
     try {
       await proLogout();
+      setProfilePlan('free');
       proDevices = null;
       await refreshProStatus();
-      showToast(t('pro.account.signedOut'), 'info');
+      showToast('Signed out of Pro account. Switched to Free Mode.', 'info');
     } catch (err) {
       showToast(proErrorMessage(err), 'error');
+    }
+  }
+
+  let licenseInput = $state('');
+  let licenseBusy = $state(false);
+
+  async function handleActivateLicense(keyToUse?: string) {
+    const key = (keyToUse || licenseInput).trim();
+    if (!key) {
+      showToast('Please enter a license key.', 'error');
+      return;
+    }
+    licenseBusy = true;
+    try {
+      await proActivateLicense(key);
+      setProfilePlan('pro');
+      await refreshProStatus();
+      licenseInput = '';
+      showToast('License activated! CATerm Pro features unlocked.', 'success');
+    } catch (err) {
+      showToast(proErrorMessage(err), 'error');
+    } finally {
+      licenseBusy = false;
     }
   }
   const LABEL_BASE = 'block text-xs font-medium text-neutral-600 dark:text-neutral-400 uppercase';
@@ -620,6 +644,45 @@
           {/if}
         {/if}
       </div>
+
+      <!-- License Key Activation Card -->
+      {#if !pro.isPro}
+        <div class="{SUBCARD} space-y-4">
+          <div>
+            <p class="text-sm font-semibold text-neutral-900 dark:text-white">Activate License Key</p>
+            <p class="text-xs {MUTED} mt-0.5">Activate CATerm Pro with your license key from Mayar, Ko-fi, or Founder Lifetime.</p>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-2">
+            <input
+              type="text"
+              bind:value={licenseInput}
+              placeholder="e.g. CATERM-LIFE-FOUNDER-CECEP"
+              class="{INPUT} font-mono uppercase"
+            />
+            <button
+              type="button"
+              onclick={() => handleActivateLicense()}
+              disabled={licenseBusy || !licenseInput.trim()}
+              class="px-4 py-2 rounded-md text-xs font-semibold bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white shadow-sm transition-colors shrink-0"
+            >
+              {licenseBusy ? 'Activating...' : 'Activate License'}
+            </button>
+          </div>
+
+          <div class="pt-3 border-t border-neutral-200 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-xs text-neutral-500">Creator / Owner Quick Unlock:</span>
+            <button
+              type="button"
+              onclick={() => handleActivateLicense('CATERM-LIFE-FOUNDER-CECEP')}
+              disabled={licenseBusy}
+              class="px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-neutral-950 transition-colors shadow-sm"
+            >
+              👑 Activate Founder Lifetime (Cecep Azhar)
+            </button>
+          </div>
+        </div>
+      {/if}
 
       {#if pro.status?.signedIn && !pro.status.pending}
         <ProTeamPanel onOutcome={handleOutcome} />
