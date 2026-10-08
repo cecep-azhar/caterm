@@ -35,6 +35,7 @@
   import { listHosts, saveHost, type HostRecord, type ConnectionProtocol } from '$lib/api/hosts';
   import type RemoteFileEditorComponent from '$lib/components/RemoteFileEditor.svelte';
   import DirectorySync from '$lib/components/DirectorySync.svelte';
+  import ProGate from '$lib/components/ProGate.svelte';
   import PageContainer from '$lib/components/PageContainer.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import { t, intlLocale } from '$lib/i18n/index.svelte';
@@ -1966,12 +1967,14 @@
 {#if showSyncModal}
   <div class="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
     <div class="bg-white dark:bg-[#151921] rounded-lg shadow-2xl border border-neutral-200 dark:border-slate-800 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
-      <DirectorySync
-        hostId={currentHostId}
-        initialLocalPath={localPath}
-        initialRemotePath={remotePath}
-        onClose={() => (showSyncModal = false)}
-      />
+      <ProGate title="Directory & Broadcast Sync Pro" description="Sinkronisasi direktori otomatis dan live watcher bidirectional memerlukan lisensi CATerm Pro.">
+        <DirectorySync
+          hostId={currentHostId}
+          initialLocalPath={localPath}
+          initialRemotePath={remotePath}
+          onClose={() => (showSyncModal = false)}
+        />
+      </ProGate>
     </div>
   </div>
 {/if}

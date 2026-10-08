@@ -24,6 +24,7 @@
   import { saveInvestigation } from '$lib/api/investigations';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { errorText } from '$lib/errors';
+  import ProGate from '$lib/components/ProGate.svelte';
 
   let { hostId, onClose }: { hostId?: string; onClose: () => void } = $props();
 
@@ -559,216 +560,220 @@ SSH Hardening Fail/Warn: ${securityReport.hardeningChecklist.filter((h) => h.sta
 
       <!-- TAB 3: SERVER BENCHMARK -->
       {#if activeMainTab === 'benchmark'}
-        <div class="space-y-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-sm font-bold text-neutral-900 dark:text-white">Hardware & Storage Benchmark</h3>
-              <p class="text-xs text-neutral-500">Benchmark komputasi multi-core CPU, memory bandwidth RAM, dan disk write IOPS (4k/64k/1M direct IO).</p>
+        <ProGate title="Network Diagnostics & Server Benchmark Pro" description="Benchmark multi-core CPU, memory bandwidth RAM, dan disk storage IOPS memerlukan lisensi CATerm Pro.">
+          <div class="space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-neutral-900 dark:text-white">Hardware & Storage Benchmark</h3>
+                <p class="text-xs text-neutral-500">Benchmark komputasi multi-core CPU, memory bandwidth RAM, dan disk write IOPS (4k/64k/1M direct IO).</p>
+              </div>
+              <button
+                onclick={startBenchmark}
+                disabled={isRunningBench || !selectedHostId}
+                class="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition"
+              >
+                {#if isRunningBench}
+                  <span class="animate-spin text-xs">⏳</span>
+                  <span>Benchmarking Hardware...</span>
+                {:else}
+                  <span>🔥 Jalankan Server Benchmark</span>
+                {/if}
+              </button>
             </div>
-            <button
-              onclick={startBenchmark}
-              disabled={isRunningBench || !selectedHostId}
-              class="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition"
-            >
-              {#if isRunningBench}
-                <span class="animate-spin text-xs">⏳</span>
-                <span>Benchmarking Hardware...</span>
-              {:else}
-                <span>🔥 Jalankan Server Benchmark</span>
-              {/if}
-            </button>
+
+            {#if benchResult}
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- CPU Card -->
+                <div class="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+                  <span class="text-xs font-bold text-neutral-500 uppercase">CPU Computing Core ({benchResult.cpuCores} Cores)</span>
+                  <div class="space-y-2 mt-2">
+                    <div class="flex justify-between items-center text-xs">
+                      <span class="text-neutral-500">Single-Core Score:</span>
+                      <strong class="font-mono text-base text-neutral-900 dark:text-white">{benchResult.cpuSingleScore} pts</strong>
+                    </div>
+                    <div class="flex justify-between items-center text-xs">
+                      <span class="text-neutral-500">Multi-Core Score:</span>
+                      <strong class="font-mono text-base text-amber-500">{benchResult.cpuMultiScore} pts</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- RAM Card -->
+                <div class="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+                  <span class="text-xs font-bold text-neutral-500 uppercase">Memory RAM Bandwidth</span>
+                  <div class="mt-2 text-center p-3 rounded-lg bg-sky-500/10 border border-sky-500/20">
+                    <div class="text-3xl font-black text-sky-600 dark:text-sky-400 font-mono">{benchResult.ramBandwidthMbps}</div>
+                    <span class="text-[10px] text-neutral-400">MB/s Direct Memory Throughput</span>
+                  </div>
+                </div>
+
+                <!-- Disk IOPS Card -->
+                <div class="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+                  <span class="text-xs font-bold text-neutral-500 uppercase">Disk Storage Throughput</span>
+                  <div class="space-y-1.5 text-xs font-mono">
+                    <div class="flex justify-between">
+                      <span class="text-neutral-500">Random 4K IOPS:</span>
+                      <strong>{benchResult.diskWriteIops4k} IOPS</strong>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-neutral-500">Sequential 64K:</span>
+                      <strong>{benchResult.diskWriteMbps64k} MB/s</strong>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-neutral-500">Sequential 1M:</span>
+                      <strong>{benchResult.diskWriteMbps1m} MB/s</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            {:else}
+              <div class="py-16 text-center text-neutral-400 text-xs">Belum ada benchmark dijalankan. Tekan "Jalankan Server Benchmark".</div>
+            {/if}
           </div>
-
-          {#if benchResult}
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <!-- CPU Card -->
-              <div class="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
-                <span class="text-xs font-bold text-neutral-500 uppercase">CPU Computing Core ({benchResult.cpuCores} Cores)</span>
-                <div class="space-y-2 mt-2">
-                  <div class="flex justify-between items-center text-xs">
-                    <span class="text-neutral-500">Single-Core Score:</span>
-                    <strong class="font-mono text-base text-neutral-900 dark:text-white">{benchResult.cpuSingleScore} pts</strong>
-                  </div>
-                  <div class="flex justify-between items-center text-xs">
-                    <span class="text-neutral-500">Multi-Core Score:</span>
-                    <strong class="font-mono text-base text-amber-500">{benchResult.cpuMultiScore} pts</strong>
-                  </div>
-                </div>
-              </div>
-
-              <!-- RAM Card -->
-              <div class="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
-                <span class="text-xs font-bold text-neutral-500 uppercase">Memory RAM Bandwidth</span>
-                <div class="mt-2 text-center p-3 rounded-lg bg-sky-500/10 border border-sky-500/20">
-                  <div class="text-3xl font-black text-sky-600 dark:text-sky-400 font-mono">{benchResult.ramBandwidthMbps}</div>
-                  <span class="text-[10px] text-neutral-400">MB/s Direct Memory Throughput</span>
-                </div>
-              </div>
-
-              <!-- Disk IOPS Card -->
-              <div class="p-5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
-                <span class="text-xs font-bold text-neutral-500 uppercase">Disk Storage Throughput</span>
-                <div class="space-y-1.5 text-xs font-mono">
-                  <div class="flex justify-between">
-                    <span class="text-neutral-500">Random 4K IOPS:</span>
-                    <strong>{benchResult.diskWriteIops4k} IOPS</strong>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-neutral-500">Sequential 64K:</span>
-                    <strong>{benchResult.diskWriteMbps64k} MB/s</strong>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-neutral-500">Sequential 1M:</span>
-                    <strong>{benchResult.diskWriteMbps1m} MB/s</strong>
-                  </div>
-                </div>
-              </div>
-            </div>
-          {:else}
-            <div class="py-16 text-center text-neutral-400 text-xs">Belum ada benchmark dijalankan. Tekan "Jalankan Server Benchmark".</div>
-          {/if}
-        </div>
+        </ProGate>
       {/if}
 
       <!-- TAB 4: MESH MATRIX & TOOLS LAB -->
       {#if activeMainTab === 'mesh_tools'}
-        <div class="space-y-6">
-          <div class="flex items-center justify-between">
-            <div>
-              <h3 class="text-sm font-bold text-neutral-900 dark:text-white">Mesh Fleet Matrix, Subnet Sweeper & PMTUD</h3>
-              <p class="text-xs text-neutral-500">RTT N x N antar armada server, pemindai CIDR lokal, penentu ukuran MTU aman, dan sertifikat SSL/TLS.</p>
-            </div>
-            <button
-              onclick={startMeshMatrix}
-              disabled={isRunningMesh || !selectedHostId}
-              class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition"
-            >
-              {#if isRunningMesh}
-                <span class="animate-spin text-xs">⏳</span>
-                <span>Probing Fleet...</span>
-              {:else}
-                <span>🌐 Probe Mesh Matrix Armada</span>
-              {/if}
-            </button>
-          </div>
-
-          <!-- Mesh Grid View -->
-          {#if meshResult}
-            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
-              <span class="text-xs font-bold text-neutral-500 uppercase">Fleet Latency Grid ({meshResult.nodes.length} Target)</span>
-              <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {#each meshResult.nodes as node}
-                  <div class="p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
-                    <div class="font-bold text-xs truncate text-neutral-900 dark:text-white">{node.targetLabel}</div>
-                    <div class="text-[11px] text-neutral-400 truncate">{node.targetHost}</div>
-                    <div class="mt-2 flex items-baseline justify-between">
-                      <span class="font-mono text-sm font-bold {node.reachable ? 'text-emerald-500' : 'text-rose-500'}">
-                        {node.reachable ? `${node.rttMs} ms` : 'UNREACHABLE'}
-                      </span>
-                      <span class="text-[10px] text-neutral-400">{node.packetLossPct}% loss</span>
-                    </div>
-                  </div>
-                {/each}
+        <ProGate title="Mesh Latency Matrix & Diagnostics Lab Pro" description="Analisis RTT armada mesh server N x N, safe MTU finder, dan subnet sweeps memerlukan lisensi CATerm Pro.">
+          <div class="space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-neutral-900 dark:text-white">Mesh Fleet Matrix, Subnet Sweeper & PMTUD</h3>
+                <p class="text-xs text-neutral-500">RTT N x N antar armada server, pemindai CIDR lokal, penentu ukuran MTU aman, dan sertifikat SSL/TLS.</p>
               </div>
+              <button
+                onclick={startMeshMatrix}
+                disabled={isRunningMesh || !selectedHostId}
+                class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-lg flex items-center gap-2 transition"
+              >
+                {#if isRunningMesh}
+                  <span class="animate-spin text-xs">⏳</span>
+                  <span>Probing Fleet...</span>
+                {:else}
+                  <span>🌐 Probe Mesh Matrix Armada</span>
+                {/if}
+              </button>
             </div>
-          {/if}
 
-          <!-- Subnet Sweeper & PMTUD Row -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Subnet Sweeper -->
-            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
-              <span class="text-xs font-bold text-neutral-500 uppercase">Subnet CIDR Sweeper</span>
-              <div class="flex gap-2">
-                <input
-                  type="text"
-                  bind:value={subnetCidr}
-                  placeholder="192.168.1.0/24"
-                  class="flex-1 px-2.5 py-1 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-neutral-900 dark:text-white font-mono"
-                />
-                <button
-                  onclick={startSubnetSweep}
-                  disabled={isRunningSubnet || !selectedHostId}
-                  class="px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold"
-                >
-                  {isRunningSubnet ? '...' : 'Scan'}
-                </button>
-              </div>
-              {#if subnetResult}
-                <div class="text-xs text-neutral-500">Ditemukan <strong>{subnetResult.activeHosts}</strong> host aktif:</div>
-                <div class="max-h-36 overflow-y-auto space-y-1 font-mono text-xs">
-                  {#each subnetResult.hosts as h}
-                    <div class="p-1.5 rounded bg-neutral-50 dark:bg-neutral-800 flex justify-between">
-                      <span>{h.ip}</span>
-                      <span class="text-[11px] text-sky-500">Ports: {h.openPorts.join(', ') || 'ICMP'}</span>
+            <!-- Mesh Grid View -->
+            {#if meshResult}
+              <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+                <span class="text-xs font-bold text-neutral-500 uppercase">Fleet Latency Grid ({meshResult.nodes.length} Target)</span>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {#each meshResult.nodes as node}
+                    <div class="p-3 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+                      <div class="font-bold text-xs truncate text-neutral-900 dark:text-white">{node.targetLabel}</div>
+                      <div class="text-[11px] text-neutral-400 truncate">{node.targetHost}</div>
+                      <div class="mt-2 flex items-baseline justify-between">
+                        <span class="font-mono text-sm font-bold {node.reachable ? 'text-emerald-500' : 'text-rose-500'}">
+                          {node.reachable ? `${node.rttMs} ms` : 'UNREACHABLE'}
+                        </span>
+                        <span class="text-[10px] text-neutral-400">{node.packetLossPct}% loss</span>
+                      </div>
                     </div>
                   {/each}
                 </div>
-              {/if}
-            </div>
-
-            <!-- PMTUD Probe -->
-            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
-              <span class="text-xs font-bold text-neutral-500 uppercase">PMTUD MTU Finder</span>
-              <div class="flex gap-2">
-                <input
-                  type="text"
-                  bind:value={pmtudTarget}
-                  placeholder="1.1.1.1"
-                  class="flex-1 px-2.5 py-1 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-neutral-900 dark:text-white font-mono"
-                />
-                <button
-                  onclick={startPmtudProbe}
-                  disabled={isRunningPmtud || !selectedHostId}
-                  class="px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold"
-                >
-                  {isRunningPmtud ? '...' : 'Find'}
-                </button>
               </div>
-              {#if pmtudResult}
-                <div class="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-center">
-                  <span class="text-xs text-neutral-400 block">Optimal Safe MTU</span>
-                  <div class="text-2xl font-black text-sky-600 dark:text-sky-300 font-mono mt-1">{pmtudResult.optimalMtu}</div>
-                </div>
-                <p class="text-xs text-neutral-500">{pmtudResult.notes}</p>
-              {/if}
-            </div>
+            {/if}
 
-            <!-- TLS Certificate Auditor -->
-            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
-              <span class="text-xs font-bold text-neutral-500 uppercase">TLS Certificate Auditor</span>
-              <div class="flex gap-2">
-                <input
-                  type="text"
-                  bind:value={tlsHost}
-                  placeholder="domain.com"
-                  class="flex-1 px-2.5 py-1 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-neutral-900 dark:text-white font-mono"
-                />
-                <button
-                  onclick={startTlsAudit}
-                  disabled={isRunningTls}
-                  class="px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold"
-                >
-                  {isRunningTls ? '...' : 'Check'}
-                </button>
-              </div>
-              {#if tlsResult}
-                <div class="space-y-1.5 text-xs font-mono">
-                  <div class="flex justify-between">
-                    <span class="text-neutral-500">Status:</span>
-                    <strong class="{tlsResult.status === 'HEALTHY' ? 'text-emerald-500' : 'text-rose-500'}">{tlsResult.status}</strong>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-neutral-500">Sisa Hari:</span>
-                    <strong>{tlsResult.daysRemaining} hari</strong>
-                  </div>
-                  <div class="truncate text-[11px] text-neutral-400 pt-1">
-                    Cipher: {tlsResult.cipherSuite}
-                  </div>
+            <!-- Subnet Sweeper & PMTUD Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <!-- Subnet Sweeper -->
+              <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+                <span class="text-xs font-bold text-neutral-500 uppercase">Subnet CIDR Sweeper</span>
+                <div class="flex gap-2">
+                  <input
+                    type="text"
+                    bind:value={subnetCidr}
+                    placeholder="192.168.1.0/24"
+                    class="flex-1 px-2.5 py-1 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-neutral-900 dark:text-white font-mono"
+                  />
+                  <button
+                    onclick={startSubnetSweep}
+                    disabled={isRunningSubnet || !selectedHostId}
+                    class="px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold"
+                  >
+                    {isRunningSubnet ? '...' : 'Scan'}
+                  </button>
                 </div>
-              {/if}
+                {#if subnetResult}
+                  <div class="text-xs text-neutral-500">Ditemukan <strong>{subnetResult.activeHosts}</strong> host aktif:</div>
+                  <div class="max-h-36 overflow-y-auto space-y-1 font-mono text-xs">
+                    {#each subnetResult.hosts as h}
+                      <div class="p-1.5 rounded bg-neutral-50 dark:bg-neutral-800 flex justify-between">
+                        <span>{h.ip}</span>
+                        <span class="text-[11px] text-sky-500">Ports: {h.openPorts.join(', ') || 'ICMP'}</span>
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+              </div>
+
+              <!-- PMTUD Probe -->
+              <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+                <span class="text-xs font-bold text-neutral-500 uppercase">PMTUD MTU Finder</span>
+                <div class="flex gap-2">
+                  <input
+                    type="text"
+                    bind:value={pmtudTarget}
+                    placeholder="1.1.1.1"
+                    class="flex-1 px-2.5 py-1 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-neutral-900 dark:text-white font-mono"
+                  />
+                  <button
+                    onclick={startPmtudProbe}
+                    disabled={isRunningPmtud || !selectedHostId}
+                    class="px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold"
+                  >
+                    {isRunningPmtud ? '...' : 'Find'}
+                  </button>
+                </div>
+                {#if pmtudResult}
+                  <div class="p-3 rounded-lg bg-sky-500/10 border border-sky-500/20 text-center">
+                    <span class="text-xs text-neutral-400 block">Optimal Safe MTU</span>
+                    <div class="text-2xl font-black text-sky-600 dark:text-sky-300 font-mono mt-1">{pmtudResult.optimalMtu}</div>
+                  </div>
+                  <p class="text-xs text-neutral-500">{pmtudResult.notes}</p>
+                {/if}
+              </div>
+
+              <!-- TLS Certificate Auditor -->
+              <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-3">
+                <span class="text-xs font-bold text-neutral-500 uppercase">TLS Certificate Auditor</span>
+                <div class="flex gap-2">
+                  <input
+                    type="text"
+                    bind:value={tlsHost}
+                    placeholder="domain.com"
+                    class="flex-1 px-2.5 py-1 text-xs bg-neutral-50 dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded text-neutral-900 dark:text-white font-mono"
+                  />
+                  <button
+                    onclick={startTlsAudit}
+                    disabled={isRunningTls}
+                    class="px-3 py-1 bg-sky-600 text-white rounded text-xs font-semibold"
+                  >
+                    {isRunningTls ? '...' : 'Check'}
+                  </button>
+                </div>
+                {#if tlsResult}
+                  <div class="space-y-1.5 text-xs font-mono">
+                    <div class="flex justify-between">
+                      <span class="text-neutral-500">Status:</span>
+                      <strong class="{tlsResult.status === 'HEALTHY' ? 'text-emerald-500' : 'text-rose-500'}">{tlsResult.status}</strong>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-neutral-500">Sisa Hari:</span>
+                      <strong>{tlsResult.daysRemaining} hari</strong>
+                    </div>
+                    <div class="truncate text-[11px] text-neutral-400 pt-1">
+                      Cipher: {tlsResult.cipherSuite}
+                    </div>
+                  </div>
+                {/if}
+              </div>
             </div>
           </div>
-        </div>
+        </ProGate>
       {/if}
     </div>
 

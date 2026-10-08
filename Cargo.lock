@@ -591,6 +591,7 @@ version = "2.1.19"
 dependencies = [
  "async-trait",
  "caterm-core",
+ "caterm-pro",
  "mimalloc",
  "parking_lot",
  "serde",
@@ -658,6 +659,24 @@ dependencies = [
  "url",
  "uuid",
  "zeroize",
+]
+
+[[package]]
+name = "caterm-pro"
+version = "2.1.19"
+dependencies = [
+ "aes-gcm",
+ "base64 0.22.1",
+ "caterm-core",
+ "chrono",
+ "ed25519-dalek",
+ "hex",
+ "rand",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.20",
+ "ureq",
 ]
 
 [[package]]

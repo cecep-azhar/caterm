@@ -4,6 +4,7 @@ members = [
     "crates/caterm-core",
     "crates/caterm-cli",
     "crates/caterm-app",
+    "crates/caterm-pro",
 ]
 
 [workspace.package]

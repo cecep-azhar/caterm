@@ -44,15 +44,25 @@ export function setSelectedTabId(tabId: string) {
   view.selectedTabId = tabId;
 }
 
+import { getPro } from '$lib/stores/pro.svelte';
+
 export function getBroadcastInput(): boolean {
   return view.broadcastInput;
 }
 
 export function setBroadcastInput(enabled: boolean) {
+  if (enabled && !getPro().isPro) {
+    view.broadcastInput = false;
+    return;
+  }
   view.broadcastInput = enabled;
 }
 
 export function toggleBroadcastInput(): boolean {
+  if (!getPro().isPro) {
+    view.broadcastInput = false;
+    return false;
+  }
   view.broadcastInput = !view.broadcastInput;
   return view.broadcastInput;
 }

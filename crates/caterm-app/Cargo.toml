@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 caterm-core = { path = "../caterm-core" }
+caterm-pro = { path = "../caterm-pro", optional = true }
 tauri = { version = "2", features = [] }
 serde.workspace = true
 serde_json.workspace = true
@@ -26,6 +27,11 @@ tauri-plugin-dialog = "2.7.3"
 mimalloc = { version = "0.1", default-features = false }
 tauri-plugin-process = "2"
 tauri-plugin-fs = "2"
+
+[features]
+default = ["pro"]
+community = []
+pro = ["dep:caterm-pro"]
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
 tauri-plugin-updater = "2"

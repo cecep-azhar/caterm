@@ -483,6 +483,10 @@
       }
       case 'broadcastInput': {
         if (!onSession || sessionTabs.length < 2) return false;
+        if (!pro.isPro) {
+          showToast('Broadcast Sync adalah fitur Pro eksklusif ($10/bulan)', 'warning');
+          return true;
+        }
         const active = toggleBroadcastInput();
         showToast(
           active ? `Broadcast Input Aktif (${sessionTabs.length} panes)` : 'Broadcast Input Dinonaktifkan',
@@ -671,6 +675,10 @@
         onToggleFiles={handleFilesToggle}
         onToggleAi={handleAiToggle}
         onToggleBroadcast={() => {
+          if (!pro.isPro) {
+            showToast('Broadcast Sync adalah fitur Pro eksklusif ($10/bulan)', 'warning');
+            return;
+          }
           const active = toggleBroadcastInput();
           showToast(
             active ? `Broadcast Input Aktif (${sessionTabs.length} panes)` : 'Broadcast Input Dinonaktifkan',
