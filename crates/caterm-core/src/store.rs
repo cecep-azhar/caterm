@@ -269,6 +269,43 @@ fn delete_host_in(conn: &Connection, id: &str) -> Result<(), CatermError> {
     crate::teams::strip_host_from_teams(conn, id)
 }
 
+pub(crate) fn list_hosts_with_secrets_in(
+    conn: &Connection,
+    local_key: &str,
+) -> Result<Vec<(HostRecord, Option<String>)>, CatermError> {
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, label, address, port, username, auth_method, tags, os, protocol, created_at, updated_at, secret_enc \
+             FROM hosts ORDER BY created_at ASC",
+        )
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal query hosts: {e}"))))?;
+    let rows = stmt
+        .query_map([], |row| {
+            let host = row_to_host(row)?;
+            let secret_enc: Option<String> = row.get("secret_enc")?;
+            let secret = match secret_enc {
+                Some(enc) if !enc.is_empty() => crate::secret::decrypt(local_key, &enc).ok(),
+                _ => None,
+            };
+            Ok((host, secret))
+        })
+        .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal query hosts: {e}"))))?;
+
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(
+            row.map_err(|e| CatermError::Db(DbError::Generic(format!("baris hosts rusak: {e}"))))?,
+        );
+    }
+    Ok(out)
+}
+
+pub fn list_hosts_with_secrets() -> Result<Vec<(HostRecord, Option<String>)>, CatermError> {
+    let data_dir = crate::paths::resolve_data_dir()?.path;
+    let local_key = crate::vault::load_or_create_local_key(&data_dir)?;
+    list_hosts_with_secrets_in(&db::open()?, &local_key)
+}
+
 /// All saved hosts, in no particular order.
 pub fn list_hosts() -> Result<Vec<HostRecord>, CatermError> {
     list_hosts_in(&db::open()?)

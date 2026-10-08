@@ -3,10 +3,11 @@
 //! Imports and merges encrypted backup archives with integrity validation.
 
 use crate::ai::{self, AiSettings};
+use crate::audit::{self, CommandLog};
 use crate::error::{CatermError, VaultError};
 use crate::groups::{self, GroupInput, GroupRecord};
 use crate::investigations::{self, InvestigationInput, InvestigationRecord};
-use crate::keys::{self, KeyRecord};
+use crate::keys::{self, KeyBackupRecord, KeyRecord};
 use crate::scheduler::store as scheduler_store;
 use crate::scheduler::task::{ScheduledTaskRecord, TaskInput};
 use crate::snippets::{self, SnippetInput, SnippetRecord};
@@ -17,11 +18,21 @@ use crate::tunnels::{self, TunnelRecord};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HostBackupSecretRecord {
+    pub host: HostRecord,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VaultBackupPayload {
     pub version: String,
     pub timestamp: u64,
     #[serde(default)]
     pub hosts: Vec<HostRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hosts_with_secrets: Vec<HostBackupSecretRecord>,
     #[serde(default)]
     pub groups: Vec<GroupRecord>,
     #[serde(default)]
@@ -30,6 +41,8 @@ pub struct VaultBackupPayload {
     pub snippets: Vec<SnippetRecord>,
     #[serde(default)]
     pub keys: Vec<KeyRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keys_with_private: Vec<KeyBackupRecord>,
     #[serde(default)]
     pub tunnels: Vec<TunnelRecord>,
     #[serde(default)]
@@ -38,20 +51,47 @@ pub struct VaultBackupPayload {
     pub investigations: Vec<InvestigationRecord>,
     #[serde(default)]
     pub totp: Vec<TotpBackupRecord>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub command_logs: Vec<CommandLog>,
     #[serde(default)]
     pub ai_settings: Option<AiSettings>,
 }
 
 pub fn build_backup_payload() -> Result<VaultBackupPayload, CatermError> {
+    build_backup_payload_with_secrets(crate::pro::is_pro())
+}
+
+pub fn build_backup_payload_with_secrets(include_secrets: bool) -> Result<VaultBackupPayload, CatermError> {
     let hosts = store::list_hosts().unwrap_or_default();
+    let hosts_with_secrets = if include_secrets {
+        store::list_hosts_with_secrets()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(host, secret)| HostBackupSecretRecord { host, secret })
+            .collect()
+    } else {
+        Vec::new()
+    };
+
     let groups = groups::list_groups().unwrap_or_default();
     let teams = teams::list_teams().unwrap_or_default();
     let snippets = snippets::list_snippets().unwrap_or_default();
     let keys = keys::list_keys().unwrap_or_default();
+    let keys_with_private = if include_secrets {
+        keys::list_keys_for_backup().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
     let tunnels = tunnels::list_tunnels().unwrap_or_default();
     let tasks = scheduler_store::list_tasks().unwrap_or_default();
     let investigations = investigations::list_investigations().unwrap_or_default();
     let totp = totp_store::list_totp_for_backup().unwrap_or_default();
+    let command_logs = if include_secrets {
+        audit::get_logs(None, None, Some(10_000)).unwrap_or_default()
+    } else {
+        Vec::new()
+    };
     let ai_settings = ai::get_ai_settings().ok();
 
     let now = std::time::SystemTime::now()
@@ -63,14 +103,17 @@ pub fn build_backup_payload() -> Result<VaultBackupPayload, CatermError> {
         version: "2.1.18".to_string(),
         timestamp: now,
         hosts,
+        hosts_with_secrets,
         groups,
         teams,
         snippets,
         keys,
+        keys_with_private,
         tunnels,
         tasks,
         investigations,
         totp,
+        command_logs,
         ai_settings,
     })
 }
@@ -78,20 +121,38 @@ pub fn build_backup_payload() -> Result<VaultBackupPayload, CatermError> {
 pub fn apply_backup_payload(payload: VaultBackupPayload) -> Result<usize, CatermError> {
     let mut imported_count = 0;
 
-    for host in payload.hosts {
-        store::save_host(HostInput {
-            id: Some(host.id),
-            label: host.label,
-            address: host.address,
-            port: host.port,
-            username: host.username,
-            auth_method: host.auth_method,
-            tags: host.tags,
-            os: host.os,
-            protocol: Some(host.protocol),
-            secret: None,
-        })?;
-        imported_count += 1;
+    if !payload.hosts_with_secrets.is_empty() {
+        for item in payload.hosts_with_secrets {
+            store::save_host(HostInput {
+                id: Some(item.host.id),
+                label: item.host.label,
+                address: item.host.address,
+                port: item.host.port,
+                username: item.host.username,
+                auth_method: item.host.auth_method,
+                tags: item.host.tags,
+                os: item.host.os,
+                protocol: Some(item.host.protocol),
+                secret: item.secret,
+            })?;
+            imported_count += 1;
+        }
+    } else {
+        for host in payload.hosts {
+            store::save_host(HostInput {
+                id: Some(host.id),
+                label: host.label,
+                address: host.address,
+                port: host.port,
+                username: host.username,
+                auth_method: host.auth_method,
+                tags: host.tags,
+                os: host.os,
+                protocol: Some(host.protocol),
+                secret: None,
+            })?;
+            imported_count += 1;
+        }
     }
 
     for group in payload.groups {
@@ -293,6 +354,9 @@ mod tests {
             tasks: vec![],
             investigations: vec![],
             totp: vec![],
+            command_logs: vec![],
+            hosts_with_secrets: vec![],
+            keys_with_private: vec![],
             ai_settings: None,
         };
         let json_bytes = serde_json::to_vec(&payload).unwrap();

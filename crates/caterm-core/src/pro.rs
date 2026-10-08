@@ -250,6 +250,16 @@ fn request(
     bearer: Option<&str>,
     body: Option<&Value>,
 ) -> Result<(u16, Value), CatermError> {
+    request_with_token(method, path, bearer, None, body)
+}
+
+fn request_with_token(
+    method: &str,
+    path: &str,
+    bearer: Option<&str>,
+    caterm_token: Option<&str>,
+    body: Option<&Value>,
+) -> Result<(u16, Value), CatermError> {
     let agent: ureq::Agent = ureq::Agent::config_builder()
         .timeout_global(Some(HTTP_TIMEOUT))
         .http_status_as_error(false) // we need the JSON error code in 4xx bodies
@@ -266,12 +276,18 @@ fn request(
             if let Some(token) = bearer {
                 req = req.header("Authorization", &format!("Bearer {token}"));
             }
+            if let Some(token) = caterm_token {
+                req = req.header("X-Caterm-Token", token);
+            }
             req.call()
         }
         _ => {
             let mut req = agent.post(&url).header("Content-Type", "application/json");
             if let Some(token) = bearer {
                 req = req.header("Authorization", &format!("Bearer {token}"));
+            }
+            if let Some(token) = caterm_token {
+                req = req.header("X-Caterm-Token", token);
             }
             req.send_json(body.cloned().unwrap_or_else(|| json!({})))
         }
@@ -610,14 +626,34 @@ fn authed(
     body: Option<&Value>,
 ) -> Result<(u16, Value), CatermError> {
     let token = access_token(conn)?;
-    let (status, value) = request(method, path, Some(&token), body)?;
+    let caterm_tok = signed_license_token(conn)?;
+    let (status, value) = request_with_token(method, path, Some(&token), caterm_tok.as_deref(), body)?;
     if status == 401 {
         // Access token rejected (e.g. server secret rotated): refresh once and retry.
         *ACCESS.lock() = None;
         let token = access_token(conn)?;
-        return request(method, path, Some(&token), body);
+        let caterm_tok = signed_license_token(conn)?;
+        return request_with_token(method, path, Some(&token), caterm_tok.as_deref(), body);
     }
     Ok((status, value))
+}
+
+fn signed_license_token(conn: &Connection) -> Result<Option<String>, CatermError> {
+    let state = load_state(conn)?;
+    match state {
+        Some(s) => match s.token {
+            Some((payload, signature, version)) => {
+                let tok = json!({
+                    "payload": payload,
+                    "signature": signature,
+                    "key_version": version,
+                });
+                Ok(Some(tok.to_string()))
+            }
+            None => Ok(None),
+        },
+        None => Ok(None),
+    }
 }
 
 // ---- Public API (called from Tauri commands) -------------------------------------------------
@@ -736,6 +772,13 @@ pub fn commit_pending() -> Result<bool, CatermError> {
     };
     save_session(&open_db()?, &session)?;
     Ok(true)
+}
+
+pub fn is_pro() -> bool {
+    status().map(|s| match s.entitlement {
+        Entitlement::Valid { ref tier, .. } => tier == "pro" || tier == "team",
+        _ => false,
+    }).unwrap_or(false)
 }
 
 /// Offline status: what this device is entitled to right now, from the stored signed token.

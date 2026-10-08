@@ -99,3 +99,15 @@ pub fn get_logs(
 
     Ok(logs)
 }
+
+pub fn restore_log(log: &CommandLog) -> Result<(), CatermError> {
+    let conn = crate::db::open()?;
+    conn.execute(
+        "INSERT INTO command_logs (id, event_type, timestamp, host_id, details)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(id) DO NOTHING",
+        rusqlite::params![log.id, log.event_type, log.timestamp, log.host_id, log.details],
+    )
+    .map_err(|e| CatermError::Db(DbError::Generic(format!("Failed to restore log: {e}"))))?;
+    Ok(())
+}

@@ -19,6 +19,19 @@ pub struct KeyRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct KeyBackupRecord {
+    pub id: String,
+    pub name: String,
+    pub algorithm: String,
+    pub fingerprint: String,
+    pub public_key: String,
+    pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub private_key: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KeyInput {
     pub name: String,
     pub algorithm: String, // "Ed25519" or "RSA-4096"
@@ -60,6 +73,40 @@ pub fn init_table(conn: &rusqlite::Connection) -> Result<(), CatermError> {
         )))
     })?;
     Ok(())
+}
+
+pub fn list_keys_for_backup() -> Result<Vec<KeyBackupRecord>, CatermError> {
+    let data_info = crate::paths::resolve_data_dir()?;
+    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
+    let conn = crate::db::open()?;
+    init_table(&conn)?;
+
+    let mut stmt = conn
+        .prepare("SELECT id, name, algorithm, fingerprint, public_key, secret_enc, created_at FROM ssh_keys ORDER BY name ASC")
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(e.to_string())))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            let secret_enc: String = row.get(5)?;
+            let private_key = crate::secret::decrypt(&key, &secret_enc).ok();
+            Ok(KeyBackupRecord {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                algorithm: row.get(2)?,
+                fingerprint: row.get(3)?,
+                public_key: row.get(4)?,
+                created_at: row.get(6)?,
+                private_key,
+            })
+        })
+        .map_err(|e| CatermError::Validation(ValidationError::Generic(e.to_string())))?;
+
+    let mut result = Vec::new();
+    for r in rows {
+        result
+            .push(r.map_err(|e| CatermError::Validation(ValidationError::Generic(e.to_string())))?);
+    }
+    Ok(result)
 }
 
 /// List all stored public keys.
@@ -166,6 +213,45 @@ pub fn generate_key(input: KeyInput) -> Result<KeyRecord, CatermError> {
         public_key,
         created_at,
     })
+}
+
+pub fn restore_key_with_private(
+    id: &str,
+    name: &str,
+    algorithm: &str,
+    fingerprint: &str,
+    public_key: &str,
+    private_key: &str,
+    created_at: &str,
+) -> Result<(), CatermError> {
+    let data_info = crate::paths::resolve_data_dir()?;
+    let key = crate::vault::load_or_create_local_key(&data_info.path)?;
+    let encrypted_secret = crate::secret::encrypt(&key, private_key)?;
+
+    let conn = crate::db::open()?;
+    init_table(&conn)?;
+
+    conn.execute(
+        "INSERT INTO ssh_keys (id, name, algorithm, fingerprint, public_key, secret_enc, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            algorithm = excluded.algorithm,
+            fingerprint = excluded.fingerprint,
+            public_key = excluded.public_key,
+            secret_enc = excluded.secret_enc",
+        rusqlite::params![
+            id,
+            name,
+            algorithm,
+            fingerprint,
+            public_key,
+            encrypted_secret,
+            created_at
+        ],
+    )
+    .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to restore key: {e}"))))?;
+    Ok(())
 }
 
 /// Import an existing OpenSSH or PKCS#8 private key.
