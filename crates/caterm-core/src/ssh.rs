@@ -745,6 +745,7 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
     // session is moved into the reader thread afterwards and is never shared with SFTP,
     // monitoring or AI execution — those use `with_exec_session` instead.
     sess.set_blocking(false);
+    sess.set_keepalive(true, 15);
 
     let channel_arc = Arc::new(Mutex::new(channel));
 
@@ -767,8 +768,14 @@ pub fn connect(host_id: &str) -> Result<SshSession, CatermError> {
         // `pending` is empty. Used to cap how long a continuous flood can be held before flushing.
         let mut batch_started: Option<Instant> = None;
         let mut idle_streak: u32 = 0;
+        let mut last_keepalive = Instant::now();
 
         loop {
+            if last_keepalive.elapsed() >= Duration::from_secs(10) {
+                let _ = _owned_session.keepalive_send();
+                last_keepalive = Instant::now();
+            }
+
             let (read_res, is_eof) = {
                 if let Ok(mut ch) = channel_read.lock() {
                     if let Ok(n_err) = ch.stderr().read(&mut err_buf)
