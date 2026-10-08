@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-network-speed-test"
+description = "Enables the run_network_speed_test command without any pre-configured scope."
+commands.allow = ["run_network_speed_test"]
+
+[[permission]]
+identifier = "deny-run-network-speed-test"
+description = "Denies the run_network_speed_test command without any pre-configured scope."
+commands.deny = ["run_network_speed_test"]

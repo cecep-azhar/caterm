@@ -121,6 +121,34 @@ Untuk melayani pasar domestik (Indonesia) dan internasional secara optimal:
 3. **Test Case 3: Offline Grace Period (14 Hari):**
    - Disconnect internet → jalankan aplikasi → verifikasi entitlement tetap `valid` hingga batas token offline `exp`.
 
+### Phase 5: DevOps Diagnostics & Security Lab Suite (v2.1.19 Integration)
+**Arsitektur:** On-Demand Zero-Dependency (0% background daemon, 0% CPU idle, footprint binary < 250 KB).
+
+1. **Cross-Host Mesh Latency Matrix:**
+   - Probe paralel RTT & jitter antar seluruh node armada (Hostinger, X1, XPC, YPC).
+   - Visualisasi matriks interaktif $N \times N$ dengan color coding:
+     - Hijau: < 20 ms
+     - Kuning: 20 – 100 ms
+     - Merah: > 100 ms / RTO
+2. **Zero-Dependency Internet Speed Test:**
+   - HTTP streaming chunks via Cloudflare Edge / CDN node terdekat.
+   - Mengukur Download Mbps, Upload Mbps, dan ping latency tanpa install Python / `speedtest-cli` di server target.
+3. **QoS & Bufferbloat Auditor:**
+   - Delta RTT saat kondisi idle vs link tersaturasi beban penuh (*saturated link*).
+   - Rating bufferbloat A+ sampai F untuk stabilitas transmisi streaming, VoIP, dan replikasi database.
+4. **Agentless Server Benchmark (Mini YABS / Sysbench):**
+   - CPU: Prime calculation multi-core loop score & SHA-256 test.
+   - RAM: Sequential memory copy throughput (MB/s).
+   - Disk IOPS & transfer rate via `dd oflag=direct` (blok 4k, 64k, 1M) bebas cache OS.
+5. **MTU Path Discovery (PMTUD):**
+   - Binary search ping `-M do -s` untuk deteksi fragmentasi paket pada VPN/Tailscale/Cloudflare WARP/WireGuard overlay.
+6. **Subnet CIDR Sweeper:**
+   - Range scan tanpa dependensi via bash `/dev/tcp` atau native Rust socket.
+7. **Threat & Outbound Reverse Shell Watchdog:**
+   - Audit anomali outbound socket dari path berisiko (`/tmp`, `/dev/shm`, `/var/tmp`) dan proses shell interaktif (`bash`, `nc`, `python`, `socat`).
+8. **TLS Weakness & Certificate Expiry Auditor:**
+   - Audit expiry < 30 hari, chain CA bundle validation, dan deteksi weak cipher suite.
+
 ---
 
 ## 4. Task Checklist untuk AI Agent Autopilot Execution
@@ -143,6 +171,17 @@ Untuk melayani pasar domestik (Indonesia) dan internasional secara optimal:
 - [ ] Tambahkan Tauri command `open_checkout_external(url: String)` pada `crates/caterm-app/src/commands.rs`.
 - [ ] Jalankan `cargo test -p caterm-core --lib pro` untuk memvalidasi evaluasi offline token.
 - [ ] Lakukan build test binary Linux x86_64 (`cargo check --all-targets`).
+
+### 🤖 Sub-Agent 4: DevOps Diagnostics & Security Lab Suite (v2.1.19)
+- [ ] **Cross-Host Mesh Latency Matrix:** Implementasikan command probe RTT & jitter paralel antar armada node (Hostinger, X1, XPC, YPC) dan visualisasi $N \times N$ color coding (<20ms hijau, 20-100ms kuning, >100ms merah).
+- [ ] **Zero-Dependency Internet Speed Test:** Implementasikan HTTP chunk download/upload test via Cloudflare Edge / CDN terdekat tanpa dependensi external runtime (Python/speedtest-cli).
+- [ ] **QoS & Bufferbloat Auditor:** Pengukuran delta latency idle vs saturated load dengan pemberian rating grade A+ s/d F.
+- [ ] **Agentless Server Benchmark (Mini YABS / Sysbench):** Runner benchmark multi-core CPU prime/sha256, sequential RAM copy, dan disk IOPS `dd oflag=direct` bebas OS cache.
+- [ ] **MTU Path Discovery (PMTUD):** Algoritma binary search ping DF-bit `-M do -s` untuk deteksi fragmentasi dan optimasi tunnel Tailscale/VPN/WARP.
+- [ ] **Subnet CIDR Sweeper:** Fast CIDR IP scanner tanpa nmap/zmap via native Rust socket / `/dev/tcp`.
+- [ ] **Threat & Outbound Reverse Shell Watchdog:** Detektor outbound anomali socket dari `/tmp`, `/dev/shm`, dan shell reverse listener.
+- [ ] **TLS Weakness & Certificate Expiry Auditor:** Scanner masa berlaku sertifikat SSL/TLS (<30 hari), missing CA chain bundle, dan weak ciphers.
+- [ ] **IPC Commands & UI Bindings:** Daftarkan IPC Tauri commands (`devops_*`) dan hubungkan ke UI DevOps Diagnostics Hub & Hana AI Copilot.
 
 ---
 

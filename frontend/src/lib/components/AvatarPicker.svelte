@@ -19,7 +19,7 @@
   function selectAvatar(id: string, isProAvatar: boolean, e: MouseEvent) {
     e.stopPropagation();
     if (isProAvatar && !pro.isPro) {
-      showToast('Avatar ini eksklusif untuk member Pro', 'warning');
+      showToast('Avatar ini eksklusif untuk member Pro', 'error');
       return;
     }
     value = id;

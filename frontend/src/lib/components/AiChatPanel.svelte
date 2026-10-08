@@ -137,17 +137,17 @@
                 title: `Broadcast ke ${activeTabs.length} Panes: ${line.slice(0, 35)}${line.length > 35 ? '...' : ''}`,
                 description: `Eksekusi serentak ke seluruh terminal aktif (${activeTabs.length} panes)`,
                 command: line,
+                is_dangerous: false,
                 action_type: 'caterm_action',
                 action_name: 'broadcast_execute',
-                action_params: { command: line },
-                risk: 'medium'
+                action_params: { command: line }
               });
             } else {
               stepsToPropose.push({
                 title: `Jalankan: ${line.slice(0, 40)}${line.length > 40 ? '...' : ''}`,
                 description: `Perintah diekstrak dari respon AI (Langkah ${stepIdx})`,
                 command: line,
-                risk: 'low'
+                is_dangerous: false
               });
             }
             stepIdx++;
@@ -225,7 +225,7 @@
 
         if (action === 'create_host' || action === 'save_host' || action === 'add_host') {
           const label = params.label || params.name || params.host || 'New Host';
-          const hostname = params.hostname || params.host || params.ip || '127.0.0.1';
+          const address = params.hostname || params.host || params.ip || '127.0.0.1';
           const port = Number(params.port) || 22;
           const username = params.username || params.user || 'root';
           const authMethod = params.auth_method || params.authMethod || 'Password';
@@ -234,7 +234,7 @@
           await saveHost({
             id: params.id,
             label,
-            hostname,
+            address,
             port,
             username,
             auth_method: authMethod === 'Key' ? { Key: { key_path: params.key_path || '' } } : { Password: {} },
@@ -242,7 +242,7 @@
             tags: params.tags || []
           });
           window.dispatchEvent(new CustomEvent('caterm:hosts-updated'));
-          runs[i] = { status: 'ok', output: `Host "${label}" (${username}@${hostname}:${port}) berhasil disimpan!` };
+          runs[i] = { status: 'ok', output: `Host "${label}" (${username}@${address}:${port}) berhasil disimpan!` };
           showToast(`Host "${label}" disimpan!`, 'success');
           return true;
         }
@@ -536,7 +536,7 @@
         >
           <option value={LOCAL_HOST_ID}>🖥️ Local Terminal (localhost)</option>
           {#each hosts as host (host.id)}
-            <option value={host.id}>🌐 {host.label} ({host.username}@{host.hostname})</option>
+            <option value={host.id}>🌐 {host.label} ({host.username}@{host.address})</option>
           {/each}
         </select>
       </div>

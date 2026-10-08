@@ -45,14 +45,14 @@
     }
   }
 
-  onMount(async () => {
-    await loadData();
-    const handleUpdate = () => { void loadData(); };
-    window.addEventListener('caterm:snippets-updated', handleUpdate);
-    window.addEventListener('caterm:groups-updated', handleUpdate);
+  onMount(() => {
+    void loadData();
+    const handleHostsChange = () => {
+      loadData();
+    };
+    window.addEventListener('caterm:hosts-updated', handleHostsChange);
     return () => {
-      window.removeEventListener('caterm:snippets-updated', handleUpdate);
-      window.removeEventListener('caterm:groups-updated', handleUpdate);
+      window.removeEventListener('caterm:hosts-updated', handleHostsChange);
     };
   });
 

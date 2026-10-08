@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-server-benchmark"
+description = "Enables the run_server_benchmark command without any pre-configured scope."
+commands.allow = ["run_server_benchmark"]
+
+[[permission]]
+identifier = "deny-run-server-benchmark"
+description = "Denies the run_server_benchmark command without any pre-configured scope."
+commands.deny = ["run_server_benchmark"]

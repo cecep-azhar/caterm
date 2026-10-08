@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-mesh-latency-matrix"
+description = "Enables the run_mesh_latency_matrix command without any pre-configured scope."
+commands.allow = ["run_mesh_latency_matrix"]
+
+[[permission]]
+identifier = "deny-run-mesh-latency-matrix"
+description = "Denies the run_mesh_latency_matrix command without any pre-configured scope."
+commands.deny = ["run_mesh_latency_matrix"]

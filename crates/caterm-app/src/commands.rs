@@ -560,6 +560,65 @@ pub async fn run_network_security_audit(
 }
 
 #[tauri::command]
+pub async fn run_server_benchmark(
+    host_id: String,
+) -> Result<network_audit::ServerBenchmarkResult, CatermError> {
+    run_blocking(move || network_audit::run_server_benchmark(&host_id)).await
+}
+
+#[tauri::command]
+pub async fn run_network_speed_test(
+    host_id: String,
+) -> Result<network_audit::SpeedTestResult, CatermError> {
+    run_blocking(move || network_audit::run_network_speed_test(&host_id)).await
+}
+
+#[tauri::command]
+pub async fn run_qos_audit(host_id: String) -> Result<network_audit::QosAuditResult, CatermError> {
+    run_blocking(move || network_audit::run_qos_audit(&host_id)).await
+}
+
+#[tauri::command]
+pub async fn run_mesh_latency_matrix(
+    source_host_id: String,
+    target_hosts: Vec<(String, String)>,
+) -> Result<network_audit::MeshLatencyMatrix, CatermError> {
+    run_blocking(move || network_audit::run_mesh_latency_matrix(&source_host_id, target_hosts))
+        .await
+}
+
+#[tauri::command]
+pub async fn run_pmtud_probe(
+    host_id: String,
+    target_ip: String,
+) -> Result<network_audit::PmtudResult, CatermError> {
+    run_blocking(move || network_audit::run_pmtud_probe(&host_id, &target_ip)).await
+}
+
+#[tauri::command]
+pub async fn run_subnet_sweep(
+    host_id: String,
+    cidr: String,
+) -> Result<network_audit::SubnetSweepResult, CatermError> {
+    run_blocking(move || network_audit::run_subnet_sweep(&host_id, &cidr)).await
+}
+
+#[tauri::command]
+pub async fn run_threat_watchdog(
+    host_id: String,
+) -> Result<network_audit::ThreatWatchdogResult, CatermError> {
+    run_blocking(move || network_audit::run_threat_watchdog(&host_id)).await
+}
+
+#[tauri::command]
+pub async fn run_tls_audit(
+    target_host: String,
+    port: Option<u16>,
+) -> Result<network_audit::TlsAuditResult, CatermError> {
+    run_blocking(move || network_audit::run_tls_audit(&target_host, port)).await
+}
+
+#[tauri::command]
 pub async fn list_teams() -> Result<Vec<teams::TeamRecord>, CatermError> {
     run_blocking(teams::list_teams).await
 }

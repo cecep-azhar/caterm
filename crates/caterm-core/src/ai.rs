@@ -1013,6 +1013,7 @@ CAPABILITIES:
    - `create_investigation`: params `{\"title\": \"...\", \"host_id\": \"...\", \"query\": \"...\", \"category\": \"incident|performance|security\"}`
    - `delete_investigation`: params `{\"id\": \"...\"}` (Single investigation only)
    - `network_security_audit`: params `{\"host_id\": \"...\"}` (Run DevOps Network & Security Audit: Egress Hunter, Inbound Exposure, Latency Probe & SSH Hardening)
+   - `run_diagnostics_suite`: params `{\"host_id\": \"...\", \"action\": \"benchmark|speedtest|qos|subnet|pmtud|threat_watchdog|tls\"}` (Run DevOps Diagnostics & Security Lab Suite)
    - `save_team`: params `{\"name\": \"...\", \"description\": \"...\"}`
    - `navigate`: params `{\"route\": \"/|/groups|/snippets|/totp|/ssh-keys|/port-forwarding|/monitoring|/command-logs|/investigations|/teams|/prompt-studio|/settings\"}`
 
@@ -1030,7 +1031,7 @@ When proposing steps or actions:
 3. Set `ready: true` once you have enough detail to execute the action.
 
 Respond with ONLY a valid JSON object matching this schema (no prose outside JSON, no markdown fences):
-{\"reply\": \"what you say to the user\", \"ready\": true_or_false, \"steps\": [{\"step\": 1, \"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"is_dangerous\": false, \"actionType\": \"caterm_action\"|\"shell\", \"actionName\": \"update_profile\"|\"save_host\"|\"create_snippet\"|\"save_group\"|\"create_totp\"|\"save_tunnel\"|\"create_investigation\"|\"network_security_audit\"|\"save_team\"|\"navigate\", \"actionParams\": {\"...\"}}]}";
+{\"reply\": \"what you say to the user\", \"ready\": true_or_false, \"steps\": [{\"step\": 1, \"title\": \"...\", \"command\": \"...\", \"description\": \"...\", \"is_dangerous\": false, \"actionType\": \"caterm_action\"|\"shell\", \"actionName\": \"update_profile\"|\"save_host\"|\"create_snippet\"|\"save_group\"|\"create_totp\"|\"save_tunnel\"|\"create_investigation\"|\"network_security_audit\"|\"run_diagnostics_suite\"|\"save_team\"|\"navigate\", \"actionParams\": {\"...\"}}]}";
 
 /// Holds a conversation with the configured LLM.
 ///

@@ -22,7 +22,7 @@ Dokumen ini adalah **spesifikasi tunggal yang mengikat** untuk CATerm v2. Ia men
 | `blueprint-v2.3.md` | Blueprint besar: peta produk, CLI, mobile, store, dokumentasi, monetisasi, BEP, marketing, sosial media, konten video | **DOKUMEN PENDAMPING** (18 September 2026). Mengatur keputusan **bisnis & ekosistem**; tidak mengubah satu REQ pun. Kalau bertentangan soal perilaku aplikasi, **dokumen ini (`prd-v2.md`) yang menang**. Fitur baru F-01..F-08 di sana wajib melewati revisi PRD sebelum dikoding. |
 | `proposal.html` / `CATerm_Sync_Cloud_Proposal.pdf` | Strategi monetisasi & GTM | **SUMBER UTAMA** untuk §10. |
 
-> ⚠️ **Penomoran REQ di dokumen ini dimulai ulang dari REQ-01 dan berakhir di REQ-36.** Setiap referensi "REQ-xx" di `task-v2.md` merujuk ke dokumen ini, bukan ke `prd.md` atau `prd-v3.md`.
+> ⚠️ **Penomoran REQ di dokumen ini dimulai ulang dari REQ-01 dan diperluas hingga REQ-39 (v2.1.19 DevOps Diagnostics Suite).** Setiap referensi "REQ-xx" di `task-v2.md` merujuk ke dokumen ini, bukan ke `prd.md` atau `prd-v3.md`.
 
 ### 0.1 Keputusan stack — kenapa rewrite, bukan lanjut
 
@@ -93,11 +93,12 @@ Pilar bukan slogan. Setiap pilar punya **angka** dan **gerbang verifikasi** yang
 10. AI Terminal Copilot (opt-in, provider kustom multi-profil + validasi, API key terenkripsi)
 11. Full Environment Backup & Restore
 12. Settings, Theming, Keybindings
+13. DevOps Diagnostics & Security Lab Suite (v2.1.19: Mesh Latency Matrix, Speed Test, Bufferbloat, Mini-Benchmark, PMTUD, CIDR Sweeper, Reverse Shell Watchdog, TLS Auditor)
 
 ### 3.2 Dalam cakupan v2.0 GA — DISABLED / NEXT FEATURE (UI Placeholder)
 
-13. E2EE Multi-Device Sync — UI lengkap, badge *"Coming Soon · Managed Sync"*, tombol non-aktif, **tanpa** koneksi jaringan apa pun.
-14. Team Vault Collaboration — idem, badge *"Coming Soon · Team"*.
+14. E2EE Multi-Device Sync — UI lengkap, badge *"Coming Soon · Managed Sync"*, tombol non-aktif, **tanpa** koneksi jaringan apa pun.
+15. Team Vault Collaboration — idem, badge *"Coming Soon · Team"*.
 
 > Kedua fitur ini **wajib ter-*ship*** dalam bentuk placeholder. Alasannya bukan pemasaran: keberadaan skema tabel, tipe data, dan layar kosongnya sejak awal mencegah rewrite kedua saat backend cloud siap. Kode kriptografinya (§9) **ditulis dan diuji penuh** di v2.0 meskipun jalur jaringannya mati.
 
@@ -113,7 +114,7 @@ Pilar bukan slogan. Setiap pilar punya **angka** dan **gerbang verifikasi** yang
 
 ---
 
-## 4. Requirement Register (REQ-01 s/d REQ-36)
+## 4. Requirement Register (REQ-01 s/d REQ-39)
 
 **Format.** Setiap REQ berisi: Deskripsi · Aturan Bisnis · Kriteria Penerimaan (GIVEN/WHEN/THEN) · Prioritas. Prioritas: **P0** = blocker rilis · **P1** = wajib GA · **P2** = boleh menyusul di patch minor.
 
@@ -936,6 +937,71 @@ angka ~4,5× dan itulah persis kesalahan yang dicabut di atas.
 
 ---
 
+### REQ-39 — DevOps Diagnostics & Security Lab Suite (v2.1.19)
+**Prioritas:** P1 *(High-Value Infrastructure & Security Diagnostic Suite)*  
+**Kategori:** DevOps, Diagnostics & Security Hardening  
+**Target Rilis:** v2.1.19  
+**Arsitektur Inti:** On-Demand Zero-Dependency (0% background daemon, 0% CPU saat idle, overhead ukuran binary < 250 KB).
+
+**Deskripsi.** Modul diagnostik jaringan, benchmark performa server, dan audit keamanan host tingkat lanjut tanpa memasang background agent/daemon di server target. Seluruh audit dieksekusi secara *on-demand* melalui SSH exec channel terisolasi dengan streaming hasil waktu-nyata ke antarmuka CATerm.
+
+**Spesifikasi Lengkap 8 Modul Diagnostik:**
+
+1. **Cross-Host Mesh Latency Matrix:**
+   - Probe paralel RTT (*Round Trip Time*) & *jitter* antar seluruh node armada (Hostinger, X1, XPC, YPC).
+   - Matriks visual interaktif $N \times N$ dengan indikator kode warna:
+     - Hijau: RTT < 20 ms
+     - Kuning: RTT 20 – 100 ms
+     - Merah: RTT > 100 ms atau RTO (*Request Timed Out*)
+   - Mengidentifikasi degradasi inter-koneksi mesh secara seketika.
+
+2. **Zero-Dependency Internet Speed Test:**
+   - Pengujian kecepatan transfer HTTP *streaming chunks* langsung via Cloudflare Edge / CDN node terdekat.
+   - Mengukur Download (Mbps), Upload (Mbps), dan Ping latency tanpa memerlukan Python, `speedtest-cli`, maupun dependensi runtime lain di server target.
+   - Menggunakan binary curl/fetch bawaan OS remote secara efisien.
+
+3. **QoS & Bufferbloat Auditor:**
+   - Menghitung delta variansi RTT saat kondisi jaringan idle vs link tersaturasi beban penuh (*saturated link*).
+   - Memberikan grade skor bufferbloat dari **A+** hingga **F**.
+   - Menilai stabilitas transmisi untuk workload sensitif latensi: *database replication*, streaming video, dan VoIP.
+
+4. **Agentless Server Benchmark (Mini YABS / Sysbench):**
+   - **CPU:** Prime number multi-core test & SHA-256 loop score untuk mengukur performa komputasi murni.
+   - **RAM:** Throughput sequential memory copy (MB/s).
+   - **Disk IOPS & Transfer Rate:** Pengujian disk bebas cache OS menggunakan `dd oflag=direct` (atau native sync) dengan ukuran blok 4k, 64k, dan 1M.
+
+5. **MTU Path Discovery (PMTUD):**
+   - Algoritma pencarian biner (*binary search*) ping dengan parameter `-M do -s` (DF bit set).
+   - Menemukan Maximum Transmission Unit optimum tanpa fragmentasi paket.
+   - Diagnosa overhead dan *packet dropping* pada tunnel overlay: Tailscale, WireGuard, IPsec, Cloudflare WARP.
+
+6. **Subnet CIDR Sweeper:**
+   - Pemindaian jangkauan subnet lokal/privat (*range scan*) tanpa dependensi Nmap/Zmap.
+   - Memanfaatkan native Rust socket probe (dari host lokal) atau bash socket `/dev/tcp` non-blocking (pada remote host).
+   - Mengidentifikasi host aktif (*alive*) dan port exposure internal dalam hitungan detik.
+
+7. **Threat & Outbound Reverse Shell Watchdog:**
+   - Audit anomali koneksi keluar (*outbound sockets*) yang diinisiasi dari direktori berisiko tinggi (`/tmp`, `/dev/shm`, `/var/tmp`).
+   - Deteksi proaktif proses shell interaktif mencurigakan (`bash`, `sh`, `nc`, `netcat`, `ncat`, `python`, `perl`, `php`, `socat`) yang terikat ke soket jaringan publik.
+   - Peringatan langsung jika terindikasi pola *reverse shell* atau aktivitas C2 (*Command and Control*).
+
+8. **TLS Weakness & Certificate Expiry Auditor:**
+   - Audit masa berlaku sertifikat SSL/TLS dengan peringatan kritis jika expiry < 30 hari.
+   - Validasi kelengkapan CA bundle chain certificate untuk mencegah `x509: certificate signed by unknown authority`.
+   - Deteksi cipher suite usang/lemah (SSLv3, TLS 1.0, TLS 1.1, RC4, 3DES, CBC cipher suites).
+
+**Aturan bisnis & keamanan:**
+- Eksekusi murni *on-demand*; tidak ada background poll atau daemon yang terus berjalan di remote node (0% background CPU idle).
+- Seluruh script payload dan binary tambahan dioptimalkan ketat agar total pertambahan binary CATerm < 250 KB.
+- Hasil diagnosa dapat disimpan terenkripsi di tabel SQLite audit log dan diekspor ke format JSON/Markdown untuk kebutuhan kepatuhan (*compliance*).
+
+**Kriteria penerimaan.**
+- **GIVEN** target host Linux tanpa Python/NodeJS, **WHEN** Internet Speed Test dijalankan, **THEN** CATerm berhasil mengukur throughput Download & Upload via Cloudflare Edge secara akurat tanpa error dependensi.
+- **GIVEN** armada multi-host (Hostinger, X1, XPC, YPC), **WHEN** Mesh Latency Matrix dieksekusi, **THEN** tabel matriks $N \times N$ terisi lengkap dengan metrik RTT dan status warna visual (<20ms hijau, 20-100ms kuning, >100ms merah).
+- **GIVEN** script reverse shell berjalan dari `/tmp`, **WHEN** Threat Watchdog dipicu, **THEN** proses dan koneksi keluar tersebut terdeteksi dengan status ALERT/CRITICAL.
+
+---
+
 ## BAGIAN H — SETTINGS, BACKUP & PORTABILITAS
 
 ### REQ-30 — Settings, Theming & Keybindings
@@ -1589,6 +1655,7 @@ Kontrak antara frontend Svelte dan Rust core. **Setiap command adalah pembungkus
 | Keys | `key_list`, `key_generate`, `key_import`, `key_export`, `key_delete`, `key_deploy` | REQ-26, 27 |
 | AI | `ai_config_get`, `ai_config_set`, `ai_consent_accept`, `ai_preview_payload`, `ai_ask`, `ai_cancel` | REQ-28, 29 |
 | AI Provider | `ai_provider_list`, `ai_provider_create`, `ai_provider_update`, `ai_provider_delete`, `ai_provider_set_default`, `ai_provider_validate` (lapis 1, tanpa jaringan), `ai_provider_test` (lapis 2–3), `ai_models_list` | REQ-36 |
+| DevOps Suite | `run_network_security_audit`, `devops_mesh_latency_matrix`, `devops_speedtest`, `devops_bufferbloat_audit`, `devops_server_benchmark`, `devops_pmtud_discovery`, `devops_cidr_sweeper`, `devops_threat_watchdog`, `devops_tls_audit` | REQ-39 |
 | Settings | `settings_get_all`, `settings_set`, `settings_reset`, `keybindings_get`, `keybindings_set`, `theme_import` | REQ-30 |
 | Backup | `backup_export`, `backup_preview`, `backup_restore`, `backup_schedule_set` | REQ-31 |
 | Sync *(disabled)* | `sync_status` → selalu `{enabled:false, reason:"coming_soon"}` | REQ-32 |
@@ -2034,7 +2101,7 @@ Daftar ini **sengaja tidak kosong**. "Tidak ada pertanyaan terbuka" pada dokumen
 
 CATerm v2.0 dinyatakan GA hanya jika **seluruh** baris berikut benar:
 
-- [ ] 38 REQ berstatus P0 dan P1 terimplementasi dan terbukti lewat test otomatis (termasuk REQ-37 2FA/TOTP dan REQ-38 Scheduled Tasks/SFTP Backup).
+- [ ] 39 REQ berstatus P0 dan P1 terimplementasi dan terbukti lewat test otomatis (termasuk REQ-37 2FA/TOTP, REQ-38 Scheduled Tasks/SFTP Backup, dan REQ-39 DevOps Diagnostics & Security Lab Suite v2.1.19).
 - [ ] Seluruh 21 anti-regresi §12 punya test yang merah bila masalahnya kembali.
 - [ ] `cargo clippy --workspace -- -D warnings` = 0 warning.
 - [ ] Coverage `caterm-core` ≥ 80%, modul kripto ≥ 95%.

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-run-subnet-sweep"
+description = "Enables the run_subnet_sweep command without any pre-configured scope."
+commands.allow = ["run_subnet_sweep"]
+
+[[permission]]
+identifier = "deny-run-subnet-sweep"
+description = "Denies the run_subnet_sweep command without any pre-configured scope."
+commands.deny = ["run_subnet_sweep"]
