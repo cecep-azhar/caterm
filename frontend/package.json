@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
+    "postinstall": "node -e \"const fs = require('fs'); const p = 'node_modules/@sveltejs/kit/src/exports/vite/index.js'; if (fs.existsSync(p)) { let c = fs.readFileSync(p, 'utf8'); if (!c.includes('bundle.flatMap')) { c = c.replace('client_chunks = bundle.output;', 'client_chunks = Array.isArray(bundle) ? bundle.flatMap((b) => b.output || []) : bundle.output;'); fs.writeFileSync(p, c); } }\"",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
   },

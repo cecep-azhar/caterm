@@ -45,7 +45,10 @@
         "sidebarImage": "icons/sidebar.bmp"
       }
     },
-    "createUpdaterArtifacts": true
+    "createUpdaterArtifacts": true,
+    "android": {
+      "minSdkVersion": 26
+    }
   },
   "plugins": {
     "updater": {
