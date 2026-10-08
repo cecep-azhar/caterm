@@ -118,6 +118,21 @@ export async function aiSaveRoutingRule(rule: TaskRouteRule): Promise<void> {
   return invoke<void>('ai_save_routing_rule', { rule });
 }
 
+export interface CustomSkill {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  category: string;
+  triggers: string[];
+  preferred_model_id?: string | null;
+  system_instructions: string;
+  allowed_tools: string[];
+  is_builtin: boolean;
+  is_enabled: boolean;
+  created_at: number;
+}
+
 export async function aiGetPersonas(): Promise<SystemPersona[]> {
   return invoke<SystemPersona[]>('ai_get_personas');
 }
@@ -155,6 +170,35 @@ export async function aiDispatchTask(
     taskType,
     task_type: taskType,
     query,
+    terminalCtx,
+    terminal_ctx: terminalCtx
+  });
+}
+
+export async function aiGetSkills(): Promise<CustomSkill[]> {
+  return invoke<CustomSkill[]>('ai_get_skills');
+}
+
+export async function aiSaveSkill(skill: CustomSkill): Promise<void> {
+  return invoke<void>('ai_save_skill', { skill });
+}
+
+export async function aiDeleteSkill(id: string): Promise<void> {
+  return invoke<void>('ai_delete_skill', { id });
+}
+
+export async function aiDispatchTaskWithSkill(
+  taskType: TaskType | string,
+  query: string,
+  skillName?: string | null,
+  terminalCtx?: TerminalContext
+): Promise<DispatchResult> {
+  return invoke<DispatchResult>('ai_dispatch_task_with_skill', {
+    taskType,
+    task_type: taskType,
+    query,
+    skillName,
+    skill_name: skillName,
     terminalCtx,
     terminal_ctx: terminalCtx
   });

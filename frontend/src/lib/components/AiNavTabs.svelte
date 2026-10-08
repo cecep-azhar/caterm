@@ -1,5 +1,5 @@
 <script lang="ts">
-  let { active }: { active: 'routing' | 'personas' | 'habits' | 'quick' } = $props();
+  let { active }: { active: 'routing' | 'personas' | 'habits' | 'skills' | 'quick' } = $props();
 </script>
 
 <div class="border-b border-neutral-200 dark:border-neutral-800 flex gap-4 overflow-x-auto text-sm font-medium" role="tablist">
@@ -12,6 +12,16 @@
       : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
   >
     Providers & Routing Matrix
+  </a>
+  <a
+    href="/settings/ai-skills"
+    role="tab"
+    aria-selected={active === 'skills'}
+    class="pb-3 whitespace-nowrap transition-colors border-b-2 {active === 'skills'
+      ? 'border-sky-500 text-neutral-900 dark:text-white font-semibold'
+      : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200'}"
+  >
+    Custom Skills (@skills)
   </a>
   <a
     href="/settings/ai-personas"

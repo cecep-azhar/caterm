@@ -141,6 +141,10 @@ const COMMANDS: &[&str] = &[
     "ai_toggle_habit_pin",
     "ai_delete_habit",
     "ai_dispatch_task",
+    "ai_get_skills",
+    "ai_save_skill",
+    "ai_delete_skill",
+    "ai_dispatch_task_with_skill",
     // System / Performance
     "get_performance_prefs",
     "set_performance_prefs",

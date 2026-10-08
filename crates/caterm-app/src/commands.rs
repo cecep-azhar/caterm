@@ -801,6 +801,32 @@ pub async fn ai_dispatch_task(
     run_blocking(move || ai::dispatch_task(tt, &query, terminal_ctx)).await
 }
 
+#[tauri::command]
+pub async fn ai_get_skills() -> Result<Vec<ai::CustomSkill>, CatermError> {
+    run_blocking(ai::get_all_skills).await
+}
+
+#[tauri::command]
+pub async fn ai_save_skill(skill: ai::CustomSkill) -> Result<(), CatermError> {
+    run_blocking(move || ai::save_custom_skill(skill)).await
+}
+
+#[tauri::command]
+pub async fn ai_delete_skill(id: String) -> Result<(), CatermError> {
+    run_blocking(move || ai::delete_custom_skill(&id)).await
+}
+
+#[tauri::command]
+pub async fn ai_dispatch_task_with_skill(
+    task_type: String,
+    query: String,
+    skill_name: Option<String>,
+    terminal_ctx: Option<ai::TerminalContext>,
+) -> Result<ai::DispatchResult, CatermError> {
+    let tt = ai::TaskType::from_str_opt(&task_type).unwrap_or(ai::TaskType::Chat);
+    run_blocking(move || ai::dispatch_task_with_skill(tt, &query, skill_name, terminal_ctx)).await
+}
+
 // ---- Hosted AI (CATerm Pro pooled quota via OmniRoute) -------------------------------------
 
 #[tauri::command]
