@@ -118,6 +118,13 @@
       color: 'text-violet-500 bg-violet-500/10'
     },
     {
+      id: 'diagnostics',
+      label: 'DevOps Lab',
+      href: '/diagnostics',
+      icon: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.438l-.318.131a6 6 0 01-3.86.438l-2.387-.477a2 2 0 00-1.022.547l-1.89 1.89A2 2 0 002.5 19v1.5a1.5 1.5 0 001.5 1.5h16a1.5 1.5 0 001.5-1.5V19a2 2 0 00-.598-1.414l-1.474-1.474zM12 2v6m0 0a3 3 0 100 6 3 3 0 000-6z',
+      color: 'text-amber-500 bg-amber-500/10'
+    },
+    {
       id: 'teams',
       label: 'Teams',
       href: '/teams',

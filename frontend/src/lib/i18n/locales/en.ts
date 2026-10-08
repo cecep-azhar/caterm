@@ -69,6 +69,7 @@ const en = {
     totp: '2FA Authenticator',
     groups: 'Work Groups',
     teams: 'Teams',
+    diagnostics: 'DevOps Lab',
     contribution: 'Contribution',
     settings: 'Settings'
   },

@@ -670,6 +670,7 @@
               </button>
               {#if openMenuId === host.id}
                 <div role="menu" class="absolute right-0 top-full mt-1 z-30 w-48 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#141414] shadow-2xl py-1 text-sm">
+                  <a role="menuitem" href="/diagnostics?host={host.id}" class={menuItem}>Lab / Audit</a>
                   <a role="menuitem" href="/sftp?host={host.id}" class={menuItem}>{t('hosts.filesSftp')}</a>
                   <button role="menuitem" onclick={() => { openMenuId = null; detailHost = host; }} class={menuItem}>{t('common.details')}</button>
                   <button role="menuitem" onclick={() => { openMenuId = null; handleClone(host); }} class={menuItem}>{t('common.clone')}</button>
@@ -681,6 +682,15 @@
                 </div>
               {/if}
             </div>
+
+            <a
+              href="/diagnostics?host={host.id}"
+              class="h-8 px-2.5 flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 text-xs font-medium transition-colors"
+              title="DevOps Lab & Audit"
+            >
+              <svg class="w-3.5 h-3.5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.438l-.318.131a6 6 0 01-3.86.438l-2.387-.477a2 2 0 00-1.022.547l-1.89 1.89A2 2 0 002.5 19v1.5a1.5 1.5 0 001.5 1.5h16a1.5 1.5 0 001.5-1.5V19a2 2 0 00-.598-1.414l-1.474-1.474zM12 2v6m0 0a3 3 0 100 6 3 3 0 000-6z"/></svg>
+              <span>Lab</span>
+            </a>
 
             <button
               onclick={() => openSession(host.id)}
