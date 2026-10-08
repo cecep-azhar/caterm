@@ -13,8 +13,8 @@ export default defineConfig(() => ({
   ],
 
   build: {
-    // Standard target compatible with modern desktop WebKitGTK/WebView2 and Android 8+
-    target: "es2020",
+    // Compatible with Android 8 (Chrome >= 61 WebView) and desktop WebKitGTK/WebView2
+    target: ["chrome61", "es2018"],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

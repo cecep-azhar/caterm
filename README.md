@@ -4,7 +4,7 @@
 > Built primarily with **Rust** (Tauri v2 + Tokio + SQLCipher) and SvelteKit.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-brightgreen.svg)](#supported-platforms)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android-brightgreen.svg)](#supported-platforms)
 [![Rust](https://img.shields.io/badge/Core-Rust%202024-orange.svg)](https://www.rust-lang.org/)
 [![GitHub Issues](https://img.shields.io/badge/Issues-GitHub-blue)](https://github.com/cecep-azhar/caterm/issues)
 [![Support on Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/cecepazhar)
@@ -13,80 +13,79 @@
 
 ## ⚡ Overview
 
-**CATerm** is a next-generation desktop terminal emulator and server management suite engineered in **Rust** for supreme speed, rock-solid stability, and zero-compromise privacy. It combines an ultra-responsive raw PTY SSH client, full WinSCP-parity dual-pane SFTP manager, real-time remote system metrics monitoring, and intelligent AI-assisted server operations into a sleek, dark-mode native desktop application.
+**CATerm** adalah desktop terminal emulator dan server management workspace generasi modern yang direkayasa dengan **Rust (Edition 2024)** untuk performa maksimal, latensi ultra rendah, dan privasi tanpa kompromi (Zero-Knowledge). Menggabungkan PTY SSH client byte-by-byte streaming, WinSCP-parity dual-pane SFTP manager, remote system monitoring real-time, zero-knowledge encrypted vault (SQLCipher + Argon2id), master multi-agent AI routing engine, serta extensible custom skills.
 
-Unlike web-wrapped shells or bloated electron tools, CATerm runs directly on lightweight Rust native binaries with memory footprint strictly optimized under 180MB RSS using `mimalloc` and headless WebKit rendering.
+CATerm dioptimalkan berjalan di native binary dengan footprint memori sangat hemat (<180MB RSS) menggunakan `mimalloc` dan headless WebKit rendering, tanpa bloatware web iframe wrapper biasa.
 
 ---
 
 ## 🖥️ Supported Platforms
 
-CATerm is built from the ground up for **Multi-Platform** deployment:
-
 | Platform | Packages / Bundles | Status |
 | :--- | :--- | :--- |
 | **Linux (Fedora / RHEL)** | `.rpm` (x86_64, aarch64) | ✅ Active & Tested |
 | **Linux (Debian / Ubuntu)** | `.deb` (x86_64, aarch64) | ✅ Active & Tested |
-| **Linux (Universal)** | `.AppImage` | ✅ Active & Tested |
+| **Linux (Universal)** | `.AppImage`, `.tar.gz` | ✅ Active & Tested |
 | **Windows 10 / 11** | Native `.exe` Installer & Portable (x64) | ✅ Active & Tested |
-| **Android** | `.apk` (ARM64) | 🚧 In Progress |
+| **macOS** | `.dmg` (Apple Silicon & Intel) | 🔄 Universal build ready |
+| **Android** | `.apk` (ARM64 debug/release ready) | ✅ Available & Tested |
 
 ---
 
 ## 🚀 Key Features
 
 ### 1. ⚡ Zero-Delay SSH PTY Terminal
-- Built on low-level Rust `ssh2` and Tokio non-blocking async streaming.
-- Immediate byte-by-byte PTY flush — zero input delay or typing latency even on high-speed typing and heavy terminal output.
-- Full xterm.js compatibility with 256 colors, true color, and native copy/paste.
+- Arsitektur non-blocking async streaming berbasis Rust `ssh2` dan Tokio.
+- Byte-by-byte immediate flush — bebas input delay pada pengetikan cepat dan throughput streaming tinggi.
+- xterm.js WebGL renderer dengan 256 colors, true color 24-bit, clipboard copy/paste aman.
 
-### 2. 🔄 True Multi-Session Persistence
-- Seamlessly open, switch, and split SSH sessions across multiple remote hosts without losing your session state.
-- Adding a new host connection never disconnects or restarts background sessions; your remote processes, long builds, and terminal scrollbacks remain alive and uninterrupted.
+### 2. 🔄 Multi-Session Persistence & Split Panes
+- Tab dan split grid multi-terminal simultan (hingga 4 pane aktif).
+- Background connection persistence: penambahan host baru atau beralih sesi tidak memutuskan proses remote yang sedang berjalan.
 
-### 3. 📁 Dual-Pane SFTP Manager (WinSCP Parity)
-- Integrated side-by-side local filesystem and remote SFTP file browsers.
-- Chunked 64KB high-speed stream upload/download with real-time progress bars and cancel tokens.
-- Native keyboard shortcuts (`F2` Rename, `F5` Copy, `F7` New Folder, `F8` Delete, `Ctrl+R` Refresh).
-- Visual permissions viewer and chmod editor.
+### 3. 📁 Dual-Pane SFTP / VFS Manager (WinSCP Parity)
+- Dual-pane side-by-side local filesystem vs remote server.
+- Stream chunked 64KB upload/download dengan progress tracking dan cancellation token.
+- Keyboard shortcuts (`F2` Rename, `F5` Copy, `F7` New Folder, `F8` Delete, `Ctrl+R` Refresh).
+- Visual permissions viewer dan chmod editor.
+- Dukungan protokol VFS multi-storage (SFTP, Local, SCP, FTP/FTPS, WebDAV, S3-compatible).
 
-### 4. 🧠 Smart Autocomplete & Autosuggest
-- Fish/Zed-style ghost autocompletion right on the active terminal cursor.
-- Suggests 200+ curated Linux sysadmin utilities, saved personal vault snippets, and active session command history.
-- Press `Tab` or `Arrow Right` to immediately apply commands.
+### 4. 🔒 Zero-Knowledge Encrypted Vault
+- Enkripsi database lokal menggunakan **SQLCipher (AES-256-GCM)** dengan kunci turunan **Argon2id**.
+- Perlindungan kredensial: Host passwords, SSH Private Keys, TOTP 2FA tokens, dan API key AI tersimpan aman secara offline.
+- Zero telemetry, zero key upload. Format backup/restore terenkripsi `.catb`.
 
-### 5. 🔒 Zero-Knowledge Encrypted Vault
-- All sensitive credentials (passwords, private SSH keys, AI API tokens) are encrypted locally using **SQLCipher (AES-256-GCM)** and **Argon2id** key derivation.
-- Zero telemetry, zero tracking, zero remote key upload. Your keys never leave your device.
-- Full encrypted backup and restore (`.catb` format) with passphrase verification.
+### 5. 🤖 Hana AI DevOps Co-Pilot & Master Router
+- Master Multi-Agent Router yang mengarahkan tugas DevOps (Chat, Diagnostic, Script Generator, Security Review) ke provider paling optimal.
+- Dukungan model luas: CATerm Pro Hosted AI (OmniRoute/9Router failover) serta Bring Your Own Key (Claude, OpenAI, Gemini, DeepSeek, Local Ollama).
+- PII Scrubber & Secret Filter otomatis menyaring token, password, dan kunci privat sebelum diteruskan ke upstream API.
+- Custom Skills framework (e.g. `@k8s-triage`, `@laravel-deploy`) dan Persistent Habit Memory berbasis SQLite FTS5.
 
-### 6. 📊 Real-Time Server Monitoring
-- Direct non-interactive SSH telemetry polling.
-- Live charts and resource monitors for CPU load, RAM utilization, Disk usage, and Network I/O without needing third-party agents on target machines.
+### 6. 📊 Real-Time Server Monitoring & Diagnostics
+- Polling telemetri non-interactive via SSH streaming langsung (CPU, RAM, Disk, Load, Network I/O) tanpa perlu instalasi agent di target server.
+- Diagnostics Lab & Network Benchmark Suite (latensi mesh, port scanning, audit keamanan).
 
 ### 7. 🌐 Port Forwarding & SSH Tunnels
-- Easily configure and manage Local, Remote, and Dynamic (SOCKS5 proxy) tunnels.
-- Single-click tunnel activation with live port status indicators.
+- Local, Remote, dan Dynamic SOCKS5 proxy tunnels dengan visual status indicator.
 
-### 8. 🤖 AI Ops Copilot (Local & OpenAI-Compatible)
-- Execute natural-language infrastructure tasks safely.
-- Transparent step-by-step proposal review before running any bash commands.
-- Full E2EE audit logging of every terminal command and AI execution.
+### 8. 🛡️ TOTP 2FA Authenticator & Security Suite
+- Terintegrasi authenticator TOTP RFC 6238 langsung di dalam vault CATerm.
+- TOFU (Trust-On-First-Use) Host Key verification untuk pencegahan Man-in-the-Middle (MITM).
 
 ---
 
-## 🛠️ Architecture
-
-CATerm is structured as a clean Rust workspace:
+## 🛠️ Workspace Architecture
 
 ```text
 caterm/
 ├── crates/
-│   ├── caterm-core/      # Pure Rust core: Vault (SQLCipher), SSH engine, SFTP, monitoring, store
-│   ├── caterm-cli/       # CLI utility for terminal testing, benchmarks, and vault migrations
-│   └── caterm-app/       # Tauri v2 native desktop application wrapper (IPC, menus, system tray)
-├── frontend/             # SvelteKit + Tailwind CSS single-page application (bundled into Tauri)
-└── scripts/              # Automated build, packaging, and memory budget validation tools
+│   ├── caterm-core/      # Rust logic murni: Vault (SQLCipher), SSH/SFTP, VFS, AI Router/Memory, TOTP, Audit
+│   ├── caterm-cli/       # catermctl utility: benchmark, terminal harness, vault migration
+│   ├── caterm-app/       # Tauri v2 native desktop wrapper (IPC handlers, system tray, window lifecycle)
+│   └── caterm-pro/       # Commercial extension: Ed25519 GCC license verification, E2EE sync payload
+├── frontend/             # SvelteKit + Tailwind CSS + xterm.js desktop UI
+├── docs/                 # Panduan teknis arsitektur, signing, lisensi, dan peluncuran
+└── scripts/              # Build, release packaging, dan budget validation
 ```
 
 ---
@@ -94,20 +93,14 @@ caterm/
 ## 📦 Building from Source
 
 ### Prerequisites
-- **Rust toolchain** (1.80+): `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
-- **Node.js** (v18+ or v20+) & **npm**
-- **System dependencies**:
+- **Rust toolchain 1.85+ (Edition 2024)**: `rustup update`
+- **Node.js 20+** & **npm**
+- **Sistem Dependency**:
   - *Fedora / RHEL*: `sudo dnf install webkit2gtk4.1-devel openssl-devel libssh2-devel libappindicator-gtk3-devel`
   - *Ubuntu / Debian*: `sudo apt install libwebkit2gtk-4.1-dev libssl-dev libssh2-1-dev libayatana-appindicator3-dev`
   - *Windows*: Visual Studio C++ Build Tools & WebView2 runtime
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/cecep-azhar/caterm.git
-cd caterm
-```
-
-### 2. Install Frontend Dependencies
+### 1. Build Frontend
 ```bash
 cd frontend
 npm install
@@ -115,69 +108,22 @@ npm run build
 cd ..
 ```
 
-### 3. Run in Development Mode
+### 2. Run Desktop App (Dev Mode)
 ```bash
-cd crates/caterm-app
-npx --prefix ../../frontend tauri dev
+cargo tauri dev
 ```
 
-### 4. Build Production Packages
-
-#### Linux (.rpm / .deb / .AppImage)
+### 3. Build Production Binary
 ```bash
-cd crates/caterm-app
-# Build RPM bundle
-npx --prefix ../../frontend tauri build --bundles rpm
+# Community Open-Core Build
+cargo build -p caterm-app --no-default-features --features community --release
 
-# Build DEB bundle
-npx --prefix ../../frontend tauri build --bundles deb
-
-# Build AppImage bundle
-npx --prefix ../../frontend tauri build --bundles appimage
-```
-
-#### Windows (.exe)
-```bash
-cd crates/caterm-app
-npx --prefix ../../frontend tauri build --bundles nsis
+# Pro Commercial Build
+cargo build -p caterm-app --features pro --release
 ```
 
 ---
 
-## 🤝 Community & Support
-
-- **Repository**: [https://github.com/cecep-azhar/caterm](https://github.com/cecep-azhar/caterm)
-- **Issue Tracker & Feature Requests**: [https://github.com/cecep-azhar/caterm/issues](https://github.com/cecep-azhar/caterm/issues)
-- **Support & Sponsorship**: [ko-fi.com/cecepazhar](https://ko-fi.com/cecepazhar) (primary) · [GitHub Sponsors](https://github.com/sponsors/cecep-azhar) · [PayPal](https://paypal.me/cecepazhar)
-
----
-
-## 💖 Sponsors
-
-CATerm's core stays free and MIT-licensed forever. Sponsorship pays for servers, cross-platform builds, and the time to keep shipping updates.
-
-| Tier | Monthly | You get |
-| :--- | :--- | :--- |
-| 💎 **Platinum** | $100+ | Large logo at the top of this section, on [caterm.fathforce.com](https://caterm.fathforce.com) and in the docs · one CATerm Pro license · quarterly roadmap call |
-| 🥇 **Gold** | $25+ | Logo in this section and on the website · thank-you in release notes · priority issue triage |
-| 🥈 **Silver** | $5+ | Your name in the supporters list below and on the website |
-
-[![Become a sponsor on Ko-fi](https://img.shields.io/badge/Become%20a%20sponsor-Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white)](https://ko-fi.com/cecepazhar)
-
-### 💎 Platinum
-
-_Your logo here — [become the first Platinum sponsor](https://ko-fi.com/cecepazhar)._
-
-### 🥇 Gold
-
-_Your logo here — [become a Gold sponsor](https://ko-fi.com/cecepazhar)._
-
-### 🥈 Silver
-
-_Your name here — [become a Silver supporter](https://ko-fi.com/cecepazhar)._
-
----
-
-## 📄 License
-
-Licensed under the [MIT License](LICENSE). Free and open source; CATerm Pro only covers server-backed features (Cloud Sync, hosted AI).
+## 📄 License & Attribution
+- Core / Community Edition dilisensikan di bawah [MIT License](LICENSE).
+- Komponen sinkronisasi armada dan hosting AI diatur di bawah lisensi komersial CATerm Pro.
