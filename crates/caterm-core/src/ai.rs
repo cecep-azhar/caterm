@@ -197,14 +197,29 @@ fn resolve_host_label(target_host: Option<&str>) -> Option<String> {
 /// content.
 ///
 /// This used to shell out to `curl`, passing the API key as `-H "Authorization: Bearer ..."`.
+fn scrub_payload_messages(payload: &mut serde_json::Value) {
+    let scrubber = crate::crash::PiiScrubber::new();
+    if let Some(messages) = payload.get_mut("messages").and_then(|m| m.as_array_mut()) {
+        for msg in messages {
+            if let Some(content) = msg.get("content").and_then(|c| c.as_str()) {
+                let scrubbed = scrubber.scrub_text(content);
+                if let Some(c_mut) = msg.get_mut("content") {
+                    *c_mut = serde_json::Value::String(scrubbed);
+                }
+            }
+        }
+    }
+}
+
 /// Command-line arguments are world-readable on both Windows and Linux, so the key was visible
 /// to any local process listing. Sending it from inside our own process closes that, and drops
 /// the dependency on `curl.exe` being present.
 fn post_chat_completion(
     settings: &AiSettings,
-    payload: serde_json::Value,
+    mut payload: serde_json::Value,
     timeout: std::time::Duration,
 ) -> Result<String, CatermError> {
+    scrub_payload_messages(&mut payload);
     let base_url = settings.base_url.trim();
     if base_url.is_empty() {
         return Err(CatermError::Ai(AiError::Generic(
