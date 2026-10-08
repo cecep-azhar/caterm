@@ -91,6 +91,7 @@
     "allow-ssh-resize",
     "allow-ssh-disconnect",
     "allow-detect-host-os",
+    "allow-run-network-security-audit",
     "allow-get-ai-settings",
     "allow-save-ai-settings",
     "allow-ai-generate-plan",

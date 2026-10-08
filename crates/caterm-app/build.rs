@@ -108,6 +108,7 @@ const COMMANDS: &[&str] = &[
     "ssh_resize",
     "ssh_disconnect",
     "detect_host_os",
+    "run_network_security_audit",
     // AI / Prompt Studio
     "get_ai_settings",
     "save_ai_settings",
