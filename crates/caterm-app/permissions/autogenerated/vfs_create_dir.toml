@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-vfs-create-dir"
+description = "Enables the vfs_create_dir command without any pre-configured scope."
+commands.allow = ["vfs_create_dir"]
+
+[[permission]]
+identifier = "deny-vfs-create-dir"
+description = "Denies the vfs_create_dir command without any pre-configured scope."
+commands.deny = ["vfs_create_dir"]

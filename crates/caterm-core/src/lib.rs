@@ -56,7 +56,7 @@ pub mod vfs;
 pub mod webdav;
 
 pub use error::CatermError;
-pub use vfs::RemoteFileSystem;
+pub use vfs::{RemoteFileSystem, VfsBackend};
 
 pub const CORE_VERSION: &str = env!("CARGO_PKG_VERSION");
 

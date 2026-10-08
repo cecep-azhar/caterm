@@ -975,6 +975,37 @@
             <option value={h.id}>{h.label} ({h.username}@{h.address}:{h.port})</option>
           {/each}
         </select>
+        {#if currentHost}
+          <div class="flex items-center gap-1.5 ml-1">
+            <span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800">
+              {activeProtocolBadge}
+            </span>
+            <select
+              value={currentHost.protocol || 'ssh'}
+              onchange={(e) => switchCurrentProtocol((e.currentTarget as HTMLSelectElement).value as ConnectionProtocol)}
+              class="bg-neutral-50 dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2 py-0.5 text-xs text-neutral-700 dark:text-slate-300 focus:outline-none focus:border-cyan-500"
+              title="Ganti Protokol VFS Host"
+            >
+              <option value="ssh">SSH / SFTP</option>
+              <option value="scp">SCP</option>
+              <option value="ftp">FTP</option>
+              <option value="ftps">FTPS</option>
+              <option value="webdav">WebDAV</option>
+              <option value="s3">Amazon S3 / R2 / MinIO</option>
+            </select>
+          </div>
+        {/if}
+        <button
+          onclick={() => (showProtocolSelector = !showProtocolSelector)}
+          class={`px-2.5 py-1 rounded text-xs font-medium border transition flex items-center gap-1 ${
+            showProtocolSelector
+              ? 'bg-cyan-600 text-white border-cyan-500'
+              : 'bg-neutral-100 dark:bg-slate-800 text-neutral-700 dark:text-slate-300 border-neutral-300 dark:border-slate-700 hover:bg-neutral-200 dark:hover:bg-slate-700'
+          }`}
+          title="Koneksi Cepat VFS / Ganti Sumber"
+        >
+          <span>⚡ Quick Connect</span>
+        </button>
       </div>
 
       <div class="flex items-center border border-neutral-300 dark:border-slate-700 rounded bg-neutral-100 dark:bg-slate-900 p-0.5 text-xs">
@@ -1030,6 +1061,188 @@
     <div class="bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs px-3 py-2 rounded flex justify-between items-center">
       <span>{successMsg}</span>
       <button onclick={() => (successMsg = '')} class="text-emerald-500 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-200" aria-label={t('sftp.dismiss')}>✕</button>
+    </div>
+  {/if}
+
+  <!-- Quick Connect / Protocol Selector Drawer -->
+  {#if showProtocolSelector}
+    <div class="p-3.5 bg-neutral-50 dark:bg-[#1a1f26] border border-cyan-500/40 rounded-lg shadow-sm space-y-3 text-xs">
+      <div class="flex items-center justify-between border-b border-neutral-200 dark:border-slate-800 pb-2">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-neutral-900 dark:text-slate-100">⚡ Unified VFS Quick Connect</span>
+          <span class="text-neutral-500 dark:text-slate-400 text-[11px]">(SFTP, S3, WebDAV, FTP/FTPS)</span>
+        </div>
+        <button
+          onclick={() => (showProtocolSelector = false)}
+          class="text-neutral-400 hover:text-neutral-600 dark:hover:text-slate-200"
+        >
+          ✕
+        </button>
+      </div>
+
+      {#if qcError}
+        <div class="p-2 bg-red-50 dark:bg-red-950/60 border border-red-200 dark:border-red-800 rounded text-red-700 dark:text-red-300">
+          {qcError}
+        </div>
+      {/if}
+
+      <!-- Protocol Tabs -->
+      <div class="flex flex-wrap gap-1.5 bg-neutral-100 dark:bg-slate-900 p-1 rounded border border-neutral-200 dark:border-slate-800">
+        <button
+          type="button"
+          onclick={() => { qcProtocol = 'ssh'; qcPort = 22; }}
+          class={`px-3 py-1 rounded font-medium text-xs transition ${
+            qcProtocol === 'ssh' ? 'bg-cyan-600 text-white shadow-xs' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
+          }`}
+        >
+          SSH / SFTP
+        </button>
+        <button
+          type="button"
+          onclick={() => { qcProtocol = 's3'; qcPort = 443; }}
+          class={`px-3 py-1 rounded font-medium text-xs transition ${
+            qcProtocol === 's3' ? 'bg-cyan-600 text-white shadow-xs' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
+          }`}
+        >
+          Amazon S3 / R2 / MinIO
+        </button>
+        <button
+          type="button"
+          onclick={() => { qcProtocol = 'webdav'; qcPort = 443; }}
+          class={`px-3 py-1 rounded font-medium text-xs transition ${
+            qcProtocol === 'webdav' ? 'bg-cyan-600 text-white shadow-xs' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
+          }`}
+        >
+          WebDAV
+        </button>
+        <button
+          type="button"
+          onclick={() => { qcProtocol = 'ftp'; qcPort = 21; }}
+          class={`px-3 py-1 rounded font-medium text-xs transition ${
+            qcProtocol === 'ftp' ? 'bg-cyan-600 text-white shadow-xs' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
+          }`}
+        >
+          FTP
+        </button>
+        <button
+          type="button"
+          onclick={() => { qcProtocol = 'ftps'; qcPort = 21; }}
+          class={`px-3 py-1 rounded font-medium text-xs transition ${
+            qcProtocol === 'ftps' ? 'bg-cyan-600 text-white shadow-xs' : 'text-neutral-600 dark:text-slate-400 hover:text-neutral-900 dark:hover:text-white'
+          }`}
+        >
+          FTPS
+        </button>
+      </div>
+
+      <!-- Credential Fields -->
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-2.5">
+        <div class="space-y-1 md:col-span-1">
+          <label class="block text-[11px] font-semibold text-neutral-600 dark:text-slate-400" for="qc-label">
+            Label
+          </label>
+          <input
+            id="qc-label"
+            type="text"
+            bind:value={qcLabel}
+            placeholder={qcProtocol.toUpperCase() + ' Connection'}
+            class="w-full bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+
+        <div class="space-y-1 md:col-span-2">
+          <label class="block text-[11px] font-semibold text-neutral-600 dark:text-slate-400" for="qc-address">
+            {#if qcProtocol === 's3'}
+              Endpoint URL / S3 Host (e.g. s3.amazonaws.com or https://minio.local:9000)
+            {:else if qcProtocol === 'webdav'}
+              WebDAV URL (e.g. https://cloud.example.com/remote.php/dav/files/user/)
+            {:else}
+              Host / Address
+            {/if}
+          </label>
+          <input
+            id="qc-address"
+            type="text"
+            bind:value={qcAddress}
+            placeholder={qcProtocol === 's3' ? 's3.amazonaws.com' : qcProtocol === 'webdav' ? 'https://dav.mailbox.org/servlet/webdav.infostore' : '192.168.1.10'}
+            class="w-full bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+
+        <div class="space-y-1 md:col-span-1">
+          <label class="block text-[11px] font-semibold text-neutral-600 dark:text-slate-400" for="qc-port">
+            Port
+          </label>
+          <input
+            id="qc-port"
+            type="number"
+            bind:value={qcPort}
+            class="w-full bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        <div class="space-y-1">
+          <label class="block text-[11px] font-semibold text-neutral-600 dark:text-slate-400" for="qc-username">
+            {#if qcProtocol === 's3'}
+              Access Key ID
+            {:else if qcProtocol === 'webdav'}
+              Username
+            {:else}
+              Username
+            {/if}
+          </label>
+          <input
+            id="qc-username"
+            type="text"
+            bind:value={qcUsername}
+            placeholder={qcProtocol === 's3' ? 'AKIAIOSFODNN7EXAMPLE' : 'admin'}
+            class="w-full bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+
+        <div class="space-y-1">
+          <label class="block text-[11px] font-semibold text-neutral-600 dark:text-slate-400" for="qc-password">
+            {#if qcProtocol === 's3'}
+              Secret Access Key
+            {:else if qcProtocol === 'webdav'}
+              Password / Token
+            {:else}
+              Password
+            {/if}
+          </label>
+          <input
+            id="qc-password"
+            type="password"
+            bind:value={qcPassword}
+            placeholder="••••••••••••"
+            class="w-full bg-white dark:bg-slate-900 border border-neutral-300 dark:border-slate-700 rounded px-2.5 py-1 text-xs font-mono text-neutral-800 dark:text-slate-200 focus:outline-none focus:border-cyan-500"
+          />
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onclick={() => (showProtocolSelector = false)}
+          class="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-neutral-700 dark:text-slate-300 rounded text-xs"
+        >
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          disabled={qcConnecting || !qcAddress.trim()}
+          onclick={handleQuickConnect}
+          class="px-4 py-1 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white rounded text-xs font-medium flex items-center gap-1.5 transition"
+        >
+          {#if qcConnecting}
+            <span class="animate-spin inline-block">⏳</span> {t('sftp.connecting')}
+          {:else}
+            Connect VFS
+          {/if}
+        </button>
+      </div>
     </div>
   {/if}
 

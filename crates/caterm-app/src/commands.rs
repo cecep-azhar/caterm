@@ -87,6 +87,14 @@ pub async fn list_remote_dir(
 }
 
 #[tauri::command]
+pub async fn vfs_list_files(
+    host_id: String,
+    remote_path: String,
+) -> Result<Vec<sftp::SftpFileEntry>, CatermError> {
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.list_dir(&remote_path)).await
+}
+
+#[tauri::command]
 pub async fn search_remote_files(
     host_id: String,
     base_path: String,
@@ -117,7 +125,21 @@ pub async fn read_remote_file(
 }
 
 #[tauri::command]
+pub async fn vfs_read_file(host_id: String, remote_path: String) -> Result<Vec<u8>, CatermError> {
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.read_file(&remote_path)).await
+}
+
+#[tauri::command]
 pub async fn write_remote_file(
+    host_id: String,
+    remote_path: String,
+    data: Vec<u8>,
+) -> Result<(), CatermError> {
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.write_file(&remote_path, &data)).await
+}
+
+#[tauri::command]
+pub async fn vfs_write_file(
     host_id: String,
     remote_path: String,
     data: Vec<u8>,
@@ -131,7 +153,29 @@ pub async fn mkdir_remote_dir(host_id: String, remote_path: String) -> Result<()
 }
 
 #[tauri::command]
+pub async fn vfs_create_dir(host_id: String, remote_path: String) -> Result<(), CatermError> {
+    run_blocking(move || vfs::get_remote_fs(&host_id)?.mkdir(&remote_path)).await
+}
+
+#[tauri::command]
 pub async fn delete_remote_file(
+    host_id: String,
+    remote_path: String,
+    is_dir: Option<bool>,
+    recursive: Option<bool>,
+) -> Result<(), CatermError> {
+    run_blocking(move || {
+        vfs::get_remote_fs(&host_id)?.delete(
+            &remote_path,
+            is_dir.unwrap_or(false),
+            recursive.unwrap_or(false),
+        )
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn vfs_delete_file(
     host_id: String,
     remote_path: String,
     is_dir: Option<bool>,

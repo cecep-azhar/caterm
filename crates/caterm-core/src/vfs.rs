@@ -60,6 +60,10 @@ pub trait RemoteFileSystem: Send + Sync {
     ) -> Result<(), CatermError>;
 }
 
+/// Alias for `RemoteFileSystem` matching Unified VFS nomenclature.
+pub trait VfsBackend: RemoteFileSystem {}
+impl<T: ?Sized + RemoteFileSystem> VfsBackend for T {}
+
 /// Sftp implementation of `RemoteFileSystem`.
 pub struct SftpFileSystem {
     pub host_id: String,
