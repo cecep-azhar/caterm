@@ -47,3 +47,4 @@ dist/
 flatpak/tools/.venv
 *.18-linux-x86_64
 *.gz
+*.idsig
