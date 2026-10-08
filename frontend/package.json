@@ -8,7 +8,6 @@
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
-    "postinstall": "node -e \"const fs = require('fs'); const p = 'node_modules/@sveltejs/kit/src/exports/vite/index.js'; if (fs.existsSync(p)) { let c = fs.readFileSync(p, 'utf8'); if (!c.includes('bundle.flatMap')) { c = c.replace('client_chunks = bundle.output;', 'client_chunks = Array.isArray(bundle) ? bundle.flatMap((b) => b.output || []) : bundle.output;'); fs.writeFileSync(p, c); } }\"",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
   },
@@ -42,13 +41,11 @@
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
     "@tailwindcss/vite": "^4",
     "@tauri-apps/cli": "^2",
-    "@vitejs/plugin-legacy": "^8.2.3",
     "autoprefixer": "^10.6.1",
     "postcss": "^8.5.28",
     "svelte": "^5.56.3",
     "svelte-check": "^4.6.0",
     "tailwindcss": "^4.3.3",
-    "terser": "^5.51.2",
     "typescript": "~6.0.3",
     "vite": "^8.0.16"
   },
