@@ -134,20 +134,22 @@
           for (const line of lines) {
             if (isBroadcastIntent && activeTabs.length > 1) {
               stepsToPropose.push({
+                step_number: stepIdx,
                 title: `Broadcast ke ${activeTabs.length} Panes: ${line.slice(0, 35)}${line.length > 35 ? '...' : ''}`,
                 description: `Eksekusi serentak ke seluruh terminal aktif (${activeTabs.length} panes)`,
                 command: line,
-                is_dangerous: false,
+                is_danger: false,
                 action_type: 'caterm_action',
                 action_name: 'broadcast_execute',
                 action_params: { command: line }
               });
             } else {
               stepsToPropose.push({
+                step_number: stepIdx,
                 title: `Jalankan: ${line.slice(0, 40)}${line.length > 40 ? '...' : ''}`,
                 description: `Perintah diekstrak dari respon AI (Langkah ${stepIdx})`,
                 command: line,
-                is_dangerous: false
+                is_danger: false
               });
             }
             stepIdx++;
@@ -237,9 +239,8 @@
             address,
             port,
             username,
-            auth_method: authMethod === 'Key' ? { Key: { key_path: params.key_path || '' } } : { Password: {} },
-            group_name: groupName || undefined,
-            tags: params.tags || []
+            authMethod: authMethod === 'Key' ? { type: 'key', path: params.key_path || '' } : { type: 'password' },
+            tags: params.tags || (groupName ? [groupName] : [])
           });
           window.dispatchEvent(new CustomEvent('caterm:hosts-updated'));
           runs[i] = { status: 'ok', output: `Host "${label}" (${username}@${address}:${port}) berhasil disimpan!` };
