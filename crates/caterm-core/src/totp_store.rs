@@ -22,6 +22,15 @@ pub struct TotpEntryRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TotpBackupRecord {
+    pub id: String,
+    pub label: String,
+    pub issuer: Option<String>,
+    pub secret: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TotpEntryInput {
     pub id: Option<String>,
     pub label: String,
@@ -89,6 +98,43 @@ pub fn list_totp_entries() -> Result<Vec<TotpEntryRecord>, CatermError> {
     }
 
     Ok(entries)
+}
+
+pub fn list_totp_for_backup() -> Result<Vec<TotpBackupRecord>, CatermError> {
+    let key = get_active_dek()?;
+    let key_hex = hex::encode(key);
+    let conn = db::open()?;
+    let mut stmt = conn
+        .prepare("SELECT id, label, issuer, secret_enc FROM totp_entries ORDER BY label COLLATE NOCASE ASC;")
+        .map_err(|e| CatermError::Db(DbError::Generic(e.to_string())))?;
+
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })
+        .map_err(|e| CatermError::Db(DbError::Generic(e.to_string())))?;
+
+    let mut records = Vec::new();
+    for r in rows {
+        let (id, label, issuer, secret_enc) =
+            r.map_err(|e| CatermError::Db(DbError::Generic(e.to_string())))?;
+
+        if let Ok(secret) = crate::secret::decrypt(&key_hex, &secret_enc) {
+            records.push(TotpBackupRecord {
+                id,
+                label,
+                issuer,
+                secret,
+            });
+        }
+    }
+
+    Ok(records)
 }
 
 pub fn save_totp_entry(input: TotpEntryInput) -> Result<TotpEntryRecord, CatermError> {

@@ -6,6 +6,7 @@ import {
   proServerAvailable,
   proCommitPending,
   proSync,
+  proSyncVault,
   proErrorCode,
   type ProStatus,
   type SyncOutcome
@@ -93,10 +94,16 @@ export async function onVaultUnlocked(): Promise<void> {
   }
   await refreshProStatus();
   void checkProServer();
-  if (status?.signedIn) void syncPro().catch(() => {});
+  if (status?.signedIn) {
+    void syncPro().catch(() => {});
+    void proSyncVault().catch(() => {});
+  }
   if (syncTimer) clearInterval(syncTimer);
   syncTimer = setInterval(() => {
-    if (status?.signedIn) void syncPro().catch(() => {});
+    if (status?.signedIn) {
+      void syncPro().catch(() => {});
+      void proSyncVault().catch(() => {});
+    }
   }, SYNC_INTERVAL_MS);
 }
 

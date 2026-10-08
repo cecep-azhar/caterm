@@ -1023,8 +1023,8 @@ pub fn sync_vault() -> Result<bool, CatermError> {
         return Ok(false);
     }
 
-    let dek = crate::vault::get_active_dek()?;
-    let local_blob = crate::backup::export_encrypted_backup_with_dek(&dek)?;
+    let sync_key = crate::vault::get_active_sync_key()?;
+    let local_blob = crate::backup::export_encrypted_backup_with_dek(&sync_key)?;
 
     let mut hasher = Sha256::new();
     hasher.update(local_blob.as_bytes());
@@ -1039,10 +1039,10 @@ pub fn sync_vault() -> Result<bool, CatermError> {
                 Ok(true)
             } else {
                 // Cloud exists with different content: import cloud backup into local
-                if let Ok(count) = crate::backup::import_encrypted_backup_with_dek(&cloud.encrypted_blob, &dek) {
+                if let Ok(count) = crate::backup::import_encrypted_backup_with_dek(&cloud.encrypted_blob, &sync_key) {
                     if count > 0 {
                         // Re-export merged local state and upload if needed
-                        if let Ok(merged_blob) = crate::backup::export_encrypted_backup_with_dek(&dek) {
+                        if let Ok(merged_blob) = crate::backup::export_encrypted_backup_with_dek(&sync_key) {
                             let mut merged_hasher = Sha256::new();
                             merged_hasher.update(merged_blob.as_bytes());
                             let merged_sum = hex::encode(merged_hasher.finalize());
@@ -1053,7 +1053,7 @@ pub fn sync_vault() -> Result<bool, CatermError> {
                     }
                     Ok(true)
                 } else {
-                    // Fallback: upload local blob to cloud if cloud blob couldn't be decrypted with this DEK
+                    // Fallback: upload local blob to cloud if cloud blob couldn't be decrypted with this sync_key
                     push_cloud_vault(&local_blob, &local_checksum)?;
                     Ok(true)
                 }

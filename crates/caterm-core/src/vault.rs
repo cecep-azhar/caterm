@@ -34,6 +34,10 @@ const LEGACY_STATIC_SALT: &[u8] = b"caterm.zero_knowledge.v2.domain_salt_2026";
 /// Vault state holding the active decrypted DEK in protected memory.
 static ACTIVE_VAULT_KEY: LazyLock<RwLock<Option<[u8; 32]>>> = LazyLock::new(|| RwLock::new(None));
 
+/// Vault state holding the active cross-device deterministic cloud sync key derived from master password.
+static ACTIVE_SYNC_KEY: LazyLock<RwLock<Option<[u8; 32]>>> = LazyLock::new(|| RwLock::new(None));
+const SYNC_VAULT_SALT: &[u8] = b"caterm.cloud.sync.vault.salt.2026";
+
 pub fn is_unlocked() -> Result<bool, CatermError> {
     let guard = ACTIVE_VAULT_KEY.read();
     Ok(guard.is_some())
@@ -64,9 +68,15 @@ pub fn reset_vault() -> Result<(), CatermError> {
         }
     }
 
-    // 2. Zeroize active vault key directly without logging to DB
+    // 2. Zeroize active vault key and sync key directly without logging to DB
     {
         let mut guard = ACTIVE_VAULT_KEY.write();
+        if let Some(mut key) = guard.take() {
+            key.zeroize();
+        }
+    }
+    {
+        let mut guard = ACTIVE_SYNC_KEY.write();
         if let Some(mut key) = guard.take() {
             key.zeroize();
         }
@@ -130,6 +140,12 @@ pub fn change_master_password(
         let mut guard = ACTIVE_VAULT_KEY.write();
         if let Some(mut previous) = guard.replace(new_key) {
             previous.zeroize();
+        }
+        if let Ok(new_sync_key) = derive_key(new_password, SYNC_VAULT_SALT) {
+            let mut sync_guard = ACTIVE_SYNC_KEY.write();
+            if let Some(mut previous_sync) = sync_guard.replace(new_sync_key) {
+                previous_sync.zeroize();
+            }
         }
     }
     old_key.zeroize();
@@ -196,6 +212,12 @@ pub fn lock_vault() -> Result<(), CatermError> {
             key.zeroize();
         }
     }
+    {
+        let mut guard = ACTIVE_SYNC_KEY.write();
+        if let Some(mut key) = guard.take() {
+            key.zeroize();
+        }
+    }
     Ok(())
 }
 
@@ -258,6 +280,12 @@ pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
     {
         let mut guard = ACTIVE_VAULT_KEY.write();
         *guard = Some(derived_key);
+    }
+
+    let sync_key = derive_key(master_password, SYNC_VAULT_SALT)?;
+    {
+        let mut guard = ACTIVE_SYNC_KEY.write();
+        *guard = Some(sync_key);
     }
 
     let _ = crate::audit::log_event("VAULT_UNLOCK", None, "Vault unlocked");
@@ -376,6 +404,14 @@ fn migrate_legacy_static_salt(
         }
     }
 
+    let sync_key = derive_key(master_password, SYNC_VAULT_SALT)?;
+    {
+        let mut guard = ACTIVE_SYNC_KEY.write();
+        if let Some(mut previous_sync) = guard.replace(sync_key) {
+            previous_sync.zeroize();
+        }
+    }
+
     let _ = crate::audit::log_event(
         "VAULT_UNLOCK",
         None,
@@ -420,6 +456,17 @@ pub fn load_or_create_local_key(data_dir: &std::path::Path) -> Result<String, Ca
 
 pub fn get_active_dek() -> Result<[u8; 32], CatermError> {
     let guard = ACTIVE_VAULT_KEY.read();
+    if let Some(key) = *guard {
+        Ok(key)
+    } else {
+        Err(CatermError::Vault(VaultError::Generic(
+            "Vault is locked".into(),
+        )))
+    }
+}
+
+pub fn get_active_sync_key() -> Result<[u8; 32], CatermError> {
+    let guard = ACTIVE_SYNC_KEY.read();
     if let Some(key) = *guard {
         Ok(key)
     } else {

@@ -167,6 +167,42 @@ pub fn save_tunnel(input: TunnelInput) -> Result<TunnelRecord, CatermError> {
     })
 }
 
+/// Save a tunnel record directly (used by cloud sync / import to preserve existing ID).
+pub fn save_tunnel_record(record: &TunnelRecord) -> Result<(), CatermError> {
+    let forward_type_str = match record.forward_type {
+        ForwardType::Local => "Local",
+        ForwardType::Remote => "Remote",
+        ForwardType::Dynamic => "Dynamic",
+    };
+
+    let conn = crate::db::open()?;
+    init_table(&conn)?;
+
+    conn.execute(
+        "INSERT INTO tunnels (id, host_id, forward_type, bind_addr, bind_port, target_addr, target_port)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+         ON CONFLICT(id) DO UPDATE SET
+            host_id = excluded.host_id,
+            forward_type = excluded.forward_type,
+            bind_addr = excluded.bind_addr,
+            bind_port = excluded.bind_port,
+            target_addr = excluded.target_addr,
+            target_port = excluded.target_port",
+        rusqlite::params![
+            record.id,
+            record.host_id,
+            forward_type_str,
+            record.bind_addr,
+            record.bind_port,
+            record.target_addr,
+            record.target_port
+        ],
+    )
+    .map_err(|e| CatermError::Validation(ValidationError::Generic(format!("Failed to upsert tunnel: {e}"))))?;
+
+    Ok(())
+}
+
 /// Delete a tunnel configuration and close if currently active.
 pub fn delete_tunnel(id: &str) -> Result<(), CatermError> {
     let _ = stop_tunnel(id);
