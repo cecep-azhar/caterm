@@ -24,7 +24,8 @@
   ];
 
   let isAddModalOpen = $state(false);
-  let backendAvailable = $state(true);
+  const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+  let backendAvailable = $state(isTauri);
   let groups = $state<GroupRecord[]>([]);
   let availableHosts = $state<HostRecord[]>([]);
   let availableSnippets = $state<SnippetRecord[]>([]);
@@ -48,26 +49,42 @@
   const colors = ['#ef4444', '#f97316', '#f59e0b', '#10b981', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899'];
 
   async function loadAllData() {
-    try {
-      const [g, h, s, tList] = await Promise.all([
-        listGroups(),
-        listHosts(),
-        listSnippets(),
-        listScheduledTasks().catch(() => [])
-      ]);
-      groups = g || [];
-      availableHosts = h || [];
-      availableSnippets = s || [];
-      availableTasks = tList || [];
+    backendAvailable = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+    const results = await Promise.allSettled([
+      listGroups(),
+      listHosts(),
+      listSnippets(),
+      listScheduledTasks().catch(() => [])
+    ]);
 
-      invoke('list_totp_entries').then((res: any) => { availableTotp = res || []; }).catch(() => {});
-      invoke('list_keys').then((res: any) => { availableKeys = res || []; }).catch(() => {});
-      invoke('list_tunnels').then((res: any) => { availableTunnels = res || []; }).catch(() => {});
-      invoke('list_investigations').then((res: any) => { availableInvestigations = res || []; }).catch(() => {});
-      backendAvailable = true;
-    } catch {
-      backendAvailable = false;
+    if (results[0].status === 'fulfilled') {
+      groups = results[0].value || [];
+    } else {
+      console.error('Failed to load groups:', results[0].reason);
     }
+
+    if (results[1].status === 'fulfilled') {
+      availableHosts = results[1].value || [];
+    } else {
+      console.error('Failed to load hosts:', results[1].reason);
+    }
+
+    if (results[2].status === 'fulfilled') {
+      availableSnippets = results[2].value || [];
+    } else {
+      console.error('Failed to load snippets:', results[2].reason);
+    }
+
+    if (results[3].status === 'fulfilled') {
+      availableTasks = results[3].value || [];
+    } else {
+      console.error('Failed to load scheduled tasks:', results[3].reason);
+    }
+
+    invoke('list_totp_entries').then((res: any) => { availableTotp = res || []; }).catch(() => {});
+    invoke('list_keys').then((res: any) => { availableKeys = res || []; }).catch(() => {});
+    invoke('list_tunnels').then((res: any) => { availableTunnels = res || []; }).catch(() => {});
+    invoke('list_investigations').then((res: any) => { availableInvestigations = res || []; }).catch(() => {});
   }
 
   onMount(async () => {

@@ -52,6 +52,7 @@ pub fn open_encrypted(data_dir: &Path, passphrase: &str) -> Result<Connection, C
     migrate_hosts_secret_column(&conn)?;
     migrate_hosts_os_column(&conn)?;
     migrate_hosts_protocol_column(&conn)?;
+    migrate_groups_categories_column(&conn)?;
     migrate_ai_routing_and_memory(&conn)?;
     Ok(conn)
 }
@@ -270,6 +271,18 @@ fn migrate_hosts_protocol_column(conn: &Connection) -> Result<(), CatermError> {
                     "gagal migrasi kolom protocol: {e}"
                 )))
             })?;
+    }
+    Ok(())
+}
+
+fn migrate_groups_categories_column(conn: &Connection) -> Result<(), CatermError> {
+    let has_col: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('groups') WHERE name = 'categories'")
+        .and_then(|mut stmt| stmt.exists([]))
+        .unwrap_or(false);
+    if !has_col {
+        conn.execute_batch("ALTER TABLE groups ADD COLUMN categories TEXT NOT NULL DEFAULT '[\"hosts\"]'")
+            .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal migrasi groups categories: {e}"))))?;
     }
     Ok(())
 }
@@ -596,6 +609,39 @@ mod tests {
             .query_row("SELECT count(*) FROM hosts", [], |r| r.get(0))
             .expect("the file is genuinely raw-key now, not still passphrase-mode");
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn groups_without_categories_column_migrated_automatically() {
+        let dir = TempDataDir::new("migrate_groups_categories");
+        let hex_key = "d".repeat(64);
+        std::fs::create_dir_all(&dir.0).expect("mkdir");
+        let db_path = crate::paths::db_path(&dir.0);
+
+        // Create legacy table without categories column
+        {
+            let conn = Connection::open(&db_path).expect("open raw");
+            conn.execute_batch(&format!("PRAGMA key = \"x'{hex_key}'\";")).expect("key");
+            conn.execute_batch(
+                "CREATE TABLE groups (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    color TEXT NOT NULL,
+                    host_ids TEXT NOT NULL,
+                    created_at INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL
+                );
+                INSERT INTO groups (id, name, color, host_ids, created_at, updated_at)
+                VALUES ('g1', 'Legacy Group', '#3b82f6', '[]', 100, 100);",
+            ).expect("init legacy groups");
+        }
+
+        // Open via open_encrypted, which runs migrations
+        let conn = open_encrypted(&dir.0, &hex_key).expect("open encrypted");
+        let categories: String = conn
+            .query_row("SELECT categories FROM groups WHERE id = 'g1'", [], |r| r.get(0))
+            .expect("query categories column");
+        assert_eq!(categories, "[\"hosts\"]");
     }
 
     #[test]

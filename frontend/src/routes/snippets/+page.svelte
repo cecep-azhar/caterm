@@ -13,7 +13,8 @@
   let isAddModalOpen = $state(false);
   let creationStep = $state(1); // 1: command, 2: details
   let injectNotice = $state('');
-  let backendAvailable = $state(true);
+  const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+  let backendAvailable = $state(isTauri);
   let editingId = $state<string | null>(null);
 
   let snippets = $state<SnippetRecord[]>([]);
@@ -32,16 +33,22 @@
   });
 
   async function loadData() {
-    try {
-      const [sList, gList] = await Promise.all([
-        listSnippets(),
-        listGroups().catch(() => [])
-      ]);
-      snippets = sList || [];
-      groups = gList || [];
-      backendAvailable = true;
-    } catch {
-      backendAvailable = false;
+    backendAvailable = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+    const results = await Promise.allSettled([
+      listSnippets(),
+      listGroups()
+    ]);
+
+    if (results[0].status === 'fulfilled') {
+      snippets = results[0].value || [];
+    } else {
+      console.error('Failed to load snippets:', results[0].reason);
+    }
+
+    if (results[1].status === 'fulfilled') {
+      groups = results[1].value || [];
+    } else {
+      console.error('Failed to load groups:', results[1].reason);
     }
   }
 
@@ -187,8 +194,9 @@
       showToast(editingId ? 'Snippet diperbarui!' : 'Snippet berhasil disimpan!', 'success');
       window.dispatchEvent(new CustomEvent('caterm:snippets-updated'));
       await loadData();
-    } catch {
-      backendAvailable = false;
+    } catch (err) {
+      console.error('Failed to save snippet:', err);
+      showToast('Gagal menyimpan snippet', 'error');
     }
 
     resetModal();
@@ -208,8 +216,9 @@
         snippets = snippets.filter(s => s.id !== id);
         showToast(`Snippet "${label}" dihapus!`, 'success');
         window.dispatchEvent(new CustomEvent('caterm:snippets-updated'));
-      } catch {
-        backendAvailable = false;
+      } catch (err) {
+        console.error('Failed to delete snippet:', err);
+        showToast('Gagal menghapus snippet', 'error');
       }
     }
   }

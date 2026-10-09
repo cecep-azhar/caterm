@@ -3,11 +3,13 @@
   import { listTeams, saveTeam, deleteTeam, type TeamRecord } from '$lib/api/teams';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { listGroups, type GroupRecord } from '$lib/api/groups';
+  import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { t } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   let isAddModalOpen = $state(false);
-  let backendAvailable = $state(true);
+  const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+  let backendAvailable = $state(isTauri);
   let teams = $state<TeamRecord[]>([]);
   let availableHosts = $state<HostRecord[]>([]);
   let availableGroups = $state<GroupRecord[]>([]);
@@ -25,14 +27,30 @@
   const colors = ["#ef4444", "#f97316", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
 
   onMount(async () => {
-    try {
-      [teams, availableHosts, availableGroups] = await Promise.all([
-        listTeams(),
-        listHosts(),
-        listGroups()
-      ]);
-    } catch {
-      backendAvailable = false;
+    backendAvailable = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+    const results = await Promise.allSettled([
+      listTeams(),
+      listHosts(),
+      listGroups()
+    ]);
+
+    if (results[0].status === 'fulfilled') {
+      teams = results[0].value || [];
+    } else {
+      console.error('Failed to load teams:', results[0].reason);
+      showToast(t('teams.loadFailed') || 'Gagal memuat daftar tim', 'error');
+    }
+
+    if (results[1].status === 'fulfilled') {
+      availableHosts = results[1].value || [];
+    } else {
+      console.error('Failed to load hosts:', results[1].reason);
+    }
+
+    if (results[2].status === 'fulfilled') {
+      availableGroups = results[2].value || [];
+    } else {
+      console.error('Failed to load groups:', results[2].reason);
     }
   });
 
@@ -82,20 +100,23 @@
       teams = editingId
         ? teams.map((t) => (t.id === saved.id ? saved : t))
         : [...teams, saved];
-    } catch {
-      backendAvailable = false;
+      showToast(editingId ? 'Tim berhasil diperbarui' : 'Tim berhasil dibuat', 'success');
+      editingId = null;
+      isAddModalOpen = false;
+    } catch (err) {
+      console.error('Failed to save team:', err);
+      showToast(t('teams.saveFailed') || 'Gagal menyimpan tim', 'error');
     }
-
-    editingId = null;
-    isAddModalOpen = false;
   }
 
   async function removeTeam(id: string) {
     try {
       await deleteTeam(id);
       teams = teams.filter((t) => t.id !== id);
-    } catch {
-      backendAvailable = false;
+      showToast('Tim berhasil dihapus', 'info');
+    } catch (err) {
+      console.error('Failed to delete team:', err);
+      showToast(t('teams.deleteFailed') || 'Gagal menghapus tim', 'error');
     }
   }
 
@@ -136,56 +157,83 @@
     <p class="text-amber-500 text-xs -mt-4">{t('common.backendUnavailable')}</p>
   {/if}
 
-  <!-- Teams Grid -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-    {#each teams as team}
-      <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-5 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors shadow-sm dark:shadow-none">
-        <div>
-          <div class="flex items-center gap-3">
-            {#if team.avatar}
-              <div class="w-8 h-8 rounded-full overflow-hidden border border-neutral-300 dark:border-neutral-700 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800">
-                <span class="text-xs">{team.avatar}</span>
-              </div>
-            {:else}
-              <span class="w-4 h-4 rounded-full inline-block" style="background-color: {team.color}"></span>
-            {/if}
-            <h3 class="font-semibold text-neutral-900 dark:text-white text-lg">{team.name}</h3>
-          </div>
-          <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-2">{t('teams.membersCount', { count: team.members.length })}</p>
-          {#if team.members.length > 0}
-            <div class="flex gap-1 flex-wrap mt-1">
-              {#each team.members as member}
-                <span class="text-xs text-neutral-500 dark:text-neutral-500">{member}</span>
-              {/each}
-            </div>
-          {/if}
-
-          <div class="mt-3">
-            {#if team.hostIds.length > 0}
-              <p class="text-neutral-500 dark:text-neutral-400 text-xs mt-2 uppercase font-medium">{t('teams.hostsLabel')}</p>
-              <div class="flex gap-1 flex-wrap mt-1">
-                {#each team.hostIds as hostId}
-                  <span class="px-2 py-0.5 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 rounded text-xs">{hostLabel(hostId)}</span>
-                {/each}
-              </div>
-            {/if}
-            {#if team.groupIds.length > 0}
-              <p class="text-neutral-500 dark:text-neutral-400 text-xs mt-2 uppercase font-medium">{t('teams.groupsLabel')}</p>
-              <div class="flex gap-1 flex-wrap mt-1">
-                {#each team.groupIds as groupId}
-                  <span class="px-2 py-0.5 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 rounded text-xs">{groupLabel(groupId)}</span>
-                {/each}
-              </div>
-            {/if}
-          </div>
-        </div>
-        <div class="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex justify-end gap-2">
-          <button onclick={() => openEditModal(team)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">{t('common.edit')}</button>
-          <button onclick={() => removeTeam(team.id)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">{t('common.delete')}</button>
-        </div>
+  <!-- Teams Grid / Empty State -->
+  {#if teams.length === 0}
+    <div class="text-center py-16 px-4 bg-white dark:bg-neutral-900/40 rounded-2xl border border-neutral-200 dark:border-neutral-800 space-y-4">
+      <div class="w-12 h-12 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center mx-auto border border-teal-500/20">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+        </svg>
       </div>
-    {/each}
-  </div>
+      <div>
+        <h3 class="text-base font-semibold text-neutral-900 dark:text-white">{t('teams.emptyTitle')}</h3>
+        <p class="text-xs text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto mt-1">
+          {t('teams.emptyBody')}
+        </p>
+      </div>
+      <div>
+        <button
+          onclick={openAddModal}
+          class="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white font-medium text-xs rounded-xl transition-colors inline-flex items-center gap-1.5 shadow-md shadow-sky-600/20"
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          {t('teams.createTeam')}
+        </button>
+      </div>
+    </div>
+  {:else}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {#each teams as team}
+        <div class="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg p-5 flex flex-col justify-between hover:border-neutral-300 dark:hover:border-neutral-700 transition-colors shadow-sm dark:shadow-none">
+          <div>
+            <div class="flex items-center gap-3">
+              {#if team.avatar}
+                <div class="w-8 h-8 rounded-full overflow-hidden border border-neutral-300 dark:border-neutral-700 flex items-center justify-center bg-neutral-100 dark:bg-neutral-800">
+                  <span class="text-xs">{team.avatar}</span>
+                </div>
+              {:else}
+                <span class="w-4 h-4 rounded-full inline-block" style="background-color: {team.color}"></span>
+              {/if}
+              <h3 class="font-semibold text-neutral-900 dark:text-white text-lg">{team.name}</h3>
+            </div>
+            <p class="text-neutral-500 dark:text-neutral-400 text-sm mt-2">{t('teams.membersCount', { count: team.members.length })}</p>
+            {#if team.members.length > 0}
+              <div class="flex gap-1 flex-wrap mt-1">
+                {#each team.members as member}
+                  <span class="text-xs text-neutral-500 dark:text-neutral-500">{member}</span>
+                {/each}
+              </div>
+            {/if}
+
+            <div class="mt-3">
+              {#if team.hostIds.length > 0}
+                <p class="text-neutral-500 dark:text-neutral-400 text-xs mt-2 uppercase font-medium">{t('teams.hostsLabel')}</p>
+                <div class="flex gap-1 flex-wrap mt-1">
+                  {#each team.hostIds as hostId}
+                    <span class="px-2 py-0.5 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 rounded text-xs">{hostLabel(hostId)}</span>
+                  {/each}
+                </div>
+              {/if}
+              {#if team.groupIds.length > 0}
+                <p class="text-neutral-500 dark:text-neutral-400 text-xs mt-2 uppercase font-medium">{t('teams.groupsLabel')}</p>
+                <div class="flex gap-1 flex-wrap mt-1">
+                  {#each team.groupIds as groupId}
+                    <span class="px-2 py-0.5 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 rounded text-xs">{groupLabel(groupId)}</span>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-neutral-100 dark:border-neutral-800/80 flex justify-end gap-2">
+            <button onclick={() => openEditModal(team)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-sky-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">{t('common.edit')}</button>
+            <button onclick={() => removeTeam(team.id)} class="px-3 py-1 bg-neutral-100 dark:bg-neutral-800 hover:bg-red-600 hover:text-white rounded text-xs text-neutral-700 dark:text-neutral-300 transition-colors">{t('common.delete')}</button>
+          </div>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <!-- Create Team Modal -->

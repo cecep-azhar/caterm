@@ -95,9 +95,9 @@
         ...messages,
         {
           role: 'assistant',
-          text: res.response_text,
-          model: res.model_used,
-          skill: res.skill_applied ?? undefined
+          text: res.content,
+          model: res.model,
+          skill: detectedSkill ?? undefined
         }
       ];
     } catch (err) {

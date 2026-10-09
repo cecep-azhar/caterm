@@ -74,6 +74,7 @@ const id: Dictionary = {
     devops: 'DevOps Lab',
     diagnostics: 'DevOps & Lab',
     contribution: 'Kontribusi',
+    designSystem: 'Lab Sistem Desain',
     settings: 'Pengaturan'
   },
   language: {

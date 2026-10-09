@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { listInvestigations, saveInvestigation, deleteInvestigation, type InvestigationRecord } from '$lib/api/investigations';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
+  import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { t, intlLocale } from '$lib/i18n/index.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import NetworkAuditModal from '$lib/components/NetworkAuditModal.svelte';
@@ -9,7 +10,8 @@
   let isAddModalOpen = $state(false);
   let isAuditModalOpen = $state(false);
   let selectedAuditHostId = $state<string | undefined>();
-  let backendAvailable = $state(true);
+  const isTauri = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+  let backendAvailable = $state(isTauri);
   let investigations = $state<InvestigationRecord[]>([]);
   let availableHosts = $state<HostRecord[]>([]);
   let editingId = $state<string | null>(null);
@@ -23,13 +25,22 @@
   });
 
   onMount(async () => {
-    try {
-      [investigations, availableHosts] = await Promise.all([
-        listInvestigations(),
-        listHosts()
-      ]);
-    } catch {
-      backendAvailable = false;
+    backendAvailable = typeof window !== 'undefined' && ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+    const results = await Promise.allSettled([
+      listInvestigations(),
+      listHosts()
+    ]);
+
+    if (results[0].status === 'fulfilled') {
+      investigations = results[0].value || [];
+    } else {
+      console.error('Failed to load investigations:', results[0].reason);
+    }
+
+    if (results[1].status === 'fulfilled') {
+      availableHosts = results[1].value || [];
+    } else {
+      console.error('Failed to load hosts:', results[1].reason);
     }
   });
 
@@ -72,20 +83,23 @@
       investigations = editingId
         ? investigations.map((i) => (i.id === saved.id ? saved : i))
         : [saved, ...investigations];
-    } catch {
-      backendAvailable = false;
+      showToast(editingId ? 'Investigasi diperbarui!' : 'Investigasi dibuat!', 'success');
+      editingId = null;
+      isAddModalOpen = false;
+    } catch (err) {
+      console.error('Failed to save investigation:', err);
+      showToast('Gagal menyimpan investigasi', 'error');
     }
-
-    editingId = null;
-    isAddModalOpen = false;
   }
 
   async function removeInvestigation(id: string) {
     try {
       await deleteInvestigation(id);
       investigations = investigations.filter((i) => i.id !== id);
-    } catch {
-      backendAvailable = false;
+      showToast('Investigasi dihapus', 'info');
+    } catch (err) {
+      console.error('Failed to delete investigation:', err);
+      showToast('Gagal menghapus investigasi', 'error');
     }
   }
 

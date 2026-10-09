@@ -73,6 +73,7 @@ const en = {
     devops: 'DevOps Lab',
     diagnostics: 'DevOps Lab',
     contribution: 'Contribution',
+    designSystem: 'Design System Lab',
     settings: 'Settings'
   },
   language: {

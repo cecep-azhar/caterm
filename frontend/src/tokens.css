@@ -1,0 +1,26 @@
+:root {
+  /* Surface & Base */
+  --ca-surface: #0a0a0c;
+  --ca-surface-elevated: #121217;
+  --ca-surface-subtle: #18181f;
+  --ca-border: #272732;
+
+  /* Typography & Foreground */
+  --ca-text-primary: #ededed;
+  --ca-text-secondary: #a1a1aa;
+  --ca-text-muted: #71717a;
+
+  /* Dynamic Brand / Pro Accent */
+  --ca-brand: #06b6d4;
+
+  /* System Semantics */
+  --ca-danger: #f43f5e;
+  --ca-success: #10b981;
+  --ca-warning: #f59e0b;
+
+  /* Corner Radius */
+  --ca-radius-sm: 6px;
+  --ca-radius-md: 8px;
+  --ca-radius-lg: 12px;
+  --ca-radius-xl: 16px;
+}
