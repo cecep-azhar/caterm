@@ -147,10 +147,15 @@
 <div class="p-6 max-w-7xl mx-auto space-y-6">
   <!-- HEADER -->
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-    <PageHeader
-      title="DevOps & Performance Lab"
-      subtitle="Benchmark komputasi server, throughput kecepatan jaringan & bufferbloat QoS, serta mesh latency matrix multi-node."
-    />
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-[var(--ca-brand,#ef4444)] shrink-0">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-white tracking-tight">DevOps</h1>
+        <p class="text-xs text-neutral-400 mt-0.5">Benchmark komputasi server, throughput kecepatan jaringan & bufferbloat QoS, serta mesh latency matrix multi-node.</p>
+      </div>
+    </div>
     <div class="flex items-center gap-3">
       <!-- Host Selector -->
       <div class="flex items-center gap-2 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-1.5 shadow-xs">
