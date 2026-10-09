@@ -684,11 +684,13 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "once_cell",
+ "parking_lot",
  "rand",
  "regex",
  "serde",
  "serde_json",
  "sha2",
+ "ssh-key",
  "thiserror 2.0.20",
  "ureq",
 ]

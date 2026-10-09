@@ -281,8 +281,14 @@ fn migrate_groups_categories_column(conn: &Connection) -> Result<(), CatermError
         .and_then(|mut stmt| stmt.exists([]))
         .unwrap_or(false);
     if !has_col {
-        conn.execute_batch("ALTER TABLE groups ADD COLUMN categories TEXT NOT NULL DEFAULT '[\"hosts\"]'")
-            .map_err(|e| CatermError::Db(DbError::Generic(format!("gagal migrasi groups categories: {e}"))))?;
+        conn.execute_batch(
+            "ALTER TABLE groups ADD COLUMN categories TEXT NOT NULL DEFAULT '[\"hosts\"]'",
+        )
+        .map_err(|e| {
+            CatermError::Db(DbError::Generic(format!(
+                "gagal migrasi groups categories: {e}"
+            )))
+        })?;
     }
     Ok(())
 }
@@ -621,7 +627,8 @@ mod tests {
         // Create legacy table without categories column
         {
             let conn = Connection::open(&db_path).expect("open raw");
-            conn.execute_batch(&format!("PRAGMA key = \"x'{hex_key}'\";")).expect("key");
+            conn.execute_batch(&format!("PRAGMA key = \"x'{hex_key}'\";"))
+                .expect("key");
             conn.execute_batch(
                 "CREATE TABLE groups (
                     id TEXT PRIMARY KEY,
@@ -633,13 +640,16 @@ mod tests {
                 );
                 INSERT INTO groups (id, name, color, host_ids, created_at, updated_at)
                 VALUES ('g1', 'Legacy Group', '#3b82f6', '[]', 100, 100);",
-            ).expect("init legacy groups");
+            )
+            .expect("init legacy groups");
         }
 
         // Open via open_encrypted, which runs migrations
         let conn = open_encrypted(&dir.0, &hex_key).expect("open encrypted");
         let categories: String = conn
-            .query_row("SELECT categories FROM groups WHERE id = 'g1'", [], |r| r.get(0))
+            .query_row("SELECT categories FROM groups WHERE id = 'g1'", [], |r| {
+                r.get(0)
+            })
             .expect("query categories column");
         assert_eq!(categories, "[\"hosts\"]");
     }

@@ -338,6 +338,12 @@ pub fn run_with_start(start: std::time::Instant) {
             commands_pro_security::pro_laptop_posture_scan,
             commands_pro_security::pro_integrity_create_baseline,
             commands_pro_security::pro_integrity_verify,
+            commands_pro_security::pro_ephemeral_key_create,
+            commands_pro_security::pro_ephemeral_keys_list,
+            commands_pro_security::pro_ephemeral_key_revoke,
+            commands_pro_security::pro_jump_proxy_probe,
+            commands_pro_security::pro_docker_probe_scan,
+            commands_pro_security::pro_session_audit_verify,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

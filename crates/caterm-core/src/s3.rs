@@ -378,7 +378,14 @@ impl RemoteFileSystem for S3FileSystem {
                 };
 
                 // Execute with Virtual-Hosted Style bucket routing
-                let mut resp = self.sign_and_execute_bucket("GET", Some(&bucket), "/", &query_params, &[], &[])?;
+                let mut resp = self.sign_and_execute_bucket(
+                    "GET",
+                    Some(&bucket),
+                    "/",
+                    &query_params,
+                    &[],
+                    &[],
+                )?;
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
                     return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
@@ -499,8 +506,8 @@ impl RemoteFileSystem for S3FileSystem {
                 mode: 0o755,
             }),
             (Some(bucket), Some(key)) => {
-                let path = format!("/{bucket}/{key}");
-                let resp = self.sign_and_execute("HEAD", &path, &[], &[], &[])?;
+                let path = format!("/{key}");
+                let resp = self.sign_and_execute_bucket("HEAD", Some(&bucket), &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
                     // Check if it's a virtual folder
@@ -554,8 +561,8 @@ impl RemoteFileSystem for S3FileSystem {
         let b = bucket.ok_or_else(|| io_err("Cannot read root directory as file"))?;
         let k = key.ok_or_else(|| io_err("Cannot read bucket root as file"))?;
 
-        let path = format!("/{b}/{k}");
-        let mut resp = self.sign_and_execute("GET", &path, &[], &[], &[])?;
+        let path = format!("/{k}");
+        let mut resp = self.sign_and_execute_bucket("GET", Some(&b), &path, &[], &[], &[])?;
         let status = resp.status().as_u16();
         if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 GetObject returned HTTP {status}")));
@@ -571,8 +578,8 @@ impl RemoteFileSystem for S3FileSystem {
         let b = bucket.ok_or_else(|| io_err("Cannot write to root"))?;
         let k = key.ok_or_else(|| io_err("Cannot write directly to bucket root"))?;
 
-        let path = format!("/{b}/{k}");
-        let resp = self.sign_and_execute("PUT", &path, &[], data, &[])?;
+        let path = format!("/{k}");
+        let resp = self.sign_and_execute_bucket("PUT", Some(&b), &path, &[], data, &[])?;
         let status = resp.status().as_u16();
         if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 PutObject returned HTTP {status}")));
@@ -585,9 +592,8 @@ impl RemoteFileSystem for S3FileSystem {
         match (bucket, key) {
             (None, _) => Err(io_err("Cannot mkdir at root")),
             (Some(b), None) => {
-                // Create bucket
-                let path = format!("/{b}");
-                let resp = self.sign_and_execute("PUT", &path, &[], &[], &[])?;
+                // Create bucket: PUT / against the virtual-hosted bucket endpoint
+                let resp = self.sign_and_execute_bucket("PUT", Some(&b), "/", &[], &[], &[])?;
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
                     return Err(io_err(format!("S3 CreateBucket returned HTTP {status}")));
@@ -597,8 +603,8 @@ impl RemoteFileSystem for S3FileSystem {
             (Some(b), Some(k)) => {
                 // Create directory marker object (ending in /)
                 let clean_key = if k.ends_with('/') { k } else { format!("{k}/") };
-                let path = format!("/{b}/{clean_key}");
-                let resp = self.sign_and_execute("PUT", &path, &[], &[], &[])?;
+                let path = format!("/{clean_key}");
+                let resp = self.sign_and_execute_bucket("PUT", Some(&b), &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
                     return Err(io_err(format!(
@@ -621,8 +627,7 @@ impl RemoteFileSystem for S3FileSystem {
             (None, _) => Err(io_err("Cannot delete root")),
             (Some(b), None) => {
                 // Delete bucket
-                let path = format!("/{b}");
-                let resp = self.sign_and_execute("DELETE", &path, &[], &[], &[])?;
+                let resp = self.sign_and_execute_bucket("DELETE", Some(&b), "/", &[], &[], &[])?;
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
                     return Err(io_err(format!("S3 DeleteBucket returned HTTP {status}")));
@@ -630,13 +635,21 @@ impl RemoteFileSystem for S3FileSystem {
                 Ok(())
             }
             (Some(b), Some(k)) => {
-                let path = format!("/{b}/{k}");
-                let resp = self.sign_and_execute("DELETE", &path, &[], &[], &[])?;
+                let path = format!("/{k}");
+                let resp =
+                    self.sign_and_execute_bucket("DELETE", Some(&b), &path, &[], &[], &[])?;
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
                     // Also try deleting folder marker if failed
-                    let folder_path = format!("/{b}/{k}/");
-                    let _ = self.sign_and_execute("DELETE", &folder_path, &[], &[], &[]);
+                    let folder_path = format!("/{k}/");
+                    let _ = self.sign_and_execute_bucket(
+                        "DELETE",
+                        Some(&b),
+                        &folder_path,
+                        &[],
+                        &[],
+                        &[],
+                    );
                 }
                 Ok(())
             }
@@ -652,11 +665,13 @@ impl RemoteFileSystem for S3FileSystem {
         let nb = new_bucket.ok_or_else(|| io_err("Cannot rename to root"))?;
         let nk = new_key.ok_or_else(|| io_err("Cannot rename to bucket root"))?;
 
-        // 1. Copy Object: PUT /new_bucket/new_key with x-amz-copy-source: /old_bucket/old_key
+        // 1. Copy Object: PUT /new_key with x-amz-copy-source: /old_bucket/old_key
+        // x-amz-copy-source is always path-style (bucket in the header value, not the host).
         let copy_source = format!("/{ob}/{}", uri_encode(&ok, false));
-        let dst_path = format!("/{nb}/{nk}");
-        let resp = self.sign_and_execute(
+        let dst_path = format!("/{nk}");
+        let resp = self.sign_and_execute_bucket(
             "PUT",
+            Some(&nb),
             &dst_path,
             &[],
             &[],
@@ -668,8 +683,8 @@ impl RemoteFileSystem for S3FileSystem {
         }
 
         // 2. Delete old object
-        let src_path = format!("/{ob}/{ok}");
-        let _ = self.sign_and_execute("DELETE", &src_path, &[], &[], &[]);
+        let src_path = format!("/{ok}");
+        let _ = self.sign_and_execute_bucket("DELETE", Some(&ob), &src_path, &[], &[], &[]);
         Ok(())
     }
 
@@ -731,8 +746,8 @@ impl RemoteFileSystem for S3FileSystem {
             }
         }
 
-        let path = format!("/{b}/{k}");
-        let resp = self.sign_and_execute("PUT", &path, &[], &data, &[])?;
+        let path = format!("/{k}");
+        let resp = self.sign_and_execute_bucket("PUT", Some(&b), &path, &[], &data, &[])?;
         let status = resp.status().as_u16();
         crate::sftp::clear_cancel_token(transfer_id);
 
@@ -757,8 +772,8 @@ impl RemoteFileSystem for S3FileSystem {
         let b = bucket.ok_or_else(|| io_err("Cannot download root directory"))?;
         let k = key.ok_or_else(|| io_err("Cannot download bucket root"))?;
 
-        let path = format!("/{b}/{k}");
-        let resp = self.sign_and_execute("GET", &path, &[], &[], &[])?;
+        let path = format!("/{k}");
+        let resp = self.sign_and_execute_bucket("GET", Some(&b), &path, &[], &[], &[])?;
         let status = resp.status().as_u16();
         if !(200..300).contains(&status) {
             return Err(io_err(format!("S3 GetObject returned HTTP {status}")));
