@@ -105,7 +105,7 @@ impl S3FileSystem {
                 (scheme.to_string(), host_header, base_url)
             };
 
-        // Determine region: default to us-east-1 unless present in address
+        // Determine region: default to us-east-1 unless present in address (AWS, Tencent COS, R2, etc.)
         let region = if let Some(idx) = host_header.find(".s3.") {
             let rest = host_header.get(idx + 4..).unwrap_or("");
             let end_idx = rest.find('.').unwrap_or(rest.len());
@@ -115,6 +115,14 @@ impl S3FileSystem {
             } else {
                 r.to_string()
             }
+        } else if let Some(idx) = host_header.find("cos.") {
+            // Tencent Cloud COS: cos.ap-jakarta.myqcloud.com -> ap-jakarta
+            let rest = host_header.get(idx + 4..).unwrap_or("");
+            let end_idx = rest.find('.').unwrap_or(rest.len());
+            let r = rest.get(..end_idx).unwrap_or("ap-beijing");
+            r.to_string()
+        } else if host_header.contains("r2.cloudflarestorage.com") {
+            "auto".to_string()
         } else {
             "us-east-1".to_string()
         };
@@ -336,11 +344,27 @@ impl RemoteFileSystem for S3FileSystem {
                     vec![("delimiter", "/"), ("list-type", "2"), ("prefix", &prefix)]
                 };
 
+                // For virtual-hosted style (bucket.cos.ap-jakarta.myqcloud.com) or path style (/bucket)
                 let path = format!("/{bucket}");
-                let mut resp = self.sign_and_execute("GET", &path, &query_params, &[], &[])?;
+                let mut resp = match self.sign_and_execute("GET", &path, &query_params, &[], &[]) {
+                    Ok(r) => r,
+                    Err(_) => {
+                        // Fallback: try root path if endpoint is already bucket-scoped
+                        self.sign_and_execute("GET", "/", &query_params, &[], &[])?
+                    }
+                };
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
-                    return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
+                    // Also try fallback if status is 404/400
+                    if let Ok(fb_resp) = self.sign_and_execute("GET", "/", &query_params, &[], &[]) {
+                        if (200..300).contains(&fb_resp.status().as_u16()) {
+                            resp = fb_resp;
+                        } else {
+                            return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
+                        }
+                    } else {
+                        return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
+                    }
                 }
 
                 let xml = resp
