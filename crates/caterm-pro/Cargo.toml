@@ -24,3 +24,6 @@ hex = "0.4"
 rand = "0.8"
 chrono = "0.4"
 ureq = { version = "3.1", features = ["json"] }
+regex = "1.13.1"
+dirs = "5.0"
+once_cell = "1.21.4"

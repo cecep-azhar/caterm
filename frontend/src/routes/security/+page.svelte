@@ -9,6 +9,14 @@
     type ThreatWatchdogResult,
     type TlsAuditResult
   } from '$lib/api/audit';
+  import {
+    scanLaptopPosture,
+    createIntegrityBaseline,
+    verifyIntegrityTripwire,
+    type LaptopPostureReport,
+    type BaselineFileRecord,
+    type IntegrityTripwireReport
+  } from '$lib/api/proSecurity';
   import { listHosts, type HostRecord } from '$lib/api/hosts';
   import { saveInvestigation } from '$lib/api/investigations';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
@@ -18,18 +26,24 @@
 
   let hosts = $state<HostRecord[]>([]);
   let selectedHostId = $state<string>('');
-  let activeTab = $state<'exposure' | 'hardening' | 'watchdog' | 'tls'>('exposure');
+  let activeTab = $state<'exposure' | 'hardening' | 'watchdog' | 'tls' | 'laptop' | 'tripwire'>('exposure');
 
   // Loading States
   let isRunningSecurity = $state(false);
   let isRunningWatchdog = $state(false);
   let isRunningTls = $state(false);
   let isSavingIncident = $state(false);
+  let isRunningLaptop = $state(false);
+  let isRunningBaseline = $state(false);
+  let isRunningTripwire = $state(false);
 
   // Results State
   let securityReport = $state<AuditReport | null>(null);
   let watchdogResult = $state<ThreatWatchdogResult | null>(null);
   let tlsResult = $state<TlsAuditResult | null>(null);
+  let laptopReport = $state<LaptopPostureReport | null>(null);
+  let baselineRecords = $state<BaselineFileRecord[]>([]);
+  let tripwireReport = $state<IntegrityTripwireReport | null>(null);
 
   // TLS Inputs
   let tlsHost = $state('cloudflare.com');
@@ -92,6 +106,51 @@
       showToast(`TLS Audit gagal: ${errorText(e)}`, 'error');
     } finally {
       isRunningTls = false;
+    }
+  }
+
+  async function startLaptopScan() {
+    isRunningLaptop = true;
+    try {
+      laptopReport = await scanLaptopPosture();
+      showToast(`Laptop Posture Scan selesai! Skor: ${laptopReport.overallScore}%`, laptopReport.overallScore > 75 ? 'success' : 'error');
+    } catch (e) {
+      showToast(`Scan gagal: ${errorText(e)}`, 'error');
+    } finally {
+      isRunningLaptop = false;
+    }
+  }
+
+  async function createBaseline() {
+    isRunningBaseline = true;
+    try {
+      const records = await createIntegrityBaseline('local');
+      baselineRecords = records;
+      showToast(`Baseline hash dibuat untuk ${records.length} file kritis!`, 'success');
+    } catch (e) {
+      showToast(`Gagal membuat baseline: ${errorText(e)}`, 'error');
+    } finally {
+      isRunningBaseline = false;
+    }
+  }
+
+  async function runIntegrityCheck() {
+    if (baselineRecords.length === 0) {
+      showToast('Buat baseline snapshot terlebih dahulu!', 'error');
+      return;
+    }
+    isRunningTripwire = true;
+    try {
+      tripwireReport = await verifyIntegrityTripwire('local', baselineRecords);
+      if (tripwireReport.tamperedCount === 0) {
+        showToast('Integrity Check: Semua file konfigurasi identik & aman!', 'success');
+      } else {
+        showToast(`Integrity Alert: Ditemukan ${tripwireReport.tamperedCount} perubahan konfigurasi!`, 'error');
+      }
+    } catch (e) {
+      showToast(`Integrity check gagal: ${errorText(e)}`, 'error');
+    } finally {
+      isRunningTripwire = false;
     }
   }
 
@@ -219,6 +278,18 @@ SSH Hardening Non-Pass: ${securityReport.hardeningChecklist.filter((h) => h.stat
       class="px-4 py-2 rounded-xl transition flex items-center gap-2 whitespace-nowrap {activeTab === 'tls' ? 'bg-white dark:bg-neutral-800 text-amber-600 dark:text-amber-400 shadow-sm border border-neutral-200/50 dark:border-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
     >
       <span>📜 TLS & SSL Auditor</span>
+    </button>
+    <button
+      onclick={() => (activeTab = 'laptop')}
+      class="px-4 py-2 rounded-xl transition flex items-center gap-2 whitespace-nowrap {activeTab === 'laptop' ? 'bg-white dark:bg-neutral-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-neutral-200/50 dark:border-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
+    >
+      <span>💻 Laptop Posture Scanner</span>
+    </button>
+    <button
+      onclick={() => (activeTab = 'tripwire')}
+      class="px-4 py-2 rounded-xl transition flex items-center gap-2 whitespace-nowrap {activeTab === 'tripwire' ? 'bg-white dark:bg-neutral-800 text-rose-600 dark:text-rose-400 shadow-sm border border-neutral-200/50 dark:border-neutral-700' : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'}"
+    >
+      <span>⚡ Integrity Tripwire</span>
     </button>
   </div>
 
@@ -416,6 +487,189 @@ SSH Hardening Non-Pass: ${securityReport.hardeningChecklist.filter((h) => h.stat
             <div class="pt-2 border-t border-neutral-200 dark:border-neutral-700 text-[11px] text-neutral-400">
               Cipher Suite: {tlsResult.cipherSuite}
             </div>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- TAB 5: LAPTOP POSTURE SCANNER -->
+  {#if activeTab === 'laptop'}
+    <div class="space-y-6">
+      <div class="p-5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="text-sm font-bold uppercase tracking-wider text-neutral-900 dark:text-white">Local Machine Posture Checker</h4>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-500 font-bold uppercase">PRO</span>
+            </div>
+            <p class="text-xs text-neutral-500 mt-1">Audit izin file <code class="text-neutral-300">~/.ssh</code> (0600 vs 0644), secret pada <code class="text-neutral-300">.env</code> world-readable, dan exposed unauthenticated listening ports.</p>
+          </div>
+          <button
+            onclick={startLaptopScan}
+            disabled={isRunningLaptop}
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-2 transition"
+          >
+            {#if isRunningLaptop}
+              <span class="animate-spin text-xs">⏳</span>
+              <span>Scanning Laptop Posture...</span>
+            {:else}
+              <span>💻 Scan Local Machine</span>
+            {/if}
+          </button>
+        </div>
+
+        {#if laptopReport}
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40">
+              <span class="text-xs font-semibold text-neutral-500 uppercase">Posture Score</span>
+              <div class="text-3xl font-black mt-1 {laptopReport.overallScore >= 80 ? 'text-emerald-500' : laptopReport.overallScore >= 60 ? 'text-amber-500' : 'text-rose-500'}">
+                {laptopReport.overallScore}%
+              </div>
+            </div>
+            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40">
+              <span class="text-xs font-semibold text-neutral-500 uppercase">SSH Keys Scanned</span>
+              <div class="text-2xl font-bold mt-1 text-sky-400">
+                {laptopReport.scannedSshKeys}
+              </div>
+            </div>
+            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40">
+              <span class="text-xs font-semibold text-neutral-500 uppercase">.env Files Checked</span>
+              <div class="text-2xl font-bold mt-1 text-amber-400">
+                {laptopReport.scannedEnvFiles}
+              </div>
+            </div>
+            <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40">
+              <span class="text-xs font-semibold text-neutral-500 uppercase">Open Local Ports Checked</span>
+              <div class="text-2xl font-bold mt-1 text-purple-400">
+                {laptopReport.scannedListeningPorts}
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-3 pt-2">
+            <h5 class="text-xs font-bold uppercase tracking-wider text-neutral-400">Audit Findings ({laptopReport.findings.length})</h5>
+            {#if laptopReport.findings.length === 0}
+              <div class="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
+                <span>✓</span> Mesin lokal Anda dalam postur prima: izin SSH aman, tidak ada kebocoran .env, dan tidak ada port database tanpa autentikasi yang terekspos.
+              </div>
+            {:else}
+              <div class="space-y-2">
+                {#each laptopReport.findings as f}
+                  <div class="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <span class="text-[10px] px-2 py-0.5 rounded font-bold uppercase {f.severity === 'critical' ? 'bg-rose-500/20 text-rose-500' : f.severity === 'high' ? 'bg-amber-500/20 text-amber-500' : 'bg-neutral-700 text-neutral-300'}">
+                          {f.severity}
+                        </span>
+                        <span class="font-bold text-xs text-neutral-900 dark:text-white">{f.title}</span>
+                      </div>
+                      {#if f.details}
+                        <span class="text-[11px] font-mono text-neutral-500">{f.details}</span>
+                      {/if}
+                    </div>
+                    <p class="text-xs text-neutral-400 leading-relaxed">{f.description}</p>
+                    <div class="p-2.5 rounded-lg bg-neutral-900 border border-neutral-800 text-[11px] text-neutral-300 font-mono">
+                      <span class="text-indigo-400 font-semibold font-sans">Saran Perbaikan:</span> {f.recommendation}
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {:else}
+          <div class="py-12 text-center text-neutral-400 text-xs border border-dashed border-neutral-300 dark:border-neutral-800 rounded-xl">
+            Klik "Scan Local Machine" untuk memeriksa keamanan permission SSH, plaintext .env, dan port rentan pada laptop Anda.
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- TAB 6: INTEGRITY TRIPWIRE -->
+  {#if activeTab === 'tripwire'}
+    <div class="space-y-6">
+      <div class="p-5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900/60 space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2">
+              <h4 class="text-sm font-bold uppercase tracking-wider text-neutral-900 dark:text-white">Server Configuration Baseline & Tamper Tripwire</h4>
+              <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-500 font-bold uppercase">PRO</span>
+            </div>
+            <p class="text-xs text-neutral-500 mt-1">Snapshot kriptografis SHA-256 berkas konfigurasi kunci (<code class="text-neutral-300">/etc/passwd</code>, <code class="text-neutral-300">/etc/sudoers</code>, <code class="text-neutral-300">sshd_config</code>, <code class="text-neutral-300">crontab</code>) untuk mendeteksi tampering seketika.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button
+              onclick={createBaseline}
+              disabled={isRunningBaseline}
+              class="px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 text-neutral-200 text-xs font-semibold rounded-xl border border-neutral-700 flex items-center gap-2 transition"
+            >
+              <span>📷 {isRunningBaseline ? 'Snapshotting...' : 'Create Baseline Snapshot'}</span>
+            </button>
+            <button
+              onclick={runIntegrityCheck}
+              disabled={isRunningTripwire || baselineRecords.length === 0}
+              class="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-semibold rounded-xl shadow-md shadow-rose-600/20 flex items-center gap-2 transition"
+            >
+              {#if isRunningTripwire}
+                <span class="animate-spin text-xs">⏳</span>
+                <span>Verifying Hashes...</span>
+              {:else}
+                <span>⚡ Verify Integrity</span>
+              {/if}
+            </button>
+          </div>
+        </div>
+
+        {#if baselineRecords.length > 0}
+          <div class="p-3 rounded-xl bg-neutral-800/40 border border-neutral-700 text-xs flex items-center justify-between">
+            <span class="text-neutral-300">Baseline aktif memantau <strong>{baselineRecords.length}</strong> file konfigurasi.</span>
+            <span class="text-[11px] font-mono text-neutral-400">Target: Local / Remote Baseline</span>
+          </div>
+        {/if}
+
+        {#if tripwireReport}
+          <div class="space-y-3 pt-2">
+            <div class="flex items-center justify-between">
+              <h5 class="text-xs font-bold uppercase tracking-wider text-neutral-400">Hasil Verifikasi Integritas</h5>
+              <span class="text-xs px-2.5 py-1 rounded-full font-bold {tripwireReport.tamperedCount === 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+                {tripwireReport.tamperedCount === 0 ? '✓ SEMUA BERKAS IDENTIK' : `🚨 ${tripwireReport.tamperedCount} BERKAS BERUBAH / TAMPERED`}
+              </span>
+            </div>
+
+            <div class="space-y-2">
+              {#each tripwireReport.items as item}
+                <div class="p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40 space-y-1.5 font-mono text-xs">
+                  <div class="flex items-center justify-between">
+                    <span class="font-bold text-neutral-900 dark:text-white">{item.path}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded font-bold uppercase {item.status === 'unchanged' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+                      {item.status}
+                    </span>
+                  </div>
+                  {#if item.alertMessage}
+                    <div class="p-2 rounded bg-rose-950/40 border border-rose-800/40 text-rose-300 text-[11px]">
+                      {item.alertMessage}
+                    </div>
+                  {/if}
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-neutral-400 pt-1">
+                    <div>
+                      <span class="text-neutral-500">Baseline Hash:</span>
+                      <div class="truncate text-neutral-300">{item.baselineHash}</div>
+                    </div>
+                    <div>
+                      <span class="text-neutral-500">Current Hash:</span>
+                      <div class="truncate {item.currentHash === item.baselineHash ? 'text-emerald-400' : 'text-rose-400'}">
+                        {item.currentHash || 'N/A (Missing)'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </div>
+        {:else}
+          <div class="py-12 text-center text-neutral-400 text-xs border border-dashed border-neutral-300 dark:border-neutral-800 rounded-xl">
+            Buat "Create Baseline Snapshot" terlebih dahulu, lalu klik "Verify Integrity" kapan saja untuk memeriksa apakah ada perubahan tidak sah pada konfigurasi sistem.
           </div>
         {/if}
       </div>

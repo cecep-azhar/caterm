@@ -25,6 +25,11 @@
 mod commands;
 mod window;
 
+#[cfg(feature = "pro")]
+pub mod commands_pro_security {
+    include!("commands/pro_security.rs");
+}
+
 use serde::Serialize;
 use tauri::Emitter;
 
@@ -328,6 +333,11 @@ pub fn run_with_start(start: std::time::Instant) {
             commands::submit_crash_report,
             commands::dismiss_crash_report,
             commands::submit_feedback,
+            commands_pro_security::pro_blast_shield_check,
+            commands_pro_security::pro_paste_sentinel_check,
+            commands_pro_security::pro_laptop_posture_scan,
+            commands_pro_security::pro_integrity_create_baseline,
+            commands_pro_security::pro_integrity_verify,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -28,6 +28,14 @@
   import { copyText } from '$lib/utils/clipboard';
   import { getAmbientStore } from '$lib/stores/ambient.svelte';
   import { aiDispatchTask, type DispatchResult } from '$lib/api/aiRouting';
+  import {
+    checkCommandBlastShield,
+    checkPasteSentinel,
+    type BlastShieldRisk,
+    type PasteCheckResult
+  } from '$lib/api/proSecurity';
+  import BlastShieldModal from '$lib/components/BlastShieldModal.svelte';
+  import PasteSentinelModal from '$lib/components/PasteSentinelModal.svelte';
 
   let {
     host,
@@ -83,6 +91,14 @@
   let isDiagnosing = $state(false);
   let diagnosticResult = $state<DispatchResult | null>(null);
   let diagnosticError = $state<string | null>(null);
+
+  // Security Sentinel State (Blast Shield & Paste Sentinel)
+  let showBlastModal = $state(false);
+  let pendingBlastCommand = $state('');
+  let pendingBlastRisk = $state<BlastShieldRisk | null>(null);
+
+  let showPasteModal = $state(false);
+  let pendingPasteResult = $state<PasteCheckResult | null>(null);
 
   function getTerminalTailLines(count: number = 40): string[] {
     if (!term) return [];
@@ -311,6 +327,25 @@
     });
     term = terminal;
 
+    // Paste Sentinel: intercept clipboard paste into the terminal
+    const handlePaste = async (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData('text');
+      if (!text) return;
+      try {
+        const check = await checkPasteSentinel(text);
+        if (check.containsSecret) {
+          e.preventDefault();
+          e.stopPropagation();
+          pendingPasteResult = check;
+          showPasteModal = true;
+        }
+      } catch {
+        // Continue standard paste if check fails
+      }
+    };
+
+    terminalContainer.addEventListener('paste', handlePaste, true);
+
     const fit = new FitAddon();
     fitAddon = fit;
     terminal.loadAddon(fit);
@@ -474,6 +509,33 @@
     });
 
     terminal.onData((data) => {
+      // Intercept Enter to run Blast Shield safety checks on complete commands
+      if (data === '\r' || data === '\n') {
+        const fullCmd = currentInputLine.trim();
+        if (fullCmd) {
+          void (async () => {
+            try {
+              const res = await checkCommandBlastShield(fullCmd);
+              if (res.isDestructive && res.risk) {
+                pendingBlastCommand = fullCmd;
+                pendingBlastRisk = res.risk;
+                showBlastModal = true;
+                return;
+              }
+            } catch {
+              // Ignore blast shield check error in community/fallback mode
+            }
+
+            dispatchPtyData(data);
+          })();
+          return;
+        }
+      }
+
+      dispatchPtyData(data);
+    });
+
+    function dispatchPtyData(data: string) {
       // Send keystroke to the real Rust SSH PTY backend
       if (session) {
         void sshWrite(session.sessionId, data).catch((err) => reportFailure(t('terminal.sendFailed'), err));
@@ -511,7 +573,7 @@
         updateSuggestions(currentInputLine);
         updateCursorPosition();
       }
-    });
+    }
 
     // Keystrokes are sent before the shell echoes them back, so follow the real cursor once
     // the echo has been rendered instead of using the pre-echo position.
@@ -549,6 +611,7 @@
 
     return () => {
       disposed = true;
+      terminalContainer?.removeEventListener('paste', handlePaste, true);
       for (const unlisten of unlisteners) unlisten();
       unlisteners.length = 0;
       observer.disconnect();
@@ -562,6 +625,47 @@
       terminal.dispose();
     };
   });
+
+  function confirmBlastCommand() {
+    showBlastModal = false;
+    if (session && pendingBlastCommand) {
+      void sshWrite(session.sessionId, '\r').catch(() => {});
+    }
+    pendingBlastCommand = '';
+    pendingBlastRisk = null;
+  }
+
+  function cancelBlastCommand() {
+    showBlastModal = false;
+    // Send Ctrl+C to clear the line in terminal
+    if (session) {
+      void sshWrite(session.sessionId, '\x03').catch(() => {});
+    }
+    currentInputLine = '';
+    pendingBlastCommand = '';
+    pendingBlastRisk = null;
+  }
+
+  function handlePasteSanitized(text: string) {
+    showPasteModal = false;
+    if (session && text) {
+      void sshWrite(session.sessionId, text).catch(() => {});
+    }
+    pendingPasteResult = null;
+  }
+
+  function handlePasteOriginal(text: string) {
+    showPasteModal = false;
+    if (session && text) {
+      void sshWrite(session.sessionId, text).catch(() => {});
+    }
+    pendingPasteResult = null;
+  }
+
+  function cancelPaste() {
+    showPasteModal = false;
+    pendingPasteResult = null;
+  }
 </script>
 
 <div
@@ -713,4 +817,21 @@
       </div>
     </div>
   {/if}
+
+  <!-- Security Sentinel Modals -->
+  <BlastShieldModal
+    isOpen={showBlastModal}
+    command={pendingBlastCommand}
+    risk={pendingBlastRisk}
+    onConfirm={confirmBlastCommand}
+    onCancel={cancelBlastCommand}
+  />
+
+  <PasteSentinelModal
+    isOpen={showPasteModal}
+    pasteResult={pendingPasteResult}
+    onPasteSanitized={handlePasteSanitized}
+    onPasteOriginal={handlePasteOriginal}
+    onCancel={cancelPaste}
+  />
 </div>
