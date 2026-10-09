@@ -106,7 +106,7 @@
     const profile = getProfile();
     const activeTabs = getTabs();
     const openHostsInfo = activeTabs.map(t => `${t.host.label}(${t.host.address})`).join(', ');
-    const uiContext = `[Active UI Context: Route="${currentRoute}", Tab="${currentTab}", CurrentProfileName="${profile.name}", HostCount=${hosts.length}, OpenPanesCount=${activeTabs.length}, OpenPanes=[${openHostsInfo}], Capabilities=["caterm_action:broadcast_execute(command)", "caterm_action:create_host", "caterm_action:create_snippet", "caterm_action:network_security_audit"]]`;
+    const uiContext = `[Context: Route="${currentRoute}", OpenPanesCount=${activeTabs.length}, OpenPanes=[${openHostsInfo}]]\n(Note: Respond naturally to the user. If suggesting shell commands or broadcast actions, write them in markdown code blocks: \`\`\`bash\n<command>\n\`\`\`. Do not write raw action tokens like caterm_action:...)`;
 
     messages = [...messages, { role: 'user', content: `${text}\n${uiContext}` }];
     draft = '';
