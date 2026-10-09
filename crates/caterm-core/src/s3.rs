@@ -152,19 +152,41 @@ impl S3FileSystem {
         }
     }
 
-    fn sign_and_execute(
+    fn sign_and_execute_bucket(
         &self,
         method: &str,
-        path: &str,
+        bucket: Option<&str>,
+        key_path: &str,
         query: &[(&str, &str)],
         body: &[u8],
         extra_headers: &[(&str, &str)],
     ) -> Result<ureq::http::Response<ureq::Body>, CatermError> {
         let conn = self.get_conn()?;
-        let canonical_uri = if path.starts_with('/') {
-            uri_encode(path, false)
-        } else {
-            format!("/{}", uri_encode(path, false))
+
+        // Tencent Cloud COS & AWS S3 support Virtual-Hosted Style: <bucket>.<endpoint>
+        let (host_header, base_url, canonical_uri) = match bucket {
+            Some(b) if !b.is_empty() && !conn.host_header.starts_with(b) => {
+                let vhost = format!("{b}.{}", conn.host_header);
+                let vbase = format!("https://{vhost}");
+                let path = if key_path.starts_with('/') {
+                    uri_encode(key_path, false)
+                } else if key_path.is_empty() {
+                    "/".to_string()
+                } else {
+                    format!("/{}", uri_encode(key_path, false))
+                };
+                (vhost, vbase, path)
+            }
+            _ => {
+                let path = if key_path.starts_with('/') {
+                    uri_encode(key_path, false)
+                } else if key_path.is_empty() {
+                    "/".to_string()
+                } else {
+                    format!("/{}", uri_encode(key_path, false))
+                };
+                (conn.host_header.clone(), conn.base_url.clone(), path)
+            }
         };
 
         let mut sorted_query = query.to_vec();
@@ -182,7 +204,7 @@ impl S3FileSystem {
         let payload_hash = sha256_hex(body);
 
         let mut headers_to_sign = vec![
-            ("host", conn.host_header.clone()),
+            ("host", host_header.clone()),
             ("x-amz-content-sha256", payload_hash.clone()),
             ("x-amz-date", amz_date.clone()),
         ];
@@ -229,9 +251,9 @@ impl S3FileSystem {
         };
 
         let full_url = if canonical_query.is_empty() {
-            format!("{}{}", conn.base_url, canonical_uri)
+            format!("{}{}", base_url, canonical_uri)
         } else {
-            format!("{}{}?{}", conn.base_url, canonical_uri, canonical_query)
+            format!("{}{}?{}", base_url, canonical_uri, canonical_query)
         };
 
         let agent = ureq::Agent::new_with_defaults();
@@ -240,7 +262,7 @@ impl S3FileSystem {
         let mut builder = Request::builder()
             .method(http_method)
             .uri(&full_url)
-            .header("Host", &conn.host_header)
+            .header("Host", &host_header)
             .header("x-amz-date", &amz_date)
             .header("x-amz-content-sha256", &payload_hash);
 
@@ -259,6 +281,17 @@ impl S3FileSystem {
         agent
             .run(req)
             .map_err(|e| io_err(format!("S3 HTTP request failed: {e}")))
+    }
+
+    fn sign_and_execute(
+        &self,
+        method: &str,
+        path: &str,
+        query: &[(&str, &str)],
+        body: &[u8],
+        extra_headers: &[(&str, &str)],
+    ) -> Result<ureq::http::Response<ureq::Body>, CatermError> {
+        self.sign_and_execute_bucket(method, None, path, query, body, extra_headers)
     }
 }
 
@@ -344,27 +377,11 @@ impl RemoteFileSystem for S3FileSystem {
                     vec![("delimiter", "/"), ("list-type", "2"), ("prefix", &prefix)]
                 };
 
-                // For virtual-hosted style (bucket.cos.ap-jakarta.myqcloud.com) or path style (/bucket)
-                let path = format!("/{bucket}");
-                let mut resp = match self.sign_and_execute("GET", &path, &query_params, &[], &[]) {
-                    Ok(r) => r,
-                    Err(_) => {
-                        // Fallback: try root path if endpoint is already bucket-scoped
-                        self.sign_and_execute("GET", "/", &query_params, &[], &[])?
-                    }
-                };
+                // Execute with Virtual-Hosted Style bucket routing
+                let mut resp = self.sign_and_execute_bucket("GET", Some(&bucket), "/", &query_params, &[], &[])?;
                 let status = resp.status().as_u16();
                 if !(200..300).contains(&status) {
-                    // Also try fallback if status is 404/400
-                    if let Ok(fb_resp) = self.sign_and_execute("GET", "/", &query_params, &[], &[]) {
-                        if (200..300).contains(&fb_resp.status().as_u16()) {
-                            resp = fb_resp;
-                        } else {
-                            return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
-                        }
-                    } else {
-                        return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
-                    }
+                    return Err(io_err(format!("S3 ListObjectsV2 returned HTTP {status}")));
                 }
 
                 let xml = resp
