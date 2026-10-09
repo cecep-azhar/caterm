@@ -28,7 +28,9 @@ export function getPro() {
     /** This account's own Pro plan or trial is valid on this device. */
     get isPro() {
       const ent = status?.entitlement;
-      return ent?.state === 'valid' && ent.features.includes('cloud_sync');
+      if (ent?.state === 'valid') return true;
+      if (status?.license && status.signedIn) return true;
+      return false;
     },
     /** Access through someone else's team only (free account in an entitled team). */
     get isTeamMember() {
