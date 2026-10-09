@@ -8,6 +8,7 @@
     type TaskRouteRule,
     type DispatchResult
   } from '$lib/api/aiRouting';
+  import { aiSettingsStore } from '$lib/stores/aiSettingsStore';
   import { showToast } from '$lib/stores/uiNotifications.svelte';
   import { errorText } from '$lib/errors';
 
@@ -15,8 +16,16 @@
   let promptInput = $state('');
   let isSending = $state(false);
   let skills = $state<CustomSkill[]>([]);
-  let activeRule = $state<TaskRouteRule | null>(null);
+  let localActiveRule = $state<TaskRouteRule | null>(null);
   let messages = $state<Array<{ role: 'user' | 'assistant'; text: string; skill?: string; model?: string }>>([]);
+
+  const activeRule = $derived(
+    $aiSettingsStore.routingMatrix.find((r) => r.task_type === 'chat') || localActiveRule
+  );
+
+  const activeModelDisplay = $derived(
+    activeRule ? activeRule.primary_model : 'Hana AI'
+  );
 
   // Autocomplete state for `@`
   let showSkillSuggestions = $state(false);
@@ -34,7 +43,7 @@
         aiGetRoutingMatrix().catch(() => [])
       ]);
       skills = allSkills;
-      activeRule = matrix.find((r) => r.task_type === 'chat') || null;
+      localActiveRule = matrix.find((r) => r.task_type === 'chat') || null;
     } catch {
       // Ignore background fetch failure
     }
@@ -161,7 +170,7 @@
       <span>Hana AI</span>
       {#if activeRule}
         <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-mono">
-          {activeRule.primary_model}
+          {activeModelDisplay}
         </span>
       {/if}
     </button>
@@ -175,7 +184,7 @@
           <span class="text-xs font-bold text-neutral-900 dark:text-white">Hana AI Assistant</span>
           {#if activeRule}
             <span class="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-600 dark:text-sky-400 font-mono">
-              {activeRule.primary_model}
+              {activeModelDisplay}
             </span>
           {/if}
         </div>
