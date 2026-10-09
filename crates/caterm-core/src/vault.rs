@@ -290,6 +290,9 @@ pub fn unlock_vault(master_password: &str) -> Result<(), CatermError> {
 
     let _ = crate::audit::log_event("VAULT_UNLOCK", None, "Vault unlocked");
 
+    // Commit any pending Pro session and restore Pro state from database
+    let _ = crate::pro::commit_pending();
+
     Ok(())
 }
 
