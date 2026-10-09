@@ -7,6 +7,7 @@
     placeholder?: string;
     disabled?: boolean;
     readonly?: boolean;
+    required?: boolean;
     id?: string;
     class?: string;
     leadingIcon?: Snippet;
@@ -21,6 +22,7 @@
     placeholder = '',
     disabled = false,
     readonly = false,
+    required = false,
     id,
     class: customClass = '',
     leadingIcon,
@@ -43,6 +45,7 @@
     {placeholder}
     {disabled}
     {readonly}
+    {required}
     bind:value
     {oninput}
     {onkeydown}
@@ -50,7 +53,7 @@
   />
 
   {#if trailingAction}
-    <div class="absolute right-2.5 flex items-center">
+    <div class="absolute right-2 flex items-center">
       {@render trailingAction()}
     </div>
   {/if}

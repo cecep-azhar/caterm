@@ -8,7 +8,7 @@
 - **Secondary Categories:** Productivity, Open Source, Cloud Management
 - **Platforms:** Linux (AppImage / Standalone), Windows (.exe / installer), macOS (Apple Silicon & Intel)
 - **Website URL:** [https://caterm.fathforce.com](https://caterm.fathforce.com) (or GCC CATerm App)
-- **Repository:** [https://github.com/cecep-azhar/caterm](https://github.com/cecep-azhar/caterm)
+- **Repository:** [https://github.com/cecepazhar/caterm](https://github.com/cecepazhar/caterm)
 - **Pricing:** Free forever (Local-first Community) / $6/month Pro / $29-$99 Founder Lifetime Deal
 
 ---

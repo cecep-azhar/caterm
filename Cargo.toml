@@ -13,7 +13,7 @@ edition = "2024"
 rust-version = "1.98"
 authors = ["Cecep Saeful Azhar Hidayat <cecep.azhtech@gmail.com>"]
 license = "MIT"
-repository = "https://github.com/cecep-azhar/caterm"
+repository = "https://github.com/cecepazhar/caterm"
 
 [workspace.dependencies]
 thiserror = "2"

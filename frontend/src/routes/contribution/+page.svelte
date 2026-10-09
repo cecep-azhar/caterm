@@ -77,7 +77,7 @@
     <h3 class="text-base font-semibold text-neutral-900 dark:text-white">{t('contribution.otherWays')}</h3>
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <a
-        href="https://github.com/cecep-azhar/caterm"
+        href="https://github.com/cecepazhar/caterm"
         target="_blank"
         rel="noreferrer"
         class="p-5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2 hover:border-amber-500/50 hover:bg-neutral-50 dark:hover:bg-neutral-850 transition-all block group"
@@ -91,7 +91,7 @@
       </a>
 
       <a
-        href="https://github.com/cecep-azhar/caterm/issues"
+        href="https://github.com/cecepazhar/caterm/issues"
         target="_blank"
         rel="noreferrer"
         class="p-5 rounded-xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2 hover:border-sky-500/50 hover:bg-neutral-50 dark:hover:bg-neutral-850 transition-all block group"

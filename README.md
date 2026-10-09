@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android-brightgreen.svg)](#supported-platforms)
 [![Rust](https://img.shields.io/badge/Core-Rust%202024-orange.svg)](https://www.rust-lang.org/)
-[![GitHub Issues](https://img.shields.io/badge/Issues-GitHub-blue)](https://github.com/cecep-azhar/caterm/issues)
+[![GitHub Issues](https://img.shields.io/badge/Issues-GitHub-blue)](https://github.com/cecepazhar/caterm/issues)
 [![Support on Ko-fi](https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white)](https://ko-fi.com/cecepazhar)
 
 ---

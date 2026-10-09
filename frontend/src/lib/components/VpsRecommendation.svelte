@@ -1,7 +1,7 @@
 <script lang="ts">
   import { t } from '$lib/i18n/index.svelte';
 
-  // Referral link for cecep-azhar's Hostinger affiliate program.
+  // Referral link for cecepazhar's Hostinger affiliate program.
   const AFFILIATE_URL =
     'https://www.hostinger.com/id/cart?product=vps%3Avps_kvm_2&period=12&referral_type=cart_link&REFERRALCODE=LRBCECEPA9SV&referral_id=01a0d7e4-490f-70ec-a28f-0d0344e575de';
   const BRAND = '#673de6';

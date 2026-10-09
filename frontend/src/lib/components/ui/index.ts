@@ -2,3 +2,11 @@ export { default as Button, type ButtonVariant, type ButtonSize } from './Button
 export { default as Badge, type BadgeVariant, type BadgeSize } from './Badge.svelte';
 export { default as Input } from './Input.svelte';
 export { default as Card } from './Card.svelte';
+export { default as Table, type Column } from './Table.svelte';
+export { default as Modal } from './Modal.svelte';
+export { default as Alert, type AlertVariant } from './Alert.svelte';
+export { default as Sidebar } from './Sidebar.svelte';
+export { default as SidebarItem } from './SidebarItem.svelte';
+export { default as Icon, type IconName } from './Icon.svelte';
+export { default as LanguageSwitcher } from './LanguageSwitcher.svelte';
+export { default as ThemeSwitcher, type BrandAccent } from './ThemeSwitcher.svelte';
