@@ -1,8 +1,5 @@
 <script lang="ts">
-  import Button from '$lib/components/ui/Button.svelte';
-  import Input from '$lib/components/ui/Input.svelte';
-  import Alert from '$lib/components/ui/Alert.svelte';
-  import Icon from '$lib/components/ui/Icon.svelte';
+  import { Button, Input, Alert, Icon } from '@cecepazhar/caui';
 
   interface Props {
     title?: string;

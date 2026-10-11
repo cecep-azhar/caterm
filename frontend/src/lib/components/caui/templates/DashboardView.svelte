@@ -1,9 +1,6 @@
 <script lang="ts">
-  import Card from '$lib/components/ui/Card.svelte';
-  import Button from '$lib/components/ui/Button.svelte';
-  import Badge from '$lib/components/ui/Badge.svelte';
-  import Table, { type Column } from '$lib/components/ui/Table.svelte';
-  import Icon from '$lib/components/ui/Icon.svelte';
+  import { Card, Button, Badge, Table, Icon } from '@cecepazhar/caui';
+  import type { Column } from '$lib/components/ui/Table.svelte';
 
   interface Metric {
     label: string;
@@ -101,9 +98,9 @@
         data={serverData}
         striped
         pageSize={5}
-        onRowClick={(row) => (selectedServer = row)}
+        onRowClick={(row: unknown) => (selectedServer = row as ServerRow)}
       >
-        {#snippet cell({ column, value })}
+        {#snippet cell({ column, value }: { column: Column<unknown>; value: unknown })}
           {#if column.key === 'name'}
             <span class="font-semibold text-white font-mono text-xs">{value}</span>
           {:else if column.key === 'ip'}
@@ -120,11 +117,11 @@
           {/if}
         {/snippet}
 
-        {#snippet actions({ item })}
+        {#snippet actions({ item }: { item: unknown })}
           <div class="flex items-center justify-end gap-1">
             <button
               type="button"
-              onclick={() => (selectedServer = item)}
+              onclick={() => (selectedServer = item as ServerRow)}
               class="p-1 rounded text-neutral-400 hover:text-white hover:bg-neutral-800 transition cursor-pointer"
               title="Inspect"
             >

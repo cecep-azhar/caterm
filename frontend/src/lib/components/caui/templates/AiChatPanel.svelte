@@ -1,7 +1,5 @@
 <script lang="ts">
-  import Button from '$lib/components/ui/Button.svelte';
-  import Badge from '$lib/components/ui/Badge.svelte';
-  import Icon from '$lib/components/ui/Icon.svelte';
+  import { Button, Badge, Icon } from '@cecepazhar/caui';
 
   export interface ChatMessage {
     id: string;

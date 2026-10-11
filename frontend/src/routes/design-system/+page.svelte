@@ -19,7 +19,7 @@
     LoginScreen, 
     DashboardView, 
     AiChatPanel 
-  } from '$lib/components/cads/templates';
+  } from '$lib/components/caui/templates';
   import PageHeader from '$lib/components/PageHeader.svelte';
 
   // Navigation Tabs for Showcase
@@ -75,7 +75,7 @@
   <!-- Top Navigation Header -->
   <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#272732] pb-5">
     <PageHeader
-      title="CADS v1.0 — CAFramework Design System"
+      title="CAUI v1.1 — CAFramework Design System"
       description="Design tokens, primitives, overlays, and full-screen templates for all 17 CA applications."
     />
     

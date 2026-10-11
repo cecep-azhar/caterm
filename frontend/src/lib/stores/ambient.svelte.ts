@@ -1,4 +1,4 @@
-// PRO Ambient Underglow & RGB Chroma Store (CADS Standard)
+// PRO Ambient Underglow & RGB Chroma Store (CAUI Standard)
 // Persisted in localStorage for instant Zero-Latency hydration.
 
 export type AmbientMode = 'app-accent' | 'solid' | 'rgb-cycle' | 'aurora';

@@ -72,7 +72,7 @@
     for (const page of [...navItems(), settingsNavItem()]) {
       result.push({ id: `page:${page.href}`, group: 'pages', label: page.label, run: () => void goto(page.href) });
     }
-    result.push({ id: 'page:/design-system', group: 'pages', label: 'Design System Lab (CADS v1.0)', run: () => void goto('/design-system') });
+    result.push({ id: 'page:/design-system', group: 'pages', label: 'Design System Lab (CAUI v1.1)', run: () => void goto('/design-system') });
     result.push(
       { id: 'action:theme', group: 'actions', label: t('palette.toggleTheme'), run: toggleTheme },
       {
